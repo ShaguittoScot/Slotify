@@ -1,0 +1,39 @@
+# Slotify Root .gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+*.swp
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+backend/**/*.user
+
+# Node
+node_modules/
+.expo/
+dist/
+
+# Environment
+.env
+.env.local
+*.env.local
+
+# Build
+*.apk
+*.ipa
+*.aab
+
+# Logs
+*.log
+npm-debug.log*
+
+# dotnet install script
+dotnet-install.ps1
