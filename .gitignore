@@ -1,39 +1,43 @@
-# Slotify Root .gitignore
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vs/
-.vscode/
-*.suo
-*.user
-*.swp
-
-# .NET
-backend/**/bin/
-backend/**/obj/
-backend/**/*.user
-
-# Node
+# dependencies
 node_modules/
+
+# Expo
 .expo/
 dist/
+web-build/
+expo-env.d.ts
 
-# Environment
-.env
-.env.local
-*.env.local
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
 
-# Build
-*.apk
-*.ipa
-*.aab
+# Metro
+.metro-health-check*
 
-# Logs
-*.log
-npm-debug.log*
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-# dotnet install script
-dotnet-install.ps1
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+/ios
+/android
