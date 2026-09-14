@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { AntDesign } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 import { colors } from '@/shared/theme/colors';
 
@@ -21,6 +22,7 @@ export const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const login = useAuthStore(state => state.login);
+  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
   const isLoading = useAuthStore(state => state.isLoading);
   const error = useAuthStore(state => state.error);
   const clearError = useAuthStore(state => state.clearError);
@@ -107,6 +109,21 @@ export const LoginScreen = () => {
               ) : (
                 <Text style={styles.buttonText}>Iniciar Sesión</Text>
               )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>o</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.googleButton}
+              onPress={loginWithGoogle}
+              disabled={isLoading}
+            >
+              <AntDesign name="google" size={20} color="#1A202C" />
+              <Text style={styles.googleButtonText}>Continuar con Google</Text>
             </TouchableOpacity>
 
             <View style={styles.footer}>
@@ -210,19 +227,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   button: {
-    backgroundColor: '#4299E1',
-    borderRadius: 10,
+    backgroundColor: '#1A202C',
+    borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#90CDF4',
+    backgroundColor: '#A0AEC0',
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#A0AEC0',
+    fontSize: 14,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 100,
+    paddingVertical: 14,
+  },
+  googleButtonText: {
+    color: '#1A202C',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
   },
   footer: {
     flexDirection: 'row',
@@ -234,7 +282,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   footerLink: {
-    color: '#4299E1',
+    color: '#1A202C',
     fontSize: 14,
     fontWeight: 'bold',
   }

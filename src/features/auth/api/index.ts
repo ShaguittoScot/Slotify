@@ -18,6 +18,17 @@ export const authApi = {
   },
 
   /**
+   * Sign in with Google using Supabase OAuth.
+   */
+  loginWithGoogle: async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  /**
    * Register with Supabase Auth, then sync the profile
    * with the .NET backend to create the Business + User row.
    */

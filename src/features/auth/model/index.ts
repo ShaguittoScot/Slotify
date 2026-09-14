@@ -12,6 +12,7 @@ interface AuthState {
 
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
@@ -23,6 +24,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
   error: null,
+
+  loginWithGoogle: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await authApi.loginWithGoogle();
+      // The redirect will handle hydration when it comes back
+    } catch (error: any) {
+      set({ error: error.message || 'Error al iniciar con Google', isLoading: false });
+    }
+  },
 
   login: async (credentials) => {
     set({ isLoading: true, error: null });
