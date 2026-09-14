@@ -14,6 +14,9 @@ export const fontFamilies = {
   headingMedium: 'Poppins_500Medium',
 
   // Inter — Body & UI
+ */
+
+export const fontFamilies = {
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semiBold: 'Inter_600SemiBold',
@@ -49,21 +52,25 @@ export const textStyles = {
     fontSize: fontSizes['4xl'],
     lineHeight: lineHeights['4xl'],
     fontFamily: fontFamilies.heading,
+    fontFamily: fontFamilies.bold,
   },
   h2: {
     fontSize: fontSizes['3xl'],
     lineHeight: lineHeights['3xl'],
     fontFamily: fontFamilies.heading,
+    fontFamily: fontFamilies.bold,
   },
   h3: {
     fontSize: fontSizes['2xl'],
     lineHeight: lineHeights['2xl'],
     fontFamily: fontFamilies.headingSemiBold,
+    fontFamily: fontFamilies.semiBold,
   },
   h4: {
     fontSize: fontSizes.xl,
     lineHeight: lineHeights.xl,
     fontFamily: fontFamilies.headingSemiBold,
+    fontFamily: fontFamilies.semiBold,
   },
   body: {
     fontSize: fontSizes.md,

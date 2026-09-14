@@ -31,4 +31,12 @@ export interface SyncProfileResponse {
   success: boolean;
   data?: AuthUser;
   message?: string;
+  sectorTemplateId: number;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  user: AuthUser;
 }

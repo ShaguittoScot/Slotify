@@ -22,6 +22,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoading: true, // true by default until hydrate completes
   error: null,
 
   login: async (credentials) => {
@@ -41,6 +47,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al iniciar sesión', isLoading: false });
+      
+      await storage.secureSet('accessToken', data.accessToken);
+      await storage.secureSet('refreshToken', data.refreshToken);
+      await storage.set('user', data.user);
+
+      set({ user: data.user, isAuthenticated: true, isLoading: false });
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Error al iniciar sesión';
+      set({ error: message, isLoading: false });
       throw error;
     }
   },
@@ -62,6 +77,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
+      
+      await storage.secureSet('accessToken', res.accessToken);
+      await storage.secureSet('refreshToken', res.refreshToken);
+      await storage.set('user', res.user);
+
+      set({ user: res.user, isAuthenticated: true, isLoading: false });
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Error al registrar el negocio';
+      set({ error: message, isLoading: false });
       throw error;
     }
   },
@@ -74,6 +98,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error('Error during logout:', error);
     }
     set({ user: null, isAuthenticated: false, isLoading: false, error: null });
+    await storage.secureRemove('accessToken');
+    await storage.secureRemove('refreshToken');
+    await storage.remove('user');
+    set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
   hydrate: async () => {
@@ -89,6 +117,11 @@ export const useAuthStore = create<AuthState>((set) => ({
           businessId: session.user.user_metadata?.business_id || '',
         };
         set({ user: authUser, isAuthenticated: true, isLoading: false });
+      const token = await storage.secureGet('accessToken');
+      const user = await storage.get<AuthUser>('user');
+
+      if (token && user) {
+        set({ user, isAuthenticated: true, isLoading: false });
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
@@ -115,3 +148,5 @@ supabase.auth.onAuthStateChange((event, session) => {
     useAuthStore.setState({ user: authUser, isAuthenticated: true });
   }
 });
+  }
+}));
