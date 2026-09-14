@@ -12,34 +12,33 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { AntDesign } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 
 export const RegisterScreen = () => {
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [businessPhone, setBusinessPhone] = useState('');
   
   const register = useAuthStore(state => state.register);
+  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
   const isLoading = useAuthStore(state => state.isLoading);
   const error = useAuthStore(state => state.error);
   const clearError = useAuthStore(state => state.clearError);
   const router = useRouter();
 
-  const isFormValid = fullName && email && password && businessName && businessPhone;
+  const isFormValid = email.length > 0 && password.length > 0;
 
   const handleRegister = async () => {
     if (!isFormValid) return;
     try {
       clearError();
       await register({
-        fullName,
+        fullName: 'Pendiente', // Will be filled in next screen
         email,
         password,
-        businessName,
-        businessPhone,
-        sectorTemplateId: 1 // TODO: Selector visual en US-006
+        businessName: 'Pendiente', // Will be filled in next screen
+        businessPhone: '0000000000', // Will be filled in next screen
+        sectorTemplateId: 1
       });
     } catch {
       // Error is handled in store
@@ -69,20 +68,6 @@ export const RegisterScreen = () => {
               </View>
             ) : null}
 
-            <Text style={styles.sectionTitle}>Tus Datos</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nombre completo</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Juan Pérez"
-                placeholderTextColor="#A0AEC0"
-                value={fullName}
-                onChangeText={setFullName}
-                editable={!isLoading}
-              />
-            </View>
-
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Correo electrónico</Text>
               <TextInput
@@ -111,33 +96,6 @@ export const RegisterScreen = () => {
               />
             </View>
 
-            <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Datos del Negocio</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nombre de tu negocio</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej. Barbería Central"
-                placeholderTextColor="#A0AEC0"
-                value={businessName}
-                onChangeText={setBusinessName}
-                editable={!isLoading}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Teléfono del negocio</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="555-123-4567"
-                placeholderTextColor="#A0AEC0"
-                keyboardType="phone-pad"
-                value={businessPhone}
-                onChangeText={setBusinessPhone}
-                editable={!isLoading}
-              />
-            </View>
-
             <TouchableOpacity
               style={[styles.button, (!isFormValid || isLoading) && styles.buttonDisabled]}
               onPress={handleRegister}
@@ -148,6 +106,21 @@ export const RegisterScreen = () => {
               ) : (
                 <Text style={styles.buttonText}>Registrarse</Text>
               )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>o</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.googleButton}
+              onPress={loginWithGoogle}
+              disabled={isLoading}
+            >
+              <AntDesign name="google" size={20} color="#1A202C" />
+              <Text style={styles.googleButtonText}>Regístrate con Google</Text>
             </TouchableOpacity>
 
             <View style={styles.footer}>
@@ -211,12 +184,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2D3748',
-    marginBottom: 16,
-  },
   inputGroup: {
     marginBottom: 16,
   },
@@ -235,19 +202,50 @@ const styles = StyleSheet.create({
     color: '#2D3748',
   },
   button: {
-    backgroundColor: '#4299E1',
-    borderRadius: 10,
+    backgroundColor: '#1A202C',
+    borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 16,
   },
   buttonDisabled: {
-    backgroundColor: '#90CDF4',
+    backgroundColor: '#A0AEC0',
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#A0AEC0',
+    fontSize: 14,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 100,
+    paddingVertical: 14,
+  },
+  googleButtonText: {
+    color: '#1A202C',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
   },
   footer: {
     flexDirection: 'row',
@@ -259,7 +257,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   footerLink: {
-    color: '#4299E1',
+    color: '#1A202C',
     fontSize: 14,
     fontWeight: 'bold',
   }
