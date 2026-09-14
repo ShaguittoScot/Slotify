@@ -11,6 +11,7 @@ import {
   ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../model';
 
@@ -33,6 +34,8 @@ export const RegisterScreen = () => {
     if (!isFormValid) return;
     try {
       clearError();
+    
+    try {
       await register({
         fullName,
         email,
@@ -43,6 +46,10 @@ export const RegisterScreen = () => {
       });
     } catch {
       // Error is handled in store
+        sectorTemplateId: 1 // TODO: Add sector template selector later (US-006)
+      });
+    } catch (err) {
+      // Error handled in store
     }
   };
 
@@ -160,6 +167,78 @@ export const RegisterScreen = () => {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <View style={styles.header}>
+        <Text style={styles.title}>Crea tu Negocio</Text>
+        <Text style={styles.subtitle}>Empieza a gestionar tus citas hoy mismo</Text>
+      </View>
+
+      <View style={styles.form}>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <Text style={styles.sectionTitle}>Datos Personales</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nombre completo"
+          placeholderTextColor="#999"
+          value={fullName}
+          onChangeText={setFullName}
+        />
+        
+        <TextInput
+          style={styles.input}
+          placeholder="Correo electrónico"
+          placeholderTextColor="#999"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+        />
+        
+        <TextInput
+          style={styles.input}
+          placeholder="Contraseña"
+          placeholderTextColor="#999"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Datos del Negocio</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nombre de tu negocio"
+          placeholderTextColor="#999"
+          value={businessName}
+          onChangeText={setBusinessName}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Teléfono del negocio"
+          placeholderTextColor="#999"
+          keyboardType="phone-pad"
+          value={businessPhone}
+          onChangeText={setBusinessPhone}
+        />
+
+        <TouchableOpacity 
+          style={[styles.button, (!isFormValid || isLoading) && styles.buttonDisabled]} 
+          onPress={handleRegister}
+          disabled={!isFormValid || isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.buttonText}>Registrarse</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={styles.footer} onPress={() => router.back()}>
+        <Text style={styles.footerText}>¿Ya tienes cuenta? <Text style={styles.footerLink}>Inicia Sesión</Text></Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 };
 
@@ -183,6 +262,21 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: '#2D3748',
+  container: {
+    flexGrow: 1,
+    backgroundColor: '#FAFAFA',
+    padding: 24,
+    paddingTop: 60,
+    paddingBottom: 40,
+  },
+  header: {
+    marginBottom: 32,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A1A1A',
     marginBottom: 8,
   },
   subtitle: {
@@ -238,6 +332,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#4299E1',
     borderRadius: 10,
     paddingVertical: 16,
+    color: '#666',
+  },
+  form: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 16,
   },
@@ -263,4 +383,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   }
+    backgroundColor: '#99C7FF',
+  },
+  buttonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  footer: {
+    marginTop: 32,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  footerLink: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
 });
