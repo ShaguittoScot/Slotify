@@ -16,12 +16,9 @@ import { AntDesign } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 
 export const RegisterScreen = () => {
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [businessPhone, setBusinessPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
@@ -32,19 +29,19 @@ export const RegisterScreen = () => {
   const router = useRouter();
 
   const passwordsMatch = password === confirmPassword;
-  const isFormValid = email.length > 0 && password.length >= 6 && passwordsMatch && fullName.length > 0 && businessName.length > 0 && businessPhone.length > 0;
+  const isFormValid = email.length > 0 && password.length >= 6 && passwordsMatch;
 
   const handleRegister = async () => {
     if (!isFormValid) return;
     try {
       clearError();
       await register({
-        fullName,
+        fullName: 'Pendiente', // Valores temporales hasta habilitar US-006
         email,
         password,
-        businessName, 
-        businessPhone, 
-        sectorTemplateId: 1 // TODO: Add sector template selector later (US-006)
+        businessName: 'Pendiente', 
+        businessPhone: '0000000000', 
+        sectorTemplateId: 1
       });
       // Routing is handled automatically by _layout.tsx thanks to isJustRegistered
     } catch {
@@ -76,18 +73,6 @@ export const RegisterScreen = () => {
             ) : null}
 
             <Text style={styles.sectionTitle}>Tus Datos</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nombre completo</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Juan Pérez"
-                placeholderTextColor="#A0AEC0"
-                value={fullName}
-                onChangeText={setFullName}
-                editable={!isLoading}
-              />
-            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Correo electrónico</Text>
@@ -147,33 +132,6 @@ export const RegisterScreen = () => {
               {confirmPassword.length > 0 && !passwordsMatch && (
                 <Text style={styles.warningText}>Las contraseñas no coinciden</Text>
               )}
-            </View>
-
-            <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Datos del Negocio</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nombre de tu negocio</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej. Barbería Central"
-                placeholderTextColor="#A0AEC0"
-                value={businessName}
-                onChangeText={setBusinessName}
-                editable={!isLoading}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Teléfono del negocio</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="555-123-4567"
-                placeholderTextColor="#A0AEC0"
-                keyboardType="phone-pad"
-                value={businessPhone}
-                onChangeText={setBusinessPhone}
-                editable={!isLoading}
-              />
             </View>
 
             <TouchableOpacity

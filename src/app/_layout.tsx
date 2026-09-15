@@ -57,9 +57,11 @@ export default function RootLayout() {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      const isJustRegistered = useAuthStore.getState().isJustRegistered;
-      if (isJustRegistered) {
+      const state = useAuthStore.getState();
+      if (state.isJustRegistered) {
         router.replace('/(auth)/register-success');
+      } else if (!state.user?.businessId) {
+        router.replace('/(auth)/onboarding');
       } else {
         router.replace('/(main)');
       }

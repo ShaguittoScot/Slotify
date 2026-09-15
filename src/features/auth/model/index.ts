@@ -15,6 +15,7 @@ interface AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
+  completeOnboarding: (data: Omit<SyncProfileRequest, 'id' | 'email'>) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
@@ -72,12 +73,38 @@ export const useAuthStore = create<AuthState>((set) => ({
           fullName: res.user.user_metadata?.full_name || data.fullName,
           email: res.user.email || data.email,
           role: 'DUENO',
-          businessId: '',
+          businessId: '', // Empty until they finish onboarding
         };
         set({ user: authUser, isAuthenticated: true, isLoading: false, isJustRegistered: true });
       }
     } catch (error: any) {
-      set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
+      set({ error: error.message || 'Error al registrar el usuario', isLoading: false });
+      throw error;
+    }
+  },
+
+  completeOnboarding: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { user } = get();
+      if (!user) throw new Error('No hay usuario autenticado');
+
+      const payload = {
+        id: user.id,
+        email: user.email,
+        ...data
+      };
+      
+      await authApi.syncProfile(payload);
+      
+      // Update business state so it marks them as complete
+      set({ 
+        user: { ...user, businessId: 'synced-backend' }, 
+        isJustRegistered: false,
+        isLoading: false 
+      });
+    } catch (error: any) {
+      set({ error: error.message || 'Error al guardar la configuración', isLoading: false });
       throw error;
     }
   },
