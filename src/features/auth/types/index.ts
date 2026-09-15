@@ -34,9 +34,21 @@ export interface SyncProfileResponse {
   sectorTemplateId: number;
 }
 
-export interface AuthResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: string;
-  user: AuthUser;
+/**
+ * Payload sent to the .NET backend after Supabase signup
+ * to sync the user profile and create a business.
+ */
+export interface SyncProfileRequest {
+  id: string;
+  fullName: string;
+  email: string;
+  businessName: string;
+  businessPhone?: string;
+  sectorTemplateId?: number;
+}
+
+export interface SyncProfileResponse {
+  success: boolean;
+  data?: AuthUser;
+  message?: string;
 }

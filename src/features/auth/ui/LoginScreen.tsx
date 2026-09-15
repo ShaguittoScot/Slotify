@@ -16,7 +16,9 @@ import { useAuthStore } from '../model';
 import { colors } from '@/shared/theme/colors';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { AntDesign } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
+import { colors } from '@/shared/theme/colors';
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -29,8 +31,10 @@ export const LoginScreen = () => {
   const clearError = useAuthStore(state => state.clearError);
   
   const login = useAuthStore(state => state.login);
+  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
   const isLoading = useAuthStore(state => state.isLoading);
   const error = useAuthStore(state => state.error);
+  const clearError = useAuthStore(state => state.clearError);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -128,59 +132,111 @@ export const LoginScreen = () => {
     </SafeAreaView>
     
     try {
+      clearError();
       await login({ email, password });
-      // The _layout.tsx effect will handle navigation once authenticated
-    } catch (err) {
-      // Error is handled in the store
+    } catch {
+      // Error is handled in the Zustand store
     }
   };
 
+  const isFormValid = email.length > 0 && password.length > 0;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Bienvenido a Slotify</Text>
-        <Text style={styles.subtitle}>Inicia sesión para gestionar tu negocio</Text>
-      </View>
-
-      <View style={styles.form}>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-        <TextInput
-          style={styles.input}
-          placeholder="Correo electrónico"
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#999"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity 
-          style={[styles.button, (!email || !password || isLoading) && styles.buttonDisabled]} 
-          onPress={handleLogin}
-          disabled={!email || !password || isLoading}
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {isLoading ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.buttonText}>Iniciar Sesión</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <View style={styles.header}>
+            <Text style={styles.title}>Slotify</Text>
+            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+          </View>
 
-      <TouchableOpacity style={styles.footer} onPress={() => router.push('/register')}>
-        <Text style={styles.footerText}>¿No tienes cuenta? <Text style={styles.footerLink}>Regístrate</Text></Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.formContainer}>
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Correo electrónico</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="tu@correo.com"
+                placeholderTextColor="#A0AEC0"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
+                editable={!isLoading}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Contraseña</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="••••••••"
+                  placeholderTextColor="#A0AEC0"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity 
+                  style={styles.eyeButton} 
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Text style={styles.eyeIcon}>{showPassword ? 'Ocultar' : 'Ver'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, (!isFormValid || isLoading) && styles.buttonDisabled]}
+              onPress={handleLogin}
+              disabled={!isFormValid || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.buttonText}>Iniciar Sesión</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>o</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.googleButton}
+              onPress={loginWithGoogle}
+              disabled={isLoading}
+            >
+              <AntDesign name="google" size={20} color="#1A202C" />
+              <Text style={styles.googleButtonText}>Continuar con Google</Text>
+            </TouchableOpacity>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>¿No tienes cuenta? </Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+                <Text style={styles.footerLink}>Regístrate aquí</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -196,7 +252,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
   },
@@ -210,11 +268,12 @@ const styles = StyleSheet.create({
     color: '#2D3748',
     marginBottom: 40,
     alignItems: 'center',
+    marginBottom: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#2D3748',
     marginBottom: 8,
   },
   subtitle: {
@@ -287,22 +346,60 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     color: '#666',
   },
-  form: {
-    gap: 16,
+  errorBox: {
+    backgroundColor: '#FED7D7',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#C53030',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A5568',
+    marginBottom: 8,
   },
   input: {
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#EDF2F7',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#1A1A1A',
+    color: '#2D3748',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#EDF2F7',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#2D3748',
+  },
+  eyeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  eyeIcon: {
+    color: '#4299E1',
+    fontWeight: '600',
+    fontSize: 14,
   },
   button: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#1A202C',
+    borderRadius: 100,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -331,25 +428,53 @@ const styles = StyleSheet.create({
     backgroundColor: '#99C7FF',
   },
   buttonText: {
-    color: '#FFF',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#A0AEC0',
+    fontSize: 14,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 100,
+    paddingVertical: 14,
+  },
+  googleButtonText: {
+    color: '#1A202C',
     fontSize: 16,
     fontWeight: '600',
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 14,
-    textAlign: 'center',
+    marginLeft: 12,
   },
   footer: {
-    marginTop: 32,
-    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 24,
   },
   footerText: {
-    color: '#666',
+    color: '#718096',
     fontSize: 14,
   },
   footerLink: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
+    color: '#1A202C',
+    fontSize: 14,
+    fontWeight: 'bold',
+  }
 });

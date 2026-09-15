@@ -67,27 +67,26 @@ export default function RootLayout() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inMainGroup = segments[0] === '(main)';
 
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login if not authenticated
-      router.replace('/(auth)/login');
+    if (!isAuthenticated && inMainGroup) {
+      // @ts-ignore
+      router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      // Redirect away from login if already authenticated
       router.replace('/(main)');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, fontsLoaded]);
 
-  if (isLoading) {
+  if (isLoading || !fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F' }}>
+        <ActivityIndicator size="large" color="#6366F1" />
       </View>
     );
   }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
       <Slot />
     </ThemeProvider>
   );
