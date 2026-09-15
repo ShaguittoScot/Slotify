@@ -18,6 +18,9 @@ import { useAuthStore } from '../model';
 export const RegisterScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const register = useAuthStore(state => state.register);
   const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
@@ -26,20 +29,24 @@ export const RegisterScreen = () => {
   const clearError = useAuthStore(state => state.clearError);
   const router = useRouter();
 
-  const isFormValid = email.length > 0 && password.length > 0;
+  const isFormValid = 
+    email.length > 0 && 
+    password.length >= 6 && 
+    password === confirmPassword;
 
   const handleRegister = async () => {
     if (!isFormValid) return;
     try {
       clearError();
       await register({
-        fullName: 'Pendiente', // Will be filled in next screen
+        fullName: 'Pendiente', // Valores temporales hasta habilitar US-006
         email,
         password,
-        businessName: 'Pendiente', // Will be filled in next screen
-        businessPhone: '0000000000', // Will be filled in next screen
+        businessName: 'Pendiente', 
+        businessPhone: '0000000000', 
         sectorTemplateId: 1
       });
+      // Routing is handled automatically by _layout.tsx thanks to isJustRegistered
     } catch {
       // Error is handled in store
     }
@@ -85,15 +92,47 @@ export const RegisterScreen = () => {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Contraseña</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#A0AEC0"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                editable={!isLoading}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Mínimo 6 caracteres"
+                  placeholderTextColor="#A0AEC0"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity 
+                  style={styles.eyeButton} 
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Text style={styles.eyeIcon}>{showPassword ? 'Ocultar' : 'Ver'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirmar Contraseña</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Repite tu contraseña"
+                  placeholderTextColor="#A0AEC0"
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity 
+                  style={styles.eyeButton} 
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Text style={styles.eyeIcon}>{showConfirmPassword ? 'Ocultar' : 'Ver'}</Text>
+                </TouchableOpacity>
+              </View>
+              {password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword && (
+                <Text style={styles.warningText}>Las contraseñas no coinciden</Text>
+              )}
             </View>
 
             <TouchableOpacity
@@ -200,6 +239,33 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#2D3748',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#EDF2F7',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#2D3748',
+  },
+  eyeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  eyeIcon: {
+    color: '#4299E1',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  warningText: {
+    color: '#DD6B20',
+    fontSize: 12,
+    marginTop: 4,
   },
   button: {
     backgroundColor: '#1A202C',

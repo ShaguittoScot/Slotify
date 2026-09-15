@@ -14,9 +14,6 @@ export const fontFamilies = {
   headingMedium: 'Poppins_500Medium',
 
   // Inter — Body & UI
- */
-
-export const fontFamilies = {
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semiBold: 'Inter_600SemiBold',

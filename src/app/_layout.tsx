@@ -16,6 +16,7 @@ import {
 } from '@expo-google-fonts/inter';
 
 import { useAuthStore } from '@/features/auth/model';
+import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,7 +57,12 @@ export default function RootLayout() {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(main)');
+      const isJustRegistered = useAuthStore.getState().isJustRegistered;
+      if (isJustRegistered) {
+        router.replace('/(auth)/register-success');
+      } else {
+        router.replace('/(main)');
+      }
     }
   }, [isAuthenticated, isLoading, segments, fontsLoaded]);
 
@@ -64,23 +70,6 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F' }}>
         <ActivityIndicator size="large" color="#6366F1" />
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login if not authenticated
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect away from login if already authenticated
-      router.replace('/(main)');
-    }
-  }, [isAuthenticated, isLoading, segments]);
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
       </View>
     );
   }

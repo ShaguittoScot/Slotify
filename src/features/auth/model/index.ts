@@ -9,6 +9,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isJustRegistered: boolean;
 
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -17,6 +18,7 @@ interface AuthState {
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
+  setJustRegistered: (val: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -24,6 +26,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
   error: null,
+  isJustRegistered: false,
+
+  setJustRegistered: (val) => set({ isJustRegistered: val }),
 
   loginWithGoogle: async () => {
     set({ isLoading: true, error: null });
@@ -69,7 +74,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           role: 'DUENO',
           businessId: '',
         };
-        set({ user: authUser, isAuthenticated: true, isLoading: false });
+        set({ user: authUser, isAuthenticated: true, isLoading: false, isJustRegistered: true });
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
