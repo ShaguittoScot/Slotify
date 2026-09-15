@@ -57,7 +57,7 @@ export default function RegisterSuccessScreen() {
 
       <Animated.View entering={FadeInDown.duration(800).delay(600)} style={styles.footer}>
         <TouchableOpacity style={styles.button} onPress={handleContinue}>
-          <Text style={styles.buttonText}>Continuar a mi Dashboard</Text>
+          <Text style={styles.buttonText}>Configurar mi Negocio</Text>
           <AntDesign name="right" size={20} color="#FFFFFF" style={styles.buttonIcon} />
         </TouchableOpacity>
       </Animated.View>
