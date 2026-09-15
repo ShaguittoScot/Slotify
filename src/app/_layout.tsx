@@ -64,6 +64,23 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F' }}>
         <ActivityIndicator size="large" color="#6366F1" />
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inMainGroup = segments[0] === '(main)';
+
+    if (!isAuthenticated && inMainGroup) {
+      // @ts-ignore
+      router.replace('/(auth)');
+    } else if (isAuthenticated && inAuthGroup) {
+      router.replace('/(main)');
+    }
+  }, [isAuthenticated, isLoading, segments, fontsLoaded]);
+
+  if (isLoading || !fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F' }}>
+        <ActivityIndicator size="large" color="#6366F1" />
       </View>
     );
   }
