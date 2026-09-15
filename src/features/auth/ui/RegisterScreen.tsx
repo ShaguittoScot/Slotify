@@ -16,35 +16,35 @@ import { AntDesign } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 
 export const RegisterScreen = () => {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [businessPhone, setBusinessPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const register = useAuthStore(state => state.register);
-  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
   const isLoading = useAuthStore(state => state.isLoading);
   const error = useAuthStore(state => state.error);
   const clearError = useAuthStore(state => state.clearError);
   const router = useRouter();
 
-  const isFormValid = 
-    email.length > 0 && 
-    password.length >= 6 && 
-    password === confirmPassword;
+  const passwordsMatch = password === confirmPassword;
+  const isFormValid = email.length > 0 && password.length >= 6 && passwordsMatch && fullName.length > 0 && businessName.length > 0 && businessPhone.length > 0;
 
   const handleRegister = async () => {
     if (!isFormValid) return;
     try {
       clearError();
       await register({
-        fullName: 'Pendiente', // Valores temporales hasta habilitar US-006
+        fullName,
         email,
         password,
-        businessName: 'Pendiente', 
-        businessPhone: '0000000000', 
-        sectorTemplateId: 1
+        businessName, 
+        businessPhone, 
+        sectorTemplateId: 1 // TODO: Add sector template selector later (US-006)
       });
       // Routing is handled automatically by _layout.tsx thanks to isJustRegistered
     } catch {
@@ -75,6 +75,20 @@ export const RegisterScreen = () => {
               </View>
             ) : null}
 
+            <Text style={styles.sectionTitle}>Tus Datos</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nombre completo</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Juan Pérez"
+                placeholderTextColor="#A0AEC0"
+                value={fullName}
+                onChangeText={setFullName}
+                editable={!isLoading}
+              />
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Correo electrónico</Text>
               <TextInput
@@ -91,11 +105,11 @@ export const RegisterScreen = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Contraseña</Text>
+              <Text style={styles.label}>Contraseña (mínimo 6 caracteres)</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="••••••••"
                   placeholderTextColor="#A0AEC0"
                   secureTextEntry={!showPassword}
                   value={password}
@@ -116,7 +130,7 @@ export const RegisterScreen = () => {
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Repite tu contraseña"
+                  placeholder="••••••••"
                   placeholderTextColor="#A0AEC0"
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
@@ -130,9 +144,36 @@ export const RegisterScreen = () => {
                   <Text style={styles.eyeIcon}>{showConfirmPassword ? 'Ocultar' : 'Ver'}</Text>
                 </TouchableOpacity>
               </View>
-              {password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword && (
+              {confirmPassword.length > 0 && !passwordsMatch && (
                 <Text style={styles.warningText}>Las contraseñas no coinciden</Text>
               )}
+            </View>
+
+            <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Datos del Negocio</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nombre de tu negocio</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej. Barbería Central"
+                placeholderTextColor="#A0AEC0"
+                value={businessName}
+                onChangeText={setBusinessName}
+                editable={!isLoading}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Teléfono del negocio</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="555-123-4567"
+                placeholderTextColor="#A0AEC0"
+                keyboardType="phone-pad"
+                value={businessPhone}
+                onChangeText={setBusinessPhone}
+                editable={!isLoading}
+              />
             </View>
 
             <TouchableOpacity
@@ -145,21 +186,6 @@ export const RegisterScreen = () => {
               ) : (
                 <Text style={styles.buttonText}>Registrarse</Text>
               )}
-            </TouchableOpacity>
-
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>o</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.googleButton}
-              onPress={loginWithGoogle}
-              disabled={isLoading}
-            >
-              <AntDesign name="google" size={20} color="#1A202C" />
-              <Text style={styles.googleButtonText}>Regístrate con Google</Text>
             </TouchableOpacity>
 
             <View style={styles.footer}>
@@ -211,6 +237,12 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 2,
     marginBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    marginBottom: 16,
   },
   errorBox: {
     backgroundColor: '#FED7D7',
@@ -282,37 +314,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#A0AEC0',
-    fontSize: 14,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 100,
-    paddingVertical: 14,
-  },
-  googleButtonText: {
-    color: '#1A202C',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -323,7 +324,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   footerLink: {
-    color: '#1A202C',
+    color: '#4299E1',
     fontSize: 14,
     fontWeight: 'bold',
   }

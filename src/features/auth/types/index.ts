@@ -2,16 +2,21 @@ import type { AuthUser } from '@/shared/types';
 
 export interface LoginCredentials {
   email: string;
-  password: string;
+  password?: string;
 }
 
 export interface RegisterAdminRequest {
   fullName: string;
   email: string;
-  password: string;
+  password?: string;
   businessName: string;
-  businessPhone: string;
+  businessPhone?: string;
   sectorTemplateId?: number;
+}
+
+export interface AuthResponse {
+  user: any;
+  session: any;
 }
 
 /**
