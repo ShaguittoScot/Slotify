@@ -46,10 +46,9 @@
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "start:back": "cd ../Slotify_back && \"C:\\Users\\evsot\\AppData\\Local\\dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
   "private": true
 }

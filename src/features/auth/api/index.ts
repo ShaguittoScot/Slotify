@@ -47,13 +47,13 @@ export const authApi = {
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error('No se pudo crear el usuario.');
 
-    // 2. Sync with our .NET backend
     const syncPayload: SyncProfileRequest = {
       id: data.user.id,
       fullName: request.fullName,
       email: request.email,
       businessName: request.businessName,
       businessPhone: request.businessPhone,
+      sectorTemplateId: request.sectorTemplateId
     };
 
     try {
@@ -62,10 +62,9 @@ export const authApi = {
         syncPayload
       );
     } catch (syncError) {
-      // If sync fails, we still have the Supabase user
       console.error('Error syncing profile with backend:', syncError);
     }
-
+    
     return data;
   },
 
