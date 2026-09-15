@@ -12,6 +12,7 @@ interface AuthState {
 
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
@@ -24,11 +25,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
-  isLoading: true, // true by default until hydrate completes
+  isLoading: true,
   error: null,
+
+  loginWithGoogle: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await authApi.loginWithGoogle();
+      // The redirect will handle hydration when it comes back
+    } catch (error: any) {
+      set({ error: error.message || 'Error al iniciar con Google', isLoading: false });
+    }
+  },
 
   login: async (credentials) => {
     set({ isLoading: true, error: null });
@@ -52,10 +63,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.secureSet('refreshToken', data.refreshToken);
       await storage.set('user', data.user);
 
-      set({ user: data.user, isAuthenticated: true, isLoading: false });
+      if (data.user) {
+        const authUser: AuthUser = {
+          id: data.user.id,
+          fullName: data.user.user_metadata?.full_name || '',
+          email: data.user.email || '',
+          role: 'DUENO',
+          businessId: data.user.user_metadata?.business_id || '',
+        };
+        set({ user: authUser, isAuthenticated: true, isLoading: false });
+      }
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Error al iniciar sesión';
-      set({ error: message, isLoading: false });
+      set({ error: error.message || 'Error al iniciar sesión', isLoading: false });
       throw error;
     }
   },
@@ -82,10 +101,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.secureSet('refreshToken', res.refreshToken);
       await storage.set('user', res.user);
 
-      set({ user: res.user, isAuthenticated: true, isLoading: false });
+      if (res.user) {
+        const authUser: AuthUser = {
+          id: res.user.id,
+          fullName: res.user.user_metadata?.full_name || data.fullName,
+          email: res.user.email || data.email,
+          role: 'DUENO',
+          businessId: '',
+        };
+        set({ user: authUser, isAuthenticated: true, isLoading: false });
+      }
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Error al registrar el negocio';
-      set({ error: message, isLoading: false });
+      set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
       throw error;
     }
   },
@@ -120,8 +147,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await storage.secureGet('accessToken');
       const user = await storage.get<AuthUser>('user');
 
-      if (token && user) {
-        set({ user, isAuthenticated: true, isLoading: false });
+      if (session?.user) {
+        const authUser: AuthUser = {
+          id: session.user.id,
+          fullName: session.user.user_metadata?.full_name || '',
+          email: session.user.email || '',
+          role: 'DUENO',
+          businessId: session.user.user_metadata?.business_id || '',
+        };
+        set({ user: authUser, isAuthenticated: true, isLoading: false });
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
@@ -150,3 +184,19 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
   }
 }));
+
+// Listen for Supabase auth state changes
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+  } else if (event === 'SIGNED_IN' && session?.user) {
+    const authUser: AuthUser = {
+      id: session.user.id,
+      fullName: session.user.user_metadata?.full_name || '',
+      email: session.user.email || '',
+      role: 'DUENO',
+      businessId: session.user.user_metadata?.business_id || '',
+    };
+    useAuthStore.setState({ user: authUser, isAuthenticated: true });
+  }
+});

@@ -17,6 +17,12 @@ export const fontFamilies = {
  */
 
 export const fontFamilies = {
+  // Poppins — Headings & Display
+  heading: 'Poppins_700Bold',
+  headingSemiBold: 'Poppins_600SemiBold',
+  headingMedium: 'Poppins_500Medium',
+
+  // Inter — Body & UI
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semiBold: 'Inter_600SemiBold',
