@@ -6,5 +6,8 @@
  */
 
 export { useSectorTemplateStore } from './model';
-export { fetchSectorTemplates } from './api';
-// export { SectorTemplateSelector, SectorTemplateCard } from './ui'; // TODO: Descomentar
+export type { OnboardingResult } from './model';
+export { fetchSectorTemplates, saveBusinessSectorSelection, getPresetSectorTemplates } from './api';
+export { SectorTemplateSelector, SectorTemplateCard, SectorSelectionScreen } from './ui';
+export * from './types';
+export * from './constants';
