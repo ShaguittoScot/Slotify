@@ -58,7 +58,13 @@ export default function RootLayout() {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(main)');
+      if (segments[1] === 'register') {
+        router.replace('/(onboarding)/sector-selection');
+      } else if (segments[1] === 'register-client') {
+        router.replace('/(main)/explore' as any);
+      } else {
+        router.replace('/(main)');
+      }
     }
   }, [isAuthenticated, isLoading, segments, fontsLoaded]);
 

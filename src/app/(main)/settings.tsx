@@ -10,12 +10,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { colors, isDark, themeMode } = useAppTheme();
-  const { user, logout } = useAuthStore();
+  const { user, logout, appMode, toggleAppMode } = useAuthStore();
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
@@ -104,19 +106,70 @@ export default function SettingsScreen() {
 
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: colors.text.primary }]}>
-                {user?.fullName || 'Administrador'}
+                {user?.fullName || (appMode === 'BUSINESS' ? 'Administrador' : 'Cliente Slotify')}
               </Text>
               <Text style={[styles.profileEmail, { color: colors.text.muted }]}>
-                {user?.email || 'admin@slotify.com'}
+                {user?.email || 'usuario@slotify.com'}
               </Text>
 
               <View style={styles.roleBadge}>
                 <Text style={styles.roleBadgeText}>
-                  {user?.role === 'DUENO' ? 'PROPIETARIO / ADMIN' : 'COLABORADOR'}
+                  {appMode === 'BUSINESS' ? 'PROPIETARIO / ADMIN' : 'CLIENTE / CONSUMIDOR'}
                 </Text>
               </View>
             </View>
           </View>
+
+          {/* Tarjeta de Cambio Rápido de Modo (Seamless Switch B2B / B2C) */}
+          <TouchableOpacity
+            style={[
+              styles.modeSwitcherCard,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(99, 102, 241, 0.12)'
+                  : 'rgba(99, 102, 241, 0.08)',
+                borderColor: isDark
+                  ? 'rgba(99, 102, 241, 0.28)'
+                  : 'rgba(99, 102, 241, 0.20)',
+              },
+            ]}
+            onPress={toggleAppMode}
+            activeOpacity={0.8}
+          >
+            <View style={styles.modeSwitcherLeft}>
+              <View
+                style={[
+                  styles.modeIconCircle,
+                  { backgroundColor: colors.action.primary },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={
+                    appMode === 'BUSINESS'
+                      ? 'storefront-outline'
+                      : 'ticket-confirmation-outline'
+                  }
+                  size={20}
+                  color={colors.action.primaryText}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modeSwitcherTitle, { color: colors.text.primary }]}>
+                  {appMode === 'BUSINESS' ? 'Modo Proveedor Activo' : 'Modo Cliente Activo'}
+                </Text>
+                <Text style={[styles.modeSwitcherSubtitle, { color: colors.text.secondary }]}>
+                  {appMode === 'BUSINESS'
+                    ? 'Toca para cambiar a explorar y agendar citas'
+                    : 'Toca para cambiar a administrar tu negocio'}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.modeSwitchAction, { backgroundColor: colors.action.primary }]}>
+              <Text style={[styles.modeSwitchActionText, { color: colors.action.primaryText }]}>
+                Cambiar
+              </Text>
+            </View>
+          </TouchableOpacity>
 
           {/* Sección: Preferencias de Apariencia */}
           <View style={styles.section}>
@@ -195,6 +248,39 @@ export default function SettingsScreen() {
             <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
               GESTIÓN DE NEGOCIO
             </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+              onPress={() => router.push('/(onboarding)/sector-selection' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingIconWrapper}>
+                <MaterialCommunityIcons
+                  name="shape-outline"
+                  size={18}
+                  color={colors.text.primary}
+                />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Giro Comercial y Plantillas (US-006)
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Explorar sectores y módulos preconfigurados
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.text.muted} />
+            </TouchableOpacity>
 
             <View
               style={[
@@ -342,6 +428,47 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#818CF8',
     letterSpacing: 0.5,
+  },
+  modeSwitcherCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 10,
+  },
+  modeSwitcherLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  modeIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeSwitcherTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  modeSwitcherSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  modeSwitchAction: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  modeSwitchActionText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   section: {
     marginBottom: 20,
