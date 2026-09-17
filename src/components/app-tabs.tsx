@@ -13,7 +13,19 @@ export default function AppTabs() {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Inicio',
+        }}
+      />
+      <Tabs.Screen
+        name="agenda"
+        options={{
           title: 'Agenda',
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          title: 'Clientes',
         }}
       />
       <Tabs.Screen
@@ -26,18 +38,6 @@ export default function AppTabs() {
         name="settings"
         options={{
           title: 'Ajustes',
-        }}
-      />
-      <Tabs.Screen
-        name="agenda"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="clients"
-        options={{
-          href: null,
         }}
       />
       <Tabs.Screen
