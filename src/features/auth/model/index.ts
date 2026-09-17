@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
 import { authApi } from '../api';
-import type { LoginCredentials, RegisterAdminRequest } from '../types';
+import type { LoginCredentials, RegisterAdminRequest, RegisterClientRequest, SyncProfileRequest } from '../types';
 
 export type AppMode = 'BUSINESS' | 'CONSUMER';
 
@@ -12,31 +12,36 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   appMode: AppMode;
+  isJustRegistered: boolean;
 
   // Actions
   setAppMode: (mode: AppMode) => void;
   toggleAppMode: () => void;
+  setJustRegistered: (val: boolean) => void;
   login: (credentials: LoginCredentials) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
-  registerClient: (data: import('../types').RegisterClientRequest) => Promise<void>;
+  registerClient: (data: RegisterClientRequest) => Promise<void>;
+  completeOnboarding: (data: Omit<SyncProfileRequest, 'id' | 'email'>) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
   error: null,
   appMode: 'BUSINESS',
+  isJustRegistered: false,
 
   setAppMode: (mode) => set({ appMode: mode }),
   toggleAppMode: () =>
     set((state) => ({
       appMode: state.appMode === 'BUSINESS' ? 'CONSUMER' : 'BUSINESS',
     })),
+  setJustRegistered: (val) => set({ isJustRegistered: val }),
 
   loginWithGoogle: async () => {
     set({ isLoading: true, error: null });
@@ -93,9 +98,15 @@ export const useAuthStore = create<AuthState>((set) => ({
           fullName: res.user.user_metadata?.full_name || data.fullName,
           email: res.user.email || data.email,
           role: 'DUENO',
-          businessId: '',
+          businessId: '', // Empty until they finish onboarding
         };
-        set({ user: authUser, isAuthenticated: true, appMode: 'BUSINESS', isLoading: false });
+        set({
+          user: authUser,
+          isAuthenticated: true,
+          appMode: 'BUSINESS',
+          isLoading: false,
+          isJustRegistered: true,
+        });
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
@@ -116,10 +127,42 @@ export const useAuthStore = create<AuthState>((set) => ({
           role: 'CLIENTE',
           businessId: '',
         };
-        set({ user: authUser, isAuthenticated: true, appMode: 'CONSUMER', isLoading: false });
+        set({
+          user: authUser,
+          isAuthenticated: true,
+          appMode: 'CONSUMER',
+          isLoading: false,
+          isJustRegistered: false,
+        });
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al crear la cuenta de cliente', isLoading: false });
+      throw error;
+    }
+  },
+
+  completeOnboarding: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { user } = get();
+      if (!user) throw new Error('No hay usuario autenticado');
+
+      const payload = {
+        id: user.id,
+        email: user.email,
+        ...data,
+      };
+
+      await authApi.syncProfile(payload);
+
+      // Update business state so it marks them as complete
+      set({
+        user: { ...user, businessId: 'synced-backend' },
+        isJustRegistered: false,
+        isLoading: false,
+      });
+    } catch (error: any) {
+      set({ error: error.message || 'Error al guardar la configuración', isLoading: false });
       throw error;
     }
   },

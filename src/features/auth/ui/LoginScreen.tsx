@@ -206,7 +206,7 @@ export const LoginScreen = () => {
               <Text style={[styles.footerText, { color: colors.text.secondary }]}>
                 ¿No tienes cuenta?{' '}
               </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+              <TouchableOpacity onPress={() => router.push('/(auth)/role-selection')}>
                 <Text style={[styles.footerLink, { color: colors.text.primary }]}>
                   Regístrate aquí
                 </Text>

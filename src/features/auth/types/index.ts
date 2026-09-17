@@ -2,7 +2,7 @@ import type { AuthUser } from '@/shared/types';
 
 export interface LoginCredentials {
   email: string;
-  password: string;
+  password?: string;
 }
 
 export interface RegisterAdminRequest {
@@ -10,7 +10,7 @@ export interface RegisterAdminRequest {
   email: string;
   password: string;
   businessName: string;
-  businessPhone: string;
+  businessPhone?: string;
   sectorTemplateId?: number;
 }
 
@@ -19,6 +19,11 @@ export interface RegisterClientRequest {
   email: string;
   password: string;
   phone?: string;
+}
+
+export interface AuthResponse {
+  user: any;
+  session: any;
 }
 
 /**

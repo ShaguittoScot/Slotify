@@ -31,13 +31,7 @@ export const SectorTemplateSelector: React.FC<SectorTemplateSelectorProps> = ({
     <View style={styles.container} testID="sector-template-selector">
       {/* Sección 1: Categorías Recomendadas */}
       <View style={styles.sectionHeader}>
-        <View style={styles.sectionKickerRow}>
-          <View style={styles.sectionKickerDot} />
-          <Text style={styles.sectionKicker}>PLANTILLAS PREDEFINIDAS</Text>
-        </View>
-        <Text style={styles.sectionSubtitle}>
-          Selecciona tu sector para precargar servicios, duraciones y módulos sugeridos
-        </Text>
+        <Text style={styles.sectionTitle}>Plantillas Predefinidas</Text>
       </View>
 
       <View style={styles.list}>
@@ -55,9 +49,7 @@ export const SectorTemplateSelector: React.FC<SectorTemplateSelectorProps> = ({
 
       {/* Separador elegante con etiqueta */}
       <View style={styles.dividerContainer}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerLabel}>O PERSONALIZACIÓN LIBRE</Text>
-        <View style={styles.dividerLine} />
+        <Text style={styles.sectionTitle}>Libre</Text>
       </View>
 
       {/* Sección 2: Otro / Servicios Generales (Lienzo Libre) */}
@@ -84,47 +76,16 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 12,
   },
-  sectionKickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  sectionKickerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#818CF8',
-  },
-  sectionKicker: {
-    fontSize: 11,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '700',
-    color: '#A5B4FC',
-    letterSpacing: 1,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#94A3B8',
+    color: '#2D3250',
+    letterSpacing: -0.2,
   },
   list: {
     gap: 4,
   },
   dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 22,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  dividerLabel: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: '#64748B',
+    marginVertical: 12,
   },
 });
