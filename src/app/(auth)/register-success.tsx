@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AntDesign } from '@expo/vector-icons';
+import { SymbolView } from 'expo-symbols';
 import Animated, { FadeInDown, FadeIn, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 
@@ -41,7 +41,7 @@ export default function RegisterSuccessScreen() {
         
         <Animated.View style={[styles.iconContainer, pulseStyle]} entering={FadeIn.duration(800).delay(200)}>
           <View style={styles.iconCircle}>
-            <AntDesign name="check" size={50} color="#FFFFFF" />
+            <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={50} tintColor="#FFFFFF" />
           </View>
         </Animated.View>
 
@@ -58,7 +58,7 @@ export default function RegisterSuccessScreen() {
       <Animated.View entering={FadeInDown.duration(800).delay(600)} style={styles.footer}>
         <TouchableOpacity style={styles.button} onPress={handleContinue}>
           <Text style={styles.buttonText}>Configurar mi Negocio</Text>
-          <AntDesign name="right" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+          <SymbolView name={{ ios: 'chevron.right', android: 'arrow_forward', web: 'arrow_forward' }} size={16} tintColor="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>
       

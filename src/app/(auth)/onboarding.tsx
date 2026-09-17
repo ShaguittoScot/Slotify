@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
-import { AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SymbolView } from 'expo-symbols';
 import { useAuthStore } from '@/features/auth/model';
 import { useRouter } from 'expo-router';
 
@@ -62,10 +62,10 @@ export default function OnboardingScreen() {
               activeOpacity={0.7}
             >
               <View style={[styles.iconBox, isSelected && styles.iconBoxSelected]}>
-                <MaterialCommunityIcons 
-                  name={sector.icon as any} 
+                <SymbolView 
+                  name={{ ios: 'briefcase', android: 'work', web: 'work' }} 
                   size={32} 
-                  color={isSelected ? '#C57747' : '#AAACAD'} 
+                  tintColor={isSelected ? '#C57747' : '#AAACAD'} 
                 />
               </View>
               <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{sector.name}</Text>
@@ -80,7 +80,7 @@ export default function OnboardingScreen() {
         disabled={!selectedSector}
       >
         <Text style={styles.buttonText}>Continuar</Text>
-        <AntDesign name="arrow-right" size={20} color="#FFFFFF" />
+        <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} size={20} tintColor="#FFFFFF" />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -88,7 +88,7 @@ export default function OnboardingScreen() {
   const renderStep2 = () => (
     <Animated.View entering={FadeInRight} exiting={FadeOutLeft} style={styles.stepContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
-        <AntDesign name="arrow-left" size={24} color="#2D3250" />
+        <SymbolView name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} size={24} tintColor="#2D3250" />
       </TouchableOpacity>
       
       <Text style={styles.title}>Casi listos</Text>

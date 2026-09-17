@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { AntDesign } from '@expo/vector-icons';
+import { SymbolView } from 'expo-symbols';
 import { useAuthStore } from '../model';
 import { colors } from '@/shared/theme/colors';
 
@@ -122,7 +122,8 @@ export const LoginScreen = () => {
               onPress={loginWithGoogle}
               disabled={isLoading}
             >
-              <AntDesign name="google" size={20} color="#1A202C" />
+                {/* Google icon doesn't have a direct SF Symbol equivalent, using a generic logo placeholder if needed, or simply text */}
+                <Text style={{fontWeight:'bold', color: '#DB4437', fontSize: 20, marginRight: 8}}>G</Text>
               <Text style={styles.googleButtonText}>Continuar con Google</Text>
             </TouchableOpacity>
 
