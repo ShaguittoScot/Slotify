@@ -13,49 +13,81 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useAuthStore } from '../model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 
-export const RegisterScreen = () => {
-  const { selectedCategory, onboardingResult } = useSectorTemplateStore();
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [businessName, setBusinessName] = useState(onboardingResult?.businessName || '');
-  const [businessPhone, setBusinessPhone] = useState('');
-  const [showThemeModal, setShowThemeModal] = useState(false);
+type SelectedRole = 'CLIENTE' | 'NEGOCIO';
 
+export const RegisterScreen = () => {
+  const router = useRouter();
   const { colors, isDark, themeMode } = useAppTheme();
+  const { selectedCategory, onboardingResult } = useSectorTemplateStore();
+
   const register = useAuthStore((state) => state.register);
+  const registerClient = useAuthStore((state) => state.registerClient);
   const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+  const setAppMode = useAuthStore((state) => state.setAppMode);
   const isLoading = useAuthStore((state) => state.isLoading);
   const error = useAuthStore((state) => state.error);
   const clearError = useAuthStore((state) => state.clearError);
-  const router = useRouter();
 
-  const isFormValid =
+  // Form State
+  const [role, setRole] = useState<SelectedRole>('CLIENTE');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [businessName, setBusinessName] = useState(onboardingResult?.businessName || '');
+  const [showThemeModal, setShowThemeModal] = useState(false);
+
+  const isBusiness = role === 'NEGOCIO';
+
+  const isClientValid =
+    fullName.trim().length > 0 &&
+    email.trim().length > 0 &&
+    password.length >= 6;
+
+  const isBusinessValid =
     fullName.trim().length > 0 &&
     email.trim().length > 0 &&
     password.length >= 6 &&
     businessName.trim().length > 0 &&
-    businessPhone.trim().length > 0;
+    phone.trim().length > 0;
+
+  const isFormValid = isBusiness ? isBusinessValid : isClientValid;
+
+  const handleRoleChange = (newRole: SelectedRole) => {
+    clearError();
+    setRole(newRole);
+    setAppMode(newRole === 'NEGOCIO' ? 'BUSINESS' : 'CONSUMER');
+  };
 
   const handleRegister = async () => {
     if (!isFormValid) return;
     try {
       clearError();
-      await register({
-        fullName,
-        email,
-        password,
-        businessName,
-        businessPhone,
-        sectorTemplateId: selectedCategory?.id ?? 1,
-      });
-      // Routing is handled automatically by _layout.tsx thanks to isJustRegistered
+      if (isBusiness) {
+        await register({
+          fullName,
+          email,
+          password,
+          businessName,
+          businessPhone: phone,
+          sectorTemplateId: selectedCategory?.id ?? 1,
+        });
+      } else {
+        await registerClient({
+          fullName,
+          email,
+          password,
+          phone: phone.trim() || undefined,
+        });
+      }
     } catch {
-      // Error is handled in store
+      // Handled in store
     }
   };
 
@@ -89,7 +121,7 @@ export const RegisterScreen = () => {
             <TouchableOpacity
               onPress={() => router.back()}
               style={[
-                styles.themeToggleBtn,
+                styles.topBtn,
                 { backgroundColor: colors.background.secondary, borderColor: colors.border.main },
               ]}
               activeOpacity={0.7}
@@ -100,7 +132,7 @@ export const RegisterScreen = () => {
             <TouchableOpacity
               onPress={() => setShowThemeModal(true)}
               style={[
-                styles.themeToggleBtn,
+                styles.topBtn,
                 { backgroundColor: colors.background.secondary, borderColor: colors.border.main },
               ]}
               activeOpacity={0.7}
@@ -113,13 +145,94 @@ export const RegisterScreen = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Header Minimalista */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text.primary }]}>Crear Negocio</Text>
+            <Text style={[styles.title, { color: colors.text.primary }]}>
+              {isBusiness ? 'Crear Negocio' : 'Crear Cuenta'}
+            </Text>
             <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-              Ingresa tus datos para comenzar tu agenda.
+              {isBusiness
+                ? 'Gestiona tu agenda, clientes y reservas online.'
+                : 'Agenda tus citas y descubre servicios al instante.'}
             </Text>
           </View>
 
+          {/* ─── SELECTOR DUAL COMPACTO (SEGMENTED CONTROL) ─── */}
+          <View
+            style={[
+              styles.segmentedContainer,
+              {
+                backgroundColor: colors.background.tertiary,
+                borderColor: colors.border.main,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.segmentItem,
+                !isBusiness && [
+                  styles.segmentItemActive,
+                  {
+                    backgroundColor: isDark ? '#383838' : '#FFFFFF',
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                  },
+                ],
+              ]}
+              onPress={() => handleRoleChange('CLIENTE')}
+              activeOpacity={0.8}
+            >
+              <Feather
+                name="user"
+                size={15}
+                color={!isBusiness ? colors.text.primary : colors.text.muted}
+              />
+              <Text
+                style={[
+                  styles.segmentText,
+                  {
+                    color: !isBusiness ? colors.text.primary : colors.text.muted,
+                    fontWeight: !isBusiness ? '700' : '500',
+                  },
+                ]}
+              >
+                Soy Cliente
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.segmentItem,
+                isBusiness && [
+                  styles.segmentItemActive,
+                  {
+                    backgroundColor: isDark ? '#383838' : '#FFFFFF',
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                  },
+                ],
+              ]}
+              onPress={() => handleRoleChange('NEGOCIO')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name="storefront-outline"
+                size={16}
+                color={isBusiness ? colors.text.primary : colors.text.muted}
+              />
+              <Text
+                style={[
+                  styles.segmentText,
+                  {
+                    color: isBusiness ? colors.text.primary : colors.text.muted,
+                    fontWeight: isBusiness ? '700' : '500',
+                  },
+                ]}
+              >
+                Dueño de Negocio
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ─── FORMULARIO DINÁMICO ─── */}
           <View
             style={[
               styles.formContainer,
@@ -143,8 +256,7 @@ export const RegisterScreen = () => {
               </View>
             ) : null}
 
-            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>TUS DATOS</Text>
-
+            {/* Nombre Completo */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Nombre completo</Text>
               <TextInput
@@ -156,7 +268,7 @@ export const RegisterScreen = () => {
                     borderColor: colors.border.main,
                   },
                 ]}
-                placeholder="Juan Pérez"
+                placeholder={isBusiness ? 'Ej. Juan Pérez (Administrador)' : 'Ej. Juan Pérez'}
                 placeholderTextColor={colors.text.muted}
                 value={fullName}
                 onChangeText={setFullName}
@@ -164,6 +276,7 @@ export const RegisterScreen = () => {
               />
             </View>
 
+            {/* Correo Electrónico */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Correo electrónico</Text>
               <TextInput
@@ -186,100 +299,12 @@ export const RegisterScreen = () => {
               />
             </View>
 
+            {/* Teléfono */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Contraseña</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background.tertiary,
-                    color: colors.text.primary,
-                    borderColor: colors.border.main,
-                  },
-                ]}
-                placeholder="•••••••• (mínimo 6 caracteres)"
-                placeholderTextColor={colors.text.muted}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                editable={!isLoading}
-              />
-            </View>
-
-            <Text style={[styles.sectionTitle, { color: colors.text.primary, marginTop: 14 }]}>
-              NEGOCIO
-            </Text>
-
-            {selectedCategory ? (
-              <TouchableOpacity
-                onPress={() => router.push('/(onboarding)/sector-selection' as any)}
-                style={[
-                  styles.sectorBadge,
-                  {
-                    backgroundColor: colors.background.tertiary,
-                    borderColor: colors.border.main,
-                  },
-                ]}
-                activeOpacity={0.7}
-              >
-                <View style={styles.sectorBadgeLeft}>
-                  <MaterialCommunityIcons
-                    name="shape-outline"
-                    size={16}
-                    color={colors.action.primary}
-                  />
-                  <Text style={[styles.sectorBadgeText, { color: colors.text.primary }]}>
-                    Giro: <Text style={{ fontWeight: '700' }}>{selectedCategory.name}</Text>
-                  </Text>
-                </View>
-                <Text style={[styles.sectorBadgeChange, { color: colors.action.primary }]}>
-                  Cambiar
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Nombre del negocio</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background.tertiary,
-                    color: colors.text.primary,
-                    borderColor: colors.border.main,
-                  },
-                ]}
-                placeholder="Ej. Barbería Central"
-                placeholderTextColor={colors.text.muted}
-                value={businessName}
-                onChangeText={setBusinessName}
-                editable={!isLoading}
-              />
-              <View
-                style={[
-                  styles.slugPreviewBox,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(99, 102, 241, 0.08)'
-                      : 'rgba(99, 102, 241, 0.05)',
-                    borderColor: isDark
-                      ? 'rgba(99, 102, 241, 0.20)'
-                      : 'rgba(99, 102, 241, 0.15)',
-                  },
-                ]}
-              >
-                <Feather name="globe" size={13} color={colors.action.primary} />
-                <Text style={[styles.slugPreviewText, { color: colors.text.secondary }]}>
-                  Enlace público:{' '}
-                  <Text style={{ fontWeight: '700', color: colors.action.primary }}>
-                    slotly.app/{generatedSlug}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Teléfono del negocio</Text>
+              <Text style={[styles.label, { color: colors.text.primary }]}>
+                {isBusiness ? 'Teléfono del negocio' : 'Teléfono / WhatsApp'}
+                {!isBusiness && <Text style={{ color: colors.text.muted, fontWeight: '400' }}> (opcional)</Text>}
+              </Text>
               <TextInput
                 style={[
                   styles.input,
@@ -292,12 +317,128 @@ export const RegisterScreen = () => {
                 placeholder="555-123-4567"
                 placeholderTextColor={colors.text.muted}
                 keyboardType="phone-pad"
-                value={businessPhone}
-                onChangeText={setBusinessPhone}
+                value={phone}
+                onChangeText={setPhone}
                 editable={!isLoading}
               />
             </View>
 
+            {/* Contraseña */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Contraseña</Text>
+              <View
+                style={[
+                  styles.passwordContainer,
+                  {
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+              >
+                <TextInput
+                  style={[styles.passwordInput, { color: colors.text.primary }]}
+                  placeholder="•••••••• (mínimo 6 caracteres)"
+                  placeholderTextColor={colors.text.muted}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Feather
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={16}
+                    color={colors.text.muted}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ─── CAMPOS EXCLUSIVOS DE NEGOCIO (EXPANSIÓN FLUIDA) ─── */}
+            {isBusiness && (
+              <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)}>
+                <View style={[styles.sectionDivider, { borderColor: colors.border.main }]}>
+                  <Text style={[styles.sectionDividerText, { color: colors.text.secondary }]}>
+                    DATOS DE TU NEGOCIO
+                  </Text>
+                </View>
+
+                {selectedCategory ? (
+                  <TouchableOpacity
+                    onPress={() => router.push('/(onboarding)/sector-selection' as any)}
+                    style={[
+                      styles.sectorBadge,
+                      {
+                        backgroundColor: colors.background.tertiary,
+                        borderColor: colors.border.main,
+                      },
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.sectorBadgeLeft}>
+                      <MaterialCommunityIcons
+                        name="shape-outline"
+                        size={16}
+                        color={colors.action.primary}
+                      />
+                      <Text style={[styles.sectorBadgeText, { color: colors.text.primary }]}>
+                        Giro: <Text style={{ fontWeight: '700' }}>{selectedCategory.name}</Text>
+                      </Text>
+                    </View>
+                    <Text style={[styles.sectorBadgeChange, { color: colors.action.primary }]}>
+                      Cambiar
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>
+                    Nombre comercial del negocio
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background.tertiary,
+                        color: colors.text.primary,
+                        borderColor: colors.border.main,
+                      },
+                    ]}
+                    placeholder="Ej. Barbería Central o Clínica Dental"
+                    placeholderTextColor={colors.text.muted}
+                    value={businessName}
+                    onChangeText={setBusinessName}
+                    editable={!isLoading}
+                  />
+                  <View
+                    style={[
+                      styles.slugPreviewBox,
+                      {
+                        backgroundColor: isDark
+                          ? 'rgba(99, 102, 241, 0.08)'
+                          : 'rgba(99, 102, 241, 0.05)',
+                        borderColor: isDark
+                          ? 'rgba(99, 102, 241, 0.20)'
+                          : 'rgba(99, 102, 241, 0.15)',
+                      },
+                    ]}
+                  >
+                    <Feather name="globe" size={13} color={colors.action.primary} />
+                    <Text style={[styles.slugPreviewText, { color: colors.text.secondary }]}>
+                      Enlace público:{' '}
+                      <Text style={{ fontWeight: '700', color: colors.action.primary }}>
+                        slotly.app/{generatedSlug}
+                      </Text>
+                    </Text>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Botón Principal de Envío */}
             <TouchableOpacity
               style={[
                 styles.button,
@@ -312,7 +453,7 @@ export const RegisterScreen = () => {
                 <ActivityIndicator color={colors.action.primaryText} />
               ) : (
                 <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>
-                  Continuar ➔
+                  {isBusiness ? 'Continuar a Configuración ➔' : 'Crear Cuenta de Cliente'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -323,6 +464,7 @@ export const RegisterScreen = () => {
               <View style={[styles.divider, { backgroundColor: colors.border.main }]} />
             </View>
 
+            {/* Google Signup */}
             <TouchableOpacity
               style={[
                 styles.googleButton,
@@ -335,12 +477,13 @@ export const RegisterScreen = () => {
               disabled={isLoading}
               activeOpacity={0.8}
             >
-              <AntDesign name="google" size={20} color={colors.text.primary} />
+              <AntDesign name="google" size={18} color={colors.text.primary} />
               <Text style={[styles.googleButtonText, { color: colors.action.secondaryText }]}>
-                Regístrate con Google
+                Continuar con Google
               </Text>
             </TouchableOpacity>
 
+            {/* Footer */}
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: colors.text.secondary }]}>
                 ¿Ya tienes cuenta?{' '}
@@ -381,7 +524,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  themeToggleBtn: {
+  topBtn: {
     width: 38,
     height: 38,
     borderRadius: 12,
@@ -390,7 +533,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 16,
     alignItems: 'flex-start',
   },
   title: {
@@ -403,6 +546,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+
+  // Segmented Control
+  segmentedContainer: {
+    flexDirection: 'row',
+    borderRadius: 100,
+    padding: 4,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 100,
+    gap: 6,
+  },
+  segmentItemActive: {
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+  },
+
   formContainer: {
     borderRadius: 22,
     padding: 20,
@@ -425,11 +599,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  sectionDivider: {
+    borderTopWidth: 1,
+    paddingTop: 16,
+    marginTop: 6,
     marginBottom: 12,
-    letterSpacing: 0.2,
+  },
+  sectionDividerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   inputGroup: {
     marginBottom: 14,
@@ -446,6 +625,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     borderWidth: 1,
   },
+  passwordContainer: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+  },
+  eyeBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
   slugPreviewBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -458,55 +653,6 @@ const styles = StyleSheet.create({
   },
   slugPreviewText: {
     fontSize: 12,
-  },
-  button: {
-    borderRadius: 100,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 14,
-  },
-  buttonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 100,
-    paddingVertical: 14,
-  },
-  googleButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 22,
-  },
-  footerText: {
-    fontSize: 13,
-  },
-  footerLink: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   sectorBadge: {
     flexDirection: 'row',
@@ -527,6 +673,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   sectorBadgeChange: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  button: {
+    borderRadius: 100,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  buttonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 100,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  googleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  footerText: {
+    fontSize: 13,
+  },
+  footerLink: {
     fontSize: 13,
     fontWeight: '700',
   },
