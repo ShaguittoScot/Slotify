@@ -105,7 +105,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: true,
           appMode: 'BUSINESS',
           isLoading: false,
-          isJustRegistered: true,
+          isJustRegistered: false,
         });
       }
     } catch (error: any) {

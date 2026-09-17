@@ -10,9 +10,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
@@ -48,6 +50,7 @@ export default function UnifiedOnboardingScreen() {
   const [serviceDuration, setServiceDuration] = useState('');
   const [servicePrice, setServicePrice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   // BottomSheet State
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -113,6 +116,18 @@ export default function UnifiedOnboardingScreen() {
 
   const handleFinish = () => {
     router.replace('/(main)' as any);
+  };
+
+  const handleShareLink = async () => {
+    try {
+      await Share.share({
+        message: `¡Reserva tu cita en mi negocio a través de Slotify! Enlace: https://slotly.app/${slug || 'tu-negocio'}`,
+      });
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 3000);
+    } catch {
+      // Ignored
+    }
   };
 
   // Progress percentage
@@ -322,27 +337,44 @@ export default function UnifiedOnboardingScreen() {
             {/* STEP 5: SUCCESS */}
             {step === 5 && (
               <Animated.View entering={FadeIn.duration(500)} style={s.successCenter}>
-                <View style={s.successCircle}>
-                  <SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} size={42} tintColor="#FFFFFF" />
+                <View style={s.successCircleOuter}>
+                  <View style={s.successCircleInner}>
+                    <Feather name="check" size={38} color="#C57747" />
+                  </View>
                 </View>
-                <Text style={s.successHeading}>¡Tu espacio de {category} está listo!</Text>
+
+                <Text style={s.successHeading}>¡Cuenta y Negocio Listos!</Text>
                 <Text style={s.successDesc}>
-                  Hemos configurado todo para que empieces a recibir citas. Tu portal público está activo en:
+                  Tu espacio de {category || 'servicios'} ha sido configurado exitosamente. Ya puedes gestionar tus reservas o compartir tu portal público.
                 </Text>
                 
                 <View style={s.successLinkBox}>
-                  <Text style={s.successLinkText} numberOfLines={1}>slotly.app/{slug}</Text>
+                  <Feather name="globe" size={16} color="#C57747" style={{ marginRight: 8 }} />
+                  <Text style={s.successLinkText} numberOfLines={1}>
+                    <Text style={{ color: '#9CA3AF' }}>slotly.app/</Text>
+                    <Text style={{ color: '#C57747', fontWeight: '800' }}>{slug || 'tu-negocio'}</Text>
+                  </Text>
                 </View>
 
                 <View style={s.successActions}>
-                  <TouchableOpacity style={s.btnOutlineSuccess} onPress={() => {}}>
-                    <SymbolView name={{ ios: 'doc.on.doc', android: 'content_copy', web: 'content_copy' }} size={16} tintColor="#374151" />
-                    <Text style={s.btnOutlineText}>Copiar enlace</Text>
+                  <TouchableOpacity
+                    style={s.btnFilledSuccess}
+                    onPress={handleFinish}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.btnFilledText}>Entrar al Dashboard</Text>
+                    <Feather name="arrow-right" size={16} color="#FFFFFF" />
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={s.btnFilledSuccess} onPress={handleFinish}>
-                    <Text style={s.btnFilledText}>Ir al Dashboard</Text>
-                    <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} size={16} tintColor="#FFFFFF" />
+                  <TouchableOpacity
+                    style={s.btnOutlineSuccess}
+                    onPress={handleShareLink}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name={isCopied ? "check" : "share-2"} size={16} color="#C57747" />
+                    <Text style={[s.btnOutlineText, { color: '#C57747', fontWeight: '700' }]}>
+                      {isCopied ? '¡Enlace Compartido!' : 'Compartir enlace público'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </Animated.View>
@@ -727,28 +759,42 @@ const s = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 32,
+    paddingHorizontal: 8,
   },
-  successCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#C57747',
+  successCircleOuter: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFF4ED',
+    borderWidth: 2,
+    borderColor: '#F0D4BD',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
     shadowColor: '#C57747',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 4,
+  },
+  successCircleInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#F0D4BD',
   },
   successHeading: {
     fontSize: 28,
     fontWeight: '800',
     color: '#111827',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+    letterSpacing: -0.5,
   },
   successDesc: {
     fontSize: 15,
@@ -756,43 +802,53 @@ const s = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
   successLinkBox: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFBF7',
+    borderWidth: 1.5,
+    borderColor: '#F0D4BD',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginBottom: 36,
+    width: '100%',
+    maxWidth: 380,
   },
   successLinkText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#374151',
+    fontSize: 15,
   },
   successActions: {
     width: '100%',
     gap: 12,
   },
+  btnFilledSuccess: {
+    height: 54,
+    borderRadius: 100,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#C57747',
+    shadowColor: '#C57747',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   btnOutlineSuccess: {
-    height: 52,
-    borderRadius: 12,
+    height: 54,
+    borderRadius: 100,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-  },
-  btnFilledSuccess: {
-    height: 52,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#111827',
+    borderColor: '#F0D4BD',
   },
 
   // Bottom Bar (Steps 1-4)

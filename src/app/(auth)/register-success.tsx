@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -41,14 +41,14 @@ export default function RegisterSuccessScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background.primary }]}>
-      {/* Background decoration */}
+      {/* Background decoration in warm terracotta tints */}
       <View
         style={[
           styles.backgroundBlob1,
           {
             backgroundColor: isDark
-              ? 'rgba(99, 102, 241, 0.08)'
-              : 'rgba(66, 153, 225, 0.1)',
+              ? 'rgba(197, 119, 71, 0.08)'
+              : 'rgba(255, 244, 237, 0.9)',
           },
         ]}
       />
@@ -57,8 +57,8 @@ export default function RegisterSuccessScreen() {
           styles.backgroundBlob2,
           {
             backgroundColor: isDark
-              ? 'rgba(168, 85, 247, 0.06)'
-              : 'rgba(159, 122, 234, 0.08)',
+              ? 'rgba(197, 119, 71, 0.05)'
+              : 'rgba(254, 243, 199, 0.5)',
           },
         ]}
       />
@@ -70,14 +70,24 @@ export default function RegisterSuccessScreen() {
         >
           <View
             style={[
-              styles.iconCircle,
+              styles.iconCircleOuter,
               {
-                backgroundColor: colors.action.primary,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(99, 102, 241, 0.2)',
+                backgroundColor: isDark ? '#262626' : '#FFF4ED',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#F0D4BD',
               },
             ]}
           >
-            <Feather name="check" size={48} color={colors.action.primaryText} />
+            <View
+              style={[
+                styles.iconCircleInner,
+                {
+                  backgroundColor: isDark ? '#333333' : '#FFFFFF',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F0D4BD',
+                },
+              ]}
+            >
+              <Feather name="check" size={40} color="#C57747" />
+            </View>
           </View>
         </Animated.View>
 
@@ -87,25 +97,24 @@ export default function RegisterSuccessScreen() {
         >
           <Text style={[styles.title, { color: colors.text.primary }]}>¡Cuenta Creada!</Text>
           <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-            Tu negocio ha sido registrado exitosamente en Slotify. Estás a un paso de
-            revolucionar la forma en que gestionas tus reservas.
+            Tu acceso a Slotify ha sido registrado exitosamente. Ahora configuremos tu negocio en unos sencillos pasos.
           </Text>
         </Animated.View>
       </View>
 
       <Animated.View entering={FadeInDown.duration(800).delay(600)} style={styles.footer}>
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.action.primary }]}
+          style={[styles.button, { backgroundColor: '#C57747' }]}
           onPress={handleContinue}
           activeOpacity={0.8}
         >
-          <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>
+          <Text style={styles.buttonText}>
             Configurar mi Negocio
           </Text>
           <Feather
             name="arrow-right"
             size={18}
-            color={colors.action.primaryText}
+            color="#FFFFFF"
             style={styles.buttonIcon}
           />
         </TouchableOpacity>
@@ -141,35 +150,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   iconContainer: {
-    marginBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+    marginBottom: 36,
   },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  iconCircleOuter: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 6,
+    borderWidth: 2,
+    shadowColor: '#C57747',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  iconCircleInner: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
   },
   textContainer: {
     alignItems: 'center',
+    paddingHorizontal: 10,
   },
   title: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '800',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   footer: {
     padding: 24,
@@ -179,17 +197,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    paddingVertical: 17,
     borderRadius: 100,
-    shadowColor: '#000',
+    shadowColor: '#C57747',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 4,
   },
   buttonText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
   buttonIcon: {
     marginLeft: 8,
