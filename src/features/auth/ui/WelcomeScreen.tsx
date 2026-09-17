@@ -23,7 +23,6 @@ export const WelcomeScreen = () => {
               entering={FadeIn.duration(400).delay(100)} 
               style={styles.logoContainer}
             >
-              {/* Replace with your actual Logo Image later */}
               <View style={styles.logoPlaceholder}>
                 <Text style={styles.logoPlaceholderText}>S</Text>
               </View>
@@ -42,7 +41,7 @@ export const WelcomeScreen = () => {
               <TouchableOpacity 
                 style={styles.primaryButton}
                 activeOpacity={0.8}
-                onPress={() => router.push('/(auth)/register')}
+                onPress={() => router.push('/(auth)/role-selection' as any)}
               >
                 <Text style={styles.primaryButtonText}>Crear cuenta</Text>
               </TouchableOpacity>
@@ -128,7 +127,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#1A202C',
-    borderRadius: 100, // Fully rounded like the reference
+    borderRadius: 100,
     paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',

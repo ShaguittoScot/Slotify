@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useAppTheme } from '@/shared/theme';
+import { useAuthStore } from '@/features/auth/model';
 
 type TabsProps = React.ComponentProps<typeof Tabs>;
 export type FloatingTabBarProps = NonNullable<TabsProps['tabBar']> extends (
@@ -25,26 +26,32 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
+  const { appMode } = useAuthStore();
 
-  // Configuración de metadatos por ruta
+  // Configuración de metadatos por ruta adaptada al rol activo
   const getTabConfig = (routeName: string) => {
     switch (routeName) {
       case 'index':
         return {
-          label: 'Agenda',
+          label: appMode === 'CONSUMER' ? 'Mis Citas' : 'Agenda',
           icon: (color: string) => <Feather name="calendar" size={19} color={color} />,
         };
       case 'explore':
         return {
-          label: 'Gridflow',
+          label: 'Explorar',
           icon: (color: string) => (
-            <MaterialCommunityIcons name="view-grid-outline" size={20} color={color} />
+            <MaterialCommunityIcons name="compass-outline" size={20} color={color} />
           ),
         };
       case 'settings':
         return {
-          label: 'Ajustes',
-          icon: (color: string) => <Feather name="settings" size={19} color={color} />,
+          label: appMode === 'CONSUMER' ? 'Mi Perfil' : 'Ajustes',
+          icon: (color: string) =>
+            appMode === 'CONSUMER' ? (
+              <Feather name="user" size={19} color={color} />
+            ) : (
+              <Feather name="settings" size={19} color={color} />
+            ),
         };
       default:
         return {

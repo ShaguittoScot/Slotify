@@ -37,8 +37,9 @@ export interface AuthUser {
   id: string;
   fullName: string;
   email: string;
-  role: 'DUENO' | 'EMPLEADO';
-  businessId: string;
+  role: 'DUENO' | 'EMPLEADO' | 'CLIENTE';
+  businessId?: string;
+  businessName?: string;
 }
 
 /** Respuesta de login/register del backend */

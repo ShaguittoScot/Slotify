@@ -4,16 +4,22 @@ import type { AuthUser } from '@/shared/types';
 import { authApi } from '../api';
 import type { LoginCredentials, RegisterAdminRequest } from '../types';
 
+export type AppMode = 'BUSINESS' | 'CONSUMER';
+
 interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  appMode: AppMode;
 
   // Actions
+  setAppMode: (mode: AppMode) => void;
+  toggleAppMode: () => void;
   login: (credentials: LoginCredentials) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
+  registerClient: (data: import('../types').RegisterClientRequest) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
@@ -24,6 +30,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
   error: null,
+  appMode: 'BUSINESS',
+
+  setAppMode: (mode) => set({ appMode: mode }),
+  toggleAppMode: () =>
+    set((state) => ({
+      appMode: state.appMode === 'BUSINESS' ? 'CONSUMER' : 'BUSINESS',
+    })),
 
   loginWithGoogle: async () => {
     set({ isLoading: true, error: null });
@@ -82,10 +95,31 @@ export const useAuthStore = create<AuthState>((set) => ({
           role: 'DUENO',
           businessId: '',
         };
-        set({ user: authUser, isAuthenticated: true, isLoading: false });
+        set({ user: authUser, isAuthenticated: true, appMode: 'BUSINESS', isLoading: false });
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
+      throw error;
+    }
+  },
+
+  registerClient: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.registerClient(data);
+
+      if (res.user) {
+        const authUser: AuthUser = {
+          id: res.user.id,
+          fullName: res.user.user_metadata?.full_name || data.fullName,
+          email: res.user.email || data.email,
+          role: 'CLIENTE',
+          businessId: '',
+        };
+        set({ user: authUser, isAuthenticated: true, appMode: 'CONSUMER', isLoading: false });
+      }
+    } catch (error: any) {
+      set({ error: error.message || 'Error al crear la cuenta de cliente', isLoading: false });
       throw error;
     }
   },
