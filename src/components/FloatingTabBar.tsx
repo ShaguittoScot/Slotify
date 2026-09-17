@@ -7,7 +7,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
@@ -28,35 +28,58 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   const { isDark } = useAppTheme();
   const { appMode } = useAuthStore();
 
-  // Configuración de metadatos por ruta adaptada al rol activo
+  const isBusiness = appMode === 'BUSINESS';
+
+  // Configuración de rutas visibles según el rol del usuario
+  const allowedRouteNames = isBusiness
+    ? ['index', 'agenda', 'clients', 'settings']
+    : ['explore', 'index', 'settings'];
+
+  const visibleRoutes = state.routes.filter((route: any) =>
+    allowedRouteNames.includes(route.name)
+  );
+
   const getTabConfig = (routeName: string) => {
     switch (routeName) {
       case 'index':
         return {
-          label: appMode === 'CONSUMER' ? 'Mis Citas' : 'Agenda',
-          icon: (color: string) => <Feather name="calendar" size={19} color={color} />,
+          label: isBusiness ? 'Inicio' : 'Mis Citas',
+          icon: (color: string) =>
+            isBusiness ? (
+              <Feather name="home" size={18} color={color} />
+            ) : (
+              <Feather name="calendar" size={18} color={color} />
+            ),
+        };
+      case 'agenda':
+        return {
+          label: 'Agenda',
+          icon: (color: string) => <Feather name="calendar" size={18} color={color} />,
+        };
+      case 'clients':
+        return {
+          label: 'Clientes',
+          icon: (color: string) => <Feather name="users" size={18} color={color} />,
         };
       case 'explore':
         return {
           label: 'Explorar',
-          icon: (color: string) => (
-            <MaterialCommunityIcons name="compass-outline" size={20} color={color} />
-          ),
+          icon: (color: string) => <Feather name="compass" size={18} color={color} />,
         };
       case 'settings':
         return {
-          label: appMode === 'CONSUMER' ? 'Mi Perfil' : 'Ajustes',
+          label: isBusiness ? 'Ajustes' : 'Mi Perfil',
           icon: (color: string) =>
-            appMode === 'CONSUMER' ? (
-              <Feather name="user" size={19} color={color} />
+            isBusiness ? (
+              <Feather name="settings" size={18} color={color} />
             ) : (
-              <Feather name="settings" size={19} color={color} />
+              <Feather name="user" size={18} color={color} />
             ),
         };
       default:
         return {
           label: routeName,
-          icon: (color: string) => <Feather name="circle" size={19} color={color} />,
+          icon: (color: string) => <Feather name="circle" size={18} color={color} />,
         };
     }
   };
@@ -84,8 +107,9 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           },
         ]}
       >
-        {state.routes.map((route: any, index: number) => {
-          const isFocused = state.index === index;
+        {visibleRoutes.map((route: any) => {
+          const originalIndex = state.routes.findIndex((r: any) => r.key === route.key);
+          const isFocused = state.index === originalIndex;
           const { label, icon } = getTabConfig(route.name);
 
           const onPress = () => {
@@ -163,8 +187,8 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
     alignItems: 'center',
     zIndex: 999,
   },
@@ -173,10 +197,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 440,
     height: 64,
     borderRadius: 32,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     borderWidth: 1,
     ...Platform.select({
       ios: {
@@ -198,9 +222,9 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 24,
     paddingVertical: 8,
-    paddingHorizontal: 8,
-    marginHorizontal: 3,
-    gap: 6,
+    paddingHorizontal: 6,
+    marginHorizontal: 2,
+    gap: 5,
   },
   tabItemActive: {
     shadowColor: '#000',
@@ -214,7 +238,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     letterSpacing: -0.2,
   },
 });
