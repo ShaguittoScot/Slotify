@@ -26,7 +26,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  const { isAuthenticated, isLoading, hydrate } = useAuthStore();
+  const { isAuthenticated, isLoading, isJustRegistered, user, appMode, hydrate } = useAuthStore();
 
   const [fontsLoaded] = useFonts({
     Poppins_500Medium,
@@ -54,23 +54,25 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inMainGroup = segments[0] === '(main)';
+    const inOnboardingGroup = segments[0] === '(onboarding)';
 
-    if (!isAuthenticated && inMainGroup) {
+    if (!isAuthenticated && (inMainGroup || inOnboardingGroup)) {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      const state = useAuthStore.getState();
-      if (segments[1] === 'register-client' || state.appMode === 'CONSUMER') {
+      if (segments[1] === 'register-client' || appMode === 'CONSUMER') {
         router.replace('/(main)/explore' as any);
-      } else if (state.isJustRegistered) {
-        router.replace('/(auth)/register-success');
-      } else if (!state.user?.businessId) {
+      } else if (isJustRegistered) {
+        if (segments[1] !== 'register-success') {
+          router.replace('/(auth)/register-success');
+        }
+      } else if (!user?.businessId) {
         router.replace('/(onboarding)/wizard');
       } else {
         router.replace('/(main)');
       }
     }
-  }, [isAuthenticated, isLoading, segments, fontsLoaded]);
+  }, [isAuthenticated, isLoading, isJustRegistered, user?.businessId, appMode, segments, fontsLoaded]);
 
   if (isLoading || !fontsLoaded) {
     return (
