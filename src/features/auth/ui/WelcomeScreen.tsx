@@ -11,16 +11,14 @@ export const WelcomeScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        
         {/* Animated Background Cards */}
         <FloatingBackgroundCards />
 
         {/* Foreground Content */}
         <View style={styles.content}>
-          
           <View style={styles.centerSection}>
-            <Animated.View 
-              entering={FadeIn.duration(400).delay(100)} 
+            <Animated.View
+              entering={FadeIn.duration(400).delay(100)}
               style={styles.logoContainer}
             >
               <View style={styles.logoPlaceholder}>
@@ -28,8 +26,8 @@ export const WelcomeScreen = () => {
               </View>
             </Animated.View>
 
-            <Animated.Text 
-              entering={FadeInUp.duration(400).delay(200)} 
+            <Animated.Text
+              entering={FadeInUp.duration(400).delay(200)}
               style={styles.title}
             >
               Gestiona tus citas al instante
@@ -38,17 +36,17 @@ export const WelcomeScreen = () => {
 
           <View style={styles.bottomSection}>
             <Animated.View entering={FadeInDown.duration(400).delay(300)}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.primaryButton}
                 activeOpacity={0.8}
-                onPress={() => router.push('/(auth)/role-selection' as any)}
+                onPress={() => router.push('/(auth)/register')}
               >
                 <Text style={styles.primaryButtonText}>Crear cuenta</Text>
               </TouchableOpacity>
             </Animated.View>
 
             <Animated.View entering={FadeInDown.duration(400).delay(400)}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.secondaryButton}
                 activeOpacity={0.8}
                 onPress={() => router.push('/(auth)/login')}
@@ -56,15 +54,14 @@ export const WelcomeScreen = () => {
                 <Text style={styles.secondaryButtonText}>Iniciar sesión</Text>
               </TouchableOpacity>
             </Animated.View>
-            
-            <Animated.Text 
-              entering={FadeInDown.duration(400).delay(500)} 
+
+            <Animated.Text
+              entering={FadeInDown.duration(400).delay(500)}
               style={styles.termsText}
             >
               Al continuar, aceptas nuestros términos y condiciones.
             </Animated.Text>
           </View>
-
         </View>
       </View>
     </SafeAreaView>
