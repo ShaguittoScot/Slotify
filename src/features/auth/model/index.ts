@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
 import { authApi } from '../api';
-import type { LoginCredentials, RegisterAdminRequest } from '../types';
+import type { LoginCredentials, RegisterAdminRequest, SyncProfileRequest } from '../types';
 
 interface AuthState {
   user: AuthUser | null;
@@ -22,7 +22,7 @@ interface AuthState {
   setJustRegistered: (val: boolean) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,

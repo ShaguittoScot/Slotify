@@ -61,7 +61,7 @@ export default function RootLayout() {
       if (state.isJustRegistered) {
         router.replace('/(auth)/register-success');
       } else if (!state.user?.businessId) {
-        router.replace('/(auth)/onboarding');
+        router.replace('/(onboarding)/wizard');
       } else {
         router.replace('/(main)');
       }

@@ -128,26 +128,17 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
           <View style={styles.topBarPlaceholder} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: 130 + insets.bottom },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Hero Header con entrada suave */}
+        <View style={styles.mainContent}>
+          {/* Hero Header Minimalista */}
           <Animated.View
             entering={FadeInDown.delay(40).springify().damping(16)}
             style={styles.header}
           >
-            <View style={styles.kickerBadge}>
-              <Text style={styles.kickerText}>ONBOARDING MODULAR</Text>
-            </View>
             <Text style={styles.heading}>
-              Elige el giro de tu negocio
+              ¿Cuál es tu giro comercial?
             </Text>
             <Text style={styles.subheading}>
-              Personalizaremos tu catálogo de servicios, tiempos y módulos con base en tu sector comercial.
+              Configuraremos tu entorno de trabajo en base a tu sector.
             </Text>
           </Animated.View>
 
@@ -167,57 +158,17 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
             />
           )}
 
-          {/* Banner Dinámico Frosted Glass con morphing elástico al alternar sector */}
-          {selectedCategory && (
-            <Animated.View
-              key={`info-${selectedCategory.id}`}
-              entering={FadeInDown.springify().damping(14).stiffness(160)}
-              style={[
-                styles.infoCard,
-                isCustomCanvas ? styles.infoCardCustom : styles.infoCardSuggested,
-                webDockGlass,
-              ]}
-            >
-              <View
-                style={[
-                  styles.infoIconBox,
-                  isCustomCanvas ? styles.infoIconCustom : styles.infoIconSuggested,
-                ]}
-              >
-                <SymbolView
-                  name={
-                    isCustomCanvas
-                      ? { ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }
-                      : { ios: 'checkmark.seal.fill', android: 'verified', web: 'verified' }
-                  }
-                  size={18}
-                  tintColor={isCustomCanvas ? '#34D399' : '#818CF8'}
-                />
-              </View>
-              <View style={styles.infoContent}>
-                <Text
-                  style={[
-                    styles.infoTitle,
-                    isCustomCanvas ? styles.infoTitleCustom : styles.infoTitleSuggested,
-                  ]}
-                >
-                  {isCustomCanvas ? 'Modo Lienzo Libre Activado' : `${selectedCategory.name} seleccionado`}
-                </Text>
-                <Text style={styles.infoDescription}>
-                  {isCustomCanvas
-                    ? 'Comenzarás con una estructura modular limpia. Tú decides qué módulos habilitar.'
-                    : `Verás opciones de plantillas y servicios optimizados para ${selectedCategory.tagline}.`}
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-        </ScrollView>
+        </View>
 
         {/* Dock Flotante Inferior con FluidButton */}
         <View style={[styles.bottomDock, webDockGlass]}>
           <FluidButton
             testID="continue-sector-button"
-            label={isCustomCanvas ? 'Continuar con Lienzo Libre' : 'Continuar al Catálogo'}
+            label={
+              selectedCategory 
+                ? (isCustomCanvas ? 'Continuar con Lienzo Libre' : `Continuar con ${selectedCategory.name}`) 
+                : 'Selecciona una opción'
+            }
             disabled={!selectedCategory}
             variant={isCustomCanvas ? 'emerald' : 'primary'}
             onPress={handleContinue}
@@ -231,23 +182,23 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
 const styles = StyleSheet.create({
   outerScreen: {
     flex: 1,
-    backgroundColor: '#06080F',
+    backgroundColor: '#FFFFFF',
   },
   responsiveShell: {
     flex: 1,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
-    backgroundColor: '#090D18',
+    backgroundColor: '#FFFFFF',
     position: 'relative',
     minHeight: '100%',
     overflow: 'hidden',
     ...(Platform.OS === 'web' && {
       borderLeftWidth: 1,
       borderRightWidth: 1,
-      borderLeftColor: 'rgba(255, 255, 255, 0.08)',
-      borderRightColor: 'rgba(255, 255, 255, 0.08)',
-      boxShadow: '0 0 80px rgba(0, 0, 0, 0.8), 0 0 50px rgba(99, 102, 241, 0.12)',
+      borderLeftColor: '#E3E5E6',
+      borderRightColor: '#E3E5E6',
+      boxShadow: '0 0 40px rgba(0, 0, 0, 0.05)',
     } as any),
   },
 
@@ -258,21 +209,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(9, 13, 24, 0.75)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomColor: '#E3E5E6',
     zIndex: 10,
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#FAFAFA',
     borderWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-    borderLeftColor: 'rgba(255, 255, 255, 0.08)',
-    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#E3E5E6',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -283,69 +231,51 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#818CF8',
+    color: '#3F5B58',
     letterSpacing: 1.2,
   },
   stepTrack: {
     width: 72,
     height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#E3E5E6',
     overflow: 'hidden',
   },
   stepProgress: {
     width: 24,
     height: '100%',
-    backgroundColor: '#6366F1',
+    backgroundColor: '#3F5B58',
     borderRadius: 2,
   },
   topBarPlaceholder: {
     width: 44,
   },
 
-  // Contenido con Scroll
-  scrollContent: {
+  // Contenido Principal
+  mainContent: {
+    flex: 1,
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 120,
+    paddingBottom: 100,
     zIndex: 1,
   },
 
   // Header
   header: {
-    marginBottom: 26,
-  },
-  kickerBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(99, 102, 241, 0.14)',
-    borderWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.25)',
-    borderBottomColor: 'rgba(99, 102, 241, 0.3)',
-    borderLeftColor: 'rgba(99, 102, 241, 0.3)',
-    borderRightColor: 'rgba(99, 102, 241, 0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 12,
-  },
-  kickerText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#A5B4FC',
-    letterSpacing: 1,
+    marginBottom: 20,
   },
   heading: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.6,
-    color: '#FFFFFF',
-    marginBottom: 8,
-    lineHeight: 34,
+    color: '#2D3250',
+    marginBottom: 6,
+    lineHeight: 32,
   },
   subheading: {
-    fontSize: 14.5,
+    fontSize: 15,
     lineHeight: 22,
-    color: '#94A3B8',
+    color: '#AAACAD',
   },
 
   // Loading
@@ -356,65 +286,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#AAACAD',
   },
 
-  // Info Card
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 18,
-    marginTop: 20,
-    gap: 14,
-    borderWidth: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.65)',
-    borderTopColor: 'rgba(255, 255, 255, 0.22)',
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    borderLeftColor: 'rgba(255, 255, 255, 0.1)',
-    borderRightColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  infoCardSuggested: {
-    borderLeftColor: 'rgba(99, 102, 241, 0.5)',
-  },
-  infoCardCustom: {
-    borderLeftColor: 'rgba(16, 185, 129, 0.5)',
-  },
-  infoIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  infoIconSuggested: {
-    backgroundColor: 'rgba(99, 102, 241, 0.18)',
-    borderColor: 'rgba(99, 102, 241, 0.35)',
-  },
-  infoIconCustom: {
-    backgroundColor: 'rgba(16, 185, 129, 0.18)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  infoTitleSuggested: {
-    color: '#A5B4FC',
-  },
-  infoTitleCustom: {
-    color: '#34D399',
-  },
-  infoDescription: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: '#94A3B8',
-  },
+
 
   // Bottom Dock
   bottomDock: {
@@ -425,9 +300,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: Platform.select({ ios: 32, default: 18 }),
-    backgroundColor: 'rgba(9, 13, 24, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: '#E3E5E6',
     zIndex: 10,
   },
 });
