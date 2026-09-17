@@ -65,7 +65,7 @@ export default function OnboardingScreen() {
                 <MaterialCommunityIcons 
                   name={sector.icon as any} 
                   size={32} 
-                  color={isSelected ? '#FFFFFF' : '#4A5568'} 
+                  color={isSelected ? '#C57747' : '#AAACAD'} 
                 />
               </View>
               <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{sector.name}</Text>
@@ -80,7 +80,7 @@ export default function OnboardingScreen() {
         disabled={!selectedSector}
       >
         <Text style={styles.buttonText}>Continuar</Text>
-        <AntDesign name="arrowright" size={20} color="#FFFFFF" />
+        <AntDesign name="arrow-right" size={20} color="#FFFFFF" />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -88,7 +88,7 @@ export default function OnboardingScreen() {
   const renderStep2 = () => (
     <Animated.View entering={FadeInRight} exiting={FadeOutLeft} style={styles.stepContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
-        <AntDesign name="arrowleft" size={24} color="#1A202C" />
+        <AntDesign name="arrow-left" size={24} color="#2D3250" />
       </TouchableOpacity>
       
       <Text style={styles.title}>Casi listos</Text>
@@ -163,10 +163,11 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#FFFFFF', // Estilo blanco
   },
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   progressContainer: {
     paddingHorizontal: 24,
@@ -178,21 +179,21 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     flex: 1,
-    height: 8,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 4,
+    height: 6,
+    backgroundColor: '#E3E5E6',
+    borderRadius: 3,
     marginRight: 16,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4299E1',
-    borderRadius: 4,
+    backgroundColor: '#3F5B58', // Teal accent
+    borderRadius: 3,
   },
   progressText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#718096',
+    fontWeight: '500',
+    color: '#AAACAD',
   },
   stepContainer: {
     flex: 1,
@@ -202,14 +203,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#2D3748',
-    marginBottom: 12,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2D3250', // Navy blue
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#718096',
+    color: '#AAACAD',
     marginBottom: 32,
     lineHeight: 24,
   },
@@ -221,62 +223,70 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '48%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Minimalist glassmorphism
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    borderWidth: 1,
+    borderColor: '#E3E5E6', // Clear division
+    shadowColor: '#2D3250',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
     shadowRadius: 10,
-    elevation: 2,
+    elevation: 1,
   },
   cardSelected: {
-    borderColor: '#4299E1',
-    backgroundColor: '#EBF8FF',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#C57747', // Orange accent
+    shadowOpacity: 0.08,
   },
   iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#EDF2F7',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FAFAFA',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   iconBoxSelected: {
-    backgroundColor: '#4299E1',
+    backgroundColor: '#FFF4ED', // Very light orange
   },
   cardText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#4A5568',
+    fontWeight: '500',
+    color: '#AAACAD',
     textAlign: 'center',
   },
   cardTextSelected: {
-    color: '#2B6CB0',
-    fontWeight: '700',
+    color: '#2D3250',
+    fontWeight: '600',
   },
   button: {
-    backgroundColor: '#1A202C',
+    backgroundColor: '#2D3250',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: 100,
+    paddingVertical: 16,
+    borderRadius: 12,
     marginTop: 'auto',
     marginBottom: 16,
+    shadowColor: '#2D3250',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#A0AEC0',
+    backgroundColor: '#E3E5E6',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     marginRight: 8,
   },
   formContainer: {
@@ -288,28 +298,31 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4A5568',
+    color: '#2D3250',
     marginBottom: 8,
   },
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
+    borderColor: '#E3E5E6',
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#2D3748',
+    color: '#2D3250',
   },
   errorBox: {
-    backgroundColor: '#FED7D7',
+    backgroundColor: '#FFF4ED',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#C57747',
   },
   errorText: {
-    color: '#C53030',
+    color: '#C57747',
     fontSize: 14,
     textAlign: 'center',
+    fontWeight: '500',
   },
 });

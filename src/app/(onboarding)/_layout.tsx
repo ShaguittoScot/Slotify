@@ -5,11 +5,10 @@ export default function OnboardingLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
+        animation: 'fade', // Soft fade to the onboarding
       }}
     >
-      <Stack.Screen name="sector-selection" />
-      <Stack.Screen name="templates" />
+      <Stack.Screen name="wizard" />
     </Stack>
   );
 }
