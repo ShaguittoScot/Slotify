@@ -19,13 +19,31 @@ export default function AppTabs() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Gridflow',
+          title: 'Explorar',
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Ajustes',
+        }}
+      />
+      <Tabs.Screen
+        name="agenda"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
