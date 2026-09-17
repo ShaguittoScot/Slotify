@@ -533,18 +533,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    marginBottom: 16,
-    alignItems: 'flex-start',
+    marginBottom: 18,
+    alignItems: 'center',
+    paddingHorizontal: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 6,
     letterSpacing: -0.4,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
   },
 
   // Segmented Control
