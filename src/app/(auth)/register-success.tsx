@@ -1,67 +1,115 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
-import Animated, { FadeInDown, FadeIn, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  FadeInDown,
+  FadeIn,
+  withRepeat,
+  withTiming,
+  useSharedValue,
+  useAnimatedStyle,
+  Easing,
+} from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
-
-const { width } = Dimensions.get('window');
+import { useAppTheme } from '@/shared/theme';
 
 export default function RegisterSuccessScreen() {
-  const setJustRegistered = useAuthStore(state => state.setJustRegistered);
-  
+  const router = useRouter();
+  const { colors, isDark } = useAppTheme();
+  const setJustRegistered = useAuthStore((state) => state.setJustRegistered);
+
   const pulseValue = useSharedValue(1);
 
   useEffect(() => {
     pulseValue.value = withRepeat(
       withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-      -1, // infinite
-      true // reverse
+      -1,
+      true
     );
   }, []);
 
   const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseValue.value }]
+    transform: [{ scale: pulseValue.value }],
   }));
 
   const handleContinue = () => {
-    // This will toggle the flag in Zustand.
-    // The _layout.tsx will detect isJustRegistered is false and immediately redirect to /(main).
     setJustRegistered(false);
+    router.replace('/(onboarding)/wizard' as any);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background.primary }]}>
       {/* Background decoration */}
-      <View style={styles.backgroundBlob1} />
-      <View style={styles.backgroundBlob2} />
+      <View
+        style={[
+          styles.backgroundBlob1,
+          {
+            backgroundColor: isDark
+              ? 'rgba(99, 102, 241, 0.08)'
+              : 'rgba(66, 153, 225, 0.1)',
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.backgroundBlob2,
+          {
+            backgroundColor: isDark
+              ? 'rgba(168, 85, 247, 0.06)'
+              : 'rgba(159, 122, 234, 0.08)',
+          },
+        ]}
+      />
 
       <View style={styles.content}>
-        
-        <Animated.View style={[styles.iconContainer, pulseStyle]} entering={FadeIn.duration(800).delay(200)}>
-          <View style={styles.iconCircle}>
-            <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={50} tintColor="#FFFFFF" />
+        <Animated.View
+          style={[styles.iconContainer, pulseStyle]}
+          entering={FadeIn.duration(800).delay(200)}
+        >
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                backgroundColor: colors.action.primary,
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(99, 102, 241, 0.2)',
+              },
+            ]}
+          >
+            <Feather name="check" size={48} color={colors.action.primaryText} />
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(800).delay(400)} style={styles.textContainer}>
-          <Text style={styles.title}>¡Cuenta Creada!</Text>
-          <Text style={styles.subtitle}>
-            Tu negocio ha sido registrado exitosamente en Slotify.
-            Estás a un paso de revolucionar la forma en que gestionas tus reservas.
+        <Animated.View
+          entering={FadeInDown.duration(800).delay(400)}
+          style={styles.textContainer}
+        >
+          <Text style={[styles.title, { color: colors.text.primary }]}>¡Cuenta Creada!</Text>
+          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+            Tu negocio ha sido registrado exitosamente en Slotify. Estás a un paso de
+            revolucionar la forma en que gestionas tus reservas.
           </Text>
         </Animated.View>
-
       </View>
 
       <Animated.View entering={FadeInDown.duration(800).delay(600)} style={styles.footer}>
-        <TouchableOpacity style={styles.button} onPress={handleContinue}>
-          <Text style={styles.buttonText}>Configurar mi Negocio</Text>
-          <SymbolView name={{ ios: 'chevron.right', android: 'arrow_forward', web: 'arrow_forward' }} size={16} tintColor="#FFFFFF" />
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.action.primary }]}
+          onPress={handleContinue}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>
+            Configurar mi Negocio
+          </Text>
+          <Feather
+            name="arrow-right"
+            size={18}
+            color={colors.action.primaryText}
+            style={styles.buttonIcon}
+          />
         </TouchableOpacity>
       </Animated.View>
-      
     </SafeAreaView>
   );
 }
@@ -69,7 +117,6 @@ export default function RegisterSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
   },
   backgroundBlob1: {
     position: 'absolute',
@@ -78,7 +125,6 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    backgroundColor: 'rgba(66, 153, 225, 0.1)',
   },
   backgroundBlob2: {
     position: 'absolute',
@@ -87,7 +133,6 @@ const styles = StyleSheet.create({
     width: 400,
     height: 400,
     borderRadius: 200,
-    backgroundColor: 'rgba(159, 122, 234, 0.1)',
   },
   content: {
     flex: 1,
@@ -97,9 +142,9 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: 40,
-    shadowColor: '#4299E1',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 10,
   },
@@ -107,11 +152,9 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#4299E1',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 8,
-    borderColor: 'rgba(66, 153, 225, 0.2)',
+    borderWidth: 6,
   },
   textContainer: {
     alignItems: 'center',
@@ -119,14 +162,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#2D3748',
     marginBottom: 16,
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#718096',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -135,24 +176,22 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   button: {
-    backgroundColor: '#1A202C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 18,
     borderRadius: 100,
-    shadowColor: '#1A202C',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 4,
   },
   buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
   },
   buttonIcon: {
-    marginLeft: 12,
-  }
+    marginLeft: 8,
+  },
 });
