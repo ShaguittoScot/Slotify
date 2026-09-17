@@ -17,6 +17,7 @@ import {
 
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme } from '@/shared/theme';
+import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -58,10 +59,13 @@ export default function RootLayout() {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      if (segments[1] === 'register') {
-        router.replace('/(onboarding)/sector-selection');
-      } else if (segments[1] === 'register-client') {
+      const state = useAuthStore.getState();
+      if (segments[1] === 'register-client' || state.appMode === 'CONSUMER') {
         router.replace('/(main)/explore' as any);
+      } else if (state.isJustRegistered) {
+        router.replace('/(auth)/register-success');
+      } else if (!state.user?.businessId) {
+        router.replace('/(onboarding)/wizard');
       } else {
         router.replace('/(main)');
       }
@@ -86,6 +90,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AnimatedSplashOverlay />
       <Slot />
     </ThemeProvider>
   );

@@ -6,7 +6,9 @@
 import axios from 'axios';
 import { storage } from './storage';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5272/api';
+
+console.log('API_BASE_URL is:', API_BASE_URL);
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

@@ -16,7 +16,7 @@ export const authApi = {
   login: async (credentials: LoginCredentials) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: credentials.email,
-      password: credentials.password,
+      password: credentials.password || '',
     });
 
     if (error) throw new Error(error.message);
@@ -35,14 +35,13 @@ export const authApi = {
   },
 
   /**
-   * Register with Supabase Auth, then sync the profile
-   * with the .NET backend to create the Business + User row.
+   * Register with Supabase Auth.
+   * Syncing with .NET backend is done separately in onboarding.
    */
   register: async (request: RegisterAdminRequest) => {
-    // 1. Create the user in Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
-      password: request.password,
+      password: request.password || '',
       options: {
         data: {
           full_name: request.fullName,
@@ -52,26 +51,6 @@ export const authApi = {
 
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error('No se pudo crear el usuario.');
-
-    // 2. Sync with our .NET backend
-    const syncPayload: SyncProfileRequest = {
-      id: data.user.id,
-      fullName: request.fullName,
-      email: request.email,
-      businessName: request.businessName,
-      businessPhone: request.businessPhone,
-    };
-
-    try {
-      await apiClient.post<SyncProfileResponse>(
-        API_ENDPOINTS.AUTH.SYNC,
-        syncPayload
-      );
-    } catch (syncError) {
-      // If sync fails, we still have the Supabase user
-      console.error('Error syncing profile with backend:', syncError);
-    }
-
     return data;
   },
 
@@ -93,6 +72,18 @@ export const authApi = {
 
     if (error) throw new Error(error.message);
     return data;
+  },
+
+  /**
+   * Sync profile with .NET backend to create Business + User row.
+   * Called at the end of onboarding.
+   */
+  syncProfile: async (syncPayload: SyncProfileRequest) => {
+    const response = await apiClient.post<SyncProfileResponse>(
+      API_ENDPOINTS.AUTH.SYNC,
+      syncPayload
+    );
+    return response.data;
   },
 
   /**

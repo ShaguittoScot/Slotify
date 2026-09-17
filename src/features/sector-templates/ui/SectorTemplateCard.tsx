@@ -112,9 +112,9 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
     WebkitBackdropFilter: 'blur(16px)',
     boxShadow: isSelected
       ? (category.isCustomCanvas
-          ? '0 0 24px rgba(16, 185, 129, 0.38), 0 8px 32px 0 rgba(0, 0, 0, 0.45)'
-          : '0 0 24px rgba(99, 102, 241, 0.38), 0 8px 32px 0 rgba(0, 0, 0, 0.45)')
-      : '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+          ? '0 0 16px rgba(63, 91, 88, 0.15)'
+          : '0 0 16px rgba(197, 119, 71, 0.15)')
+      : '0 2px 10px rgba(0, 0, 0, 0.02)',
     transition: 'border 0.2s ease, background-color 0.2s ease, box-shadow 0.25s ease',
     cursor: disabled ? 'not-allowed' : 'pointer',
   } as any) : {};
@@ -164,8 +164,8 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
             size={22}
             tintColor={
               isSelected
-                ? (category.isCustomCanvas ? '#34D399' : '#818CF8')
-                : '#94A3B8'
+                ? (category.isCustomCanvas ? '#3F5B58' : '#C57747')
+                : '#AAACAD'
             }
           />
         </View>
@@ -180,35 +180,11 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
               {category.name}
             </Text>
 
-            {category.isCustomCanvas && (
-              <View style={styles.canvasPill}>
-                <View style={styles.canvasDot} />
-                <Text style={styles.canvasPillText}>Lienzo Libre</Text>
-              </View>
-            )}
           </View>
 
-          <Text style={styles.tagline} numberOfLines={2}>
+          <Text style={styles.tagline} numberOfLines={1}>
             {category.tagline}
           </Text>
-
-          {/* Chips de metadatos */}
-          <View style={styles.chipsRow}>
-            {category.isCustomCanvas ? (
-              <View style={styles.chipCustom}>
-                <Text style={styles.chipCustomText}>Total flexibilidad • Sin módulos forzados</Text>
-              </View>
-            ) : (
-              <>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>{category.defaultModules.length} módulos base</Text>
-                </View>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>{category.suggestedServices.length} servicios</Text>
-                </View>
-              </>
-            )}
-          </View>
         </View>
 
         {/* Indicador de Selección Radio con Spring Pop */}
@@ -237,26 +213,23 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cardContainer: {
-    minHeight: 88,
+    minHeight: 70,
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: '#16161D',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     borderWidth: 1,
-    borderTopColor: '#2B2B38',
-    borderBottomColor: '#20202A',
-    borderLeftColor: '#262632',
-    borderRightColor: '#262632',
+    borderColor: '#E3E5E6',
     marginVertical: 5,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowColor: '#2D3250',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 1,
   },
   glowBar: {
     position: 'absolute',
@@ -264,36 +237,24 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 3.5,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#C57747',
     borderRadius: 2,
   },
   glowBarCustom: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#3F5B58',
   },
 
   cardSelected: {
-    backgroundColor: '#1C1B2E',
-    borderTopColor: '#6366F1',
-    borderBottomColor: '#4F46E5',
-    borderLeftColor: '#4F46E5',
-    borderRightColor: '#4F46E5',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 5,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#C57747',
+    shadowOpacity: 0.06,
+    elevation: 3,
   },
   cardCustomSelected: {
-    backgroundColor: '#111E1A',
-    borderTopColor: '#10B981',
-    borderBottomColor: '#059669',
-    borderLeftColor: '#059669',
-    borderRightColor: '#059669',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    elevation: 5,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#3F5B58',
+    shadowOpacity: 0.06,
+    elevation: 3,
   },
   cardDisabled: {
     opacity: 0.4,
@@ -301,28 +262,25 @@ const styles = StyleSheet.create({
 
   // Icon Badge
   iconBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
     borderWidth: 1,
   },
   iconBadgeDefault: {
-    backgroundColor: '#202028',
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
-    borderBottomColor: '#181820',
-    borderLeftColor: '#282834',
-    borderRightColor: '#282834',
+    backgroundColor: '#FAFAFA',
+    borderColor: '#E3E5E6',
   },
   iconBadgeSelected: {
-    backgroundColor: '#2D2A54',
-    borderColor: '#4F46E5',
+    backgroundColor: '#FFF4ED',
+    borderColor: '#C57747',
   },
   iconBadgeCustomSelected: {
-    backgroundColor: '#0F2A22',
-    borderColor: '#10B981',
+    backgroundColor: '#F0F5F4',
+    borderColor: '#3F5B58',
   },
 
   // Text Container
@@ -335,80 +293,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   title: {
-    fontSize: 15.5,
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.2,
-    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    color: '#2D3250',
   },
   titleSelected: {
-    color: '#FFFFFF',
-  },
-  canvasPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#20202A',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: '#303040',
-  },
-  canvasDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#818CF8',
-  },
-  canvasPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#A5B4FC',
-    letterSpacing: 0.2,
+    color: '#2D3250',
   },
   tagline: {
-    fontSize: 12.5,
-    lineHeight: 17,
-    color: '#8E8E98',
-    marginBottom: 6,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#AAACAD',
   },
 
-  // Chips
-  chipsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  chip: {
-    backgroundColor: '#202028',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#2B2B38',
-  },
-  chipText: {
-    fontSize: 10.5,
-    fontWeight: '500',
-    color: '#9CA3AF',
-  },
-  chipCustom: {
-    backgroundColor: '#202028',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#2B2B38',
-  },
-  chipCustomText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#A5B4FC',
-  },
+
 
   // Radio Ring
   radioRing: {
@@ -416,26 +318,26 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: '#383846',
+    borderColor: '#E3E5E6',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
   radioRingSelected: {
-    borderColor: '#6366F1',
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    borderColor: '#C57747',
+    backgroundColor: '#FFF4ED',
   },
   radioRingCustom: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: '#3F5B58',
+    backgroundColor: '#F0F5F4',
   },
   radioDot: {
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#C57747',
   },
   radioDotCustom: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#3F5B58',
   },
 });

@@ -53,6 +53,7 @@ export const RegisterScreen = () => {
         businessPhone,
         sectorTemplateId: selectedCategory?.id ?? 1,
       });
+      // Routing is handled automatically by _layout.tsx thanks to isJustRegistered
     } catch {
       // Error is handled in store
     }
@@ -391,19 +392,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 20,
     alignItems: 'flex-start',
-  },
-  roleBadgeTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-    marginBottom: 10,
-  },
-  roleBadgeTopText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   title: {
     fontSize: 28,
