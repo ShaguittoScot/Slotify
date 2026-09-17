@@ -258,9 +258,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 15,
+    textAlign: 'center',
   },
   formContainer: {
     borderRadius: 20,
