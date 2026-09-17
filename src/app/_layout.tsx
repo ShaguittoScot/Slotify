@@ -26,7 +26,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  const { isAuthenticated, isLoading, isJustRegistered, user, appMode, hydrate } = useAuthStore();
+  const { isAuthenticated, isLoading, user, appMode, hydrate } = useAuthStore();
 
   const [fontsLoaded] = useFonts({
     Poppins_500Medium,
@@ -62,17 +62,13 @@ export default function RootLayout() {
     } else if (isAuthenticated && inAuthGroup) {
       if (segments[1] === 'register-client' || appMode === 'CONSUMER') {
         router.replace('/(main)/explore' as any);
-      } else if (isJustRegistered) {
-        if (segments[1] !== 'register-success') {
-          router.replace('/(auth)/register-success');
-        }
       } else if (!user?.businessId) {
         router.replace('/(onboarding)/wizard');
       } else {
         router.replace('/(main)');
       }
     }
-  }, [isAuthenticated, isLoading, isJustRegistered, user?.businessId, appMode, segments, fontsLoaded]);
+  }, [isAuthenticated, isLoading, user?.businessId, appMode, segments, fontsLoaded]);
 
   if (isLoading || !fontsLoaded) {
     return (
