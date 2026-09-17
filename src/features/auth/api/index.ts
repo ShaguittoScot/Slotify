@@ -1,7 +1,13 @@
 import { supabase } from '@/shared/lib/supabase';
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
-import type { LoginCredentials, RegisterAdminRequest, SyncProfileRequest, SyncProfileResponse } from '../types';
+import type {
+  LoginCredentials,
+  RegisterAdminRequest,
+  RegisterClientRequest,
+  SyncProfileRequest,
+  SyncProfileResponse,
+} from '../types';
 
 export const authApi = {
   /**
@@ -66,6 +72,26 @@ export const authApi = {
       console.error('Error syncing profile with backend:', syncError);
     }
 
+    return data;
+  },
+
+  /**
+   * Register a consumer client with Supabase Auth.
+   */
+  registerClient: async (request: RegisterClientRequest) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: request.email,
+      password: request.password,
+      options: {
+        data: {
+          full_name: request.fullName,
+          phone: request.phone,
+          role: 'CLIENTE',
+        },
+      },
+    });
+
+    if (error) throw new Error(error.message);
     return data;
   },
 

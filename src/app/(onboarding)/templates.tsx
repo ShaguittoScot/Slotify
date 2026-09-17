@@ -34,6 +34,7 @@ import { FluidButton } from '@/components/ui/FluidButton';
 import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
+import { useAuthStore } from '@/features/auth/model';
 import type { SuggestedServiceDto } from '@/features/sector-templates/types';
 
 // Tipo para servicios personalizados creados por el usuario en modo Lienzo Libre
@@ -496,7 +497,12 @@ export default function TemplatesCatalogRoute() {
       isCustomCanvas: isCustomMode,
     });
 
-    router.replace('/(main)');
+    const { isAuthenticated } = useAuthStore.getState();
+    if (isAuthenticated) {
+      router.replace('/(main)');
+    } else {
+      router.replace('/(auth)/register');
+    }
   };
 
   const handleBack = () => {
