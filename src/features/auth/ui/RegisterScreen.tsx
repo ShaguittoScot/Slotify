@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { AntDesign } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 
 export const RegisterScreen = () => {
