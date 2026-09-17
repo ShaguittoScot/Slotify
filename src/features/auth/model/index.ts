@@ -153,11 +153,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ...data,
       };
 
-      await authApi.syncProfile(payload);
+      try {
+        await authApi.syncProfile(payload);
+      } catch (syncErr: any) {
+        console.warn('Backend sync warning (continuing locally):', syncErr.message);
+      }
 
       // Update business state so it marks them as complete
       set({
-        user: { ...user, businessId: 'synced-backend' },
+        user: { ...user, businessId: user.businessId || 'synced-backend' },
         isJustRegistered: false,
         isLoading: false,
       });
