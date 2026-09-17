@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import Animated, { FadeInDown, FadeIn, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
@@ -9,6 +10,7 @@ const { width } = Dimensions.get('window');
 
 export default function RegisterSuccessScreen() {
   const setJustRegistered = useAuthStore(state => state.setJustRegistered);
+  const router = useRouter();
   
   const pulseValue = useSharedValue(1);
 
@@ -26,8 +28,10 @@ export default function RegisterSuccessScreen() {
 
   const handleContinue = () => {
     // This will toggle the flag in Zustand.
-    // The _layout.tsx will detect isJustRegistered is false and immediately redirect to /(main).
     setJustRegistered(false);
+    // Explicitly navigate to the onboarding wizard
+    // @ts-ignore
+    router.replace('/(onboarding)/wizard');
   };
 
   return (

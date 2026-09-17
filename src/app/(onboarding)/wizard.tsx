@@ -37,7 +37,7 @@ export default function UnifiedOnboardingScreen() {
   const router = useRouter();
   const [step, setStep] = useState(1);
 
-  const { user, completeOnboarding } = useAuthStore();
+  const { user, completeOnboarding, logout } = useAuthStore();
 
   // State
   const [category, setCategory] = useState('');
@@ -125,6 +125,15 @@ export default function UnifiedOnboardingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={s.shell}>
+          
+          {/* Header con botón de cerrar sesión */}
+          <View style={s.headerRow}>
+            <TouchableOpacity onPress={logout} style={s.logoutBtnSm} activeOpacity={0.7}>
+              <SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={16} tintColor="#EF4444" />
+              <Text style={s.logoutTextSm}>Cerrar Sesión</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Progress Bar (Hide on success) */}
           {step < 5 && (
             <View style={s.progressBarTrack}>
@@ -471,6 +480,30 @@ const s = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
+  },
+
+  // Header & Logout
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
+  logoutBtnSm: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  logoutTextSm: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 
   // Progress Bar
