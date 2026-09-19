@@ -16,7 +16,7 @@
     "expo-font": "~57.0.3",
     "expo-glass-effect": "~57.0.2",
     "expo-image": "~57.0.4",
-    "expo-linear-gradient": "^57.0.1",
+    "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.9",
     "expo-router": "~57.0.20",
     "expo-secure-store": "~57.0.3",
@@ -45,10 +45,9 @@
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "start:back": "cd ../Slotify_back && \"C:\\Users\\evsot\\AppData\\Local\\dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
   "private": true
 }

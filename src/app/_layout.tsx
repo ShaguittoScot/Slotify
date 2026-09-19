@@ -16,6 +16,7 @@ import {
 } from '@expo-google-fonts/inter';
 
 import { useAuthStore } from '@/features/auth/model';
+import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,24 +57,14 @@ export default function RootLayout() {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(main)');
-    }
-  }, [isAuthenticated, isLoading, segments, fontsLoaded]);
-
-  if (isLoading || !fontsLoaded) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-    const inMainGroup = segments[0] === '(main)';
-
-    if (!isAuthenticated && inMainGroup) {
-      // @ts-ignore
-      router.replace('/(auth)');
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(main)');
+      const state = useAuthStore.getState();
+      if (state.isJustRegistered) {
+        router.replace('/(auth)/register-success');
+      } else if (!state.user?.businessId) {
+        router.replace('/(onboarding)/wizard');
+      } else {
+        router.replace('/(main)');
+      }
     }
   }, [isAuthenticated, isLoading, segments, fontsLoaded]);
 
@@ -87,6 +78,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <AnimatedSplashOverlay />
       <Slot />
     </ThemeProvider>
   );
