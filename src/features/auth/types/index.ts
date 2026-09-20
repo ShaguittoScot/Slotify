@@ -2,7 +2,7 @@ import type { AuthUser } from '@/shared/types';
 
 export interface LoginCredentials {
   email: string;
-  password: string;
+  password?: string;
 }
 
 export interface RegisterAdminRequest {
@@ -10,8 +10,20 @@ export interface RegisterAdminRequest {
   email: string;
   password: string;
   businessName: string;
-  businessPhone: string;
+  businessPhone?: string;
   sectorTemplateId?: number;
+}
+
+export interface RegisterClientRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+export interface AuthResponse {
+  user: any;
+  session: any;
 }
 
 /**
@@ -31,24 +43,5 @@ export interface SyncProfileResponse {
   success: boolean;
   data?: AuthUser;
   message?: string;
-  sectorTemplateId: number;
-}
-
-/**
- * Payload sent to the .NET backend after Supabase signup
- * to sync the user profile and create a business.
- */
-export interface SyncProfileRequest {
-  id: string;
-  fullName: string;
-  email: string;
-  businessName: string;
-  businessPhone?: string;
   sectorTemplateId?: number;
-}
-
-export interface SyncProfileResponse {
-  success: boolean;
-  data?: AuthUser;
-  message?: string;
 }
