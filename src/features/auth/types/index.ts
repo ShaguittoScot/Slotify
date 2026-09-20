@@ -8,10 +8,17 @@ export interface LoginCredentials {
 export interface RegisterAdminRequest {
   fullName: string;
   email: string;
-  password?: string;
+  password: string;
   businessName: string;
   businessPhone?: string;
   sectorTemplateId?: number;
+}
+
+export interface RegisterClientRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  phone?: string;
 }
 
 export interface AuthResponse {
@@ -36,4 +43,5 @@ export interface SyncProfileResponse {
   success: boolean;
   data?: AuthUser;
   message?: string;
+  sectorTemplateId?: number;
 }

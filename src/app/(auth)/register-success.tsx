@@ -1,71 +1,123 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
-import Animated, { FadeInDown, FadeIn, withRepeat, withTiming, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  FadeInDown,
+  FadeIn,
+  withRepeat,
+  withTiming,
+  useSharedValue,
+  useAnimatedStyle,
+  Easing,
+} from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
-
-const { width } = Dimensions.get('window');
+import { useAppTheme } from '@/shared/theme';
 
 export default function RegisterSuccessScreen() {
-  const setJustRegistered = useAuthStore(state => state.setJustRegistered);
   const router = useRouter();
-  
+  const { colors, isDark } = useAppTheme();
+  const setJustRegistered = useAuthStore((state) => state.setJustRegistered);
   const pulseValue = useSharedValue(1);
 
   useEffect(() => {
     pulseValue.value = withRepeat(
       withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-      -1, // infinite
-      true // reverse
+      -1,
+      true
     );
   }, []);
 
   const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseValue.value }]
+    transform: [{ scale: pulseValue.value }],
   }));
 
   const handleContinue = () => {
-    // This will toggle the flag in Zustand.
     setJustRegistered(false);
-    // Explicitly navigate to the onboarding wizard
-    // @ts-ignore
-    router.replace('/(onboarding)/wizard');
+    router.replace('/(onboarding)/wizard' as any);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      
-      {/* Background decoration */}
-      <View style={styles.backgroundBlob1} />
-      <View style={styles.backgroundBlob2} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background.primary }]}>
+      {/* Background decoration in warm terracotta tints */}
+      <View
+        style={[
+          styles.backgroundBlob1,
+          {
+            backgroundColor: isDark
+              ? 'rgba(197, 119, 71, 0.08)'
+              : 'rgba(255, 244, 237, 0.9)',
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.backgroundBlob2,
+          {
+            backgroundColor: isDark
+              ? 'rgba(197, 119, 71, 0.05)'
+              : 'rgba(254, 243, 199, 0.5)',
+          },
+        ]}
+      />
 
       <View style={styles.content}>
-        
-        <Animated.View style={[styles.iconContainer, pulseStyle]} entering={FadeIn.duration(800).delay(200)}>
-          <View style={styles.iconCircle}>
-            <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={50} tintColor="#FFFFFF" />
+        <Animated.View
+          style={[styles.iconContainer, pulseStyle]}
+          entering={FadeIn.duration(800).delay(200)}
+        >
+          <View
+            style={[
+              styles.iconCircleOuter,
+              {
+                backgroundColor: isDark ? '#262626' : '#FFF4ED',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#F0D4BD',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.iconCircleInner,
+                {
+                  backgroundColor: isDark ? '#333333' : '#FFFFFF',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F0D4BD',
+                },
+              ]}
+            >
+              <Feather name="check" size={40} color="#C57747" />
+            </View>
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(800).delay(400)} style={styles.textContainer}>
-          <Text style={styles.title}>¡Cuenta Creada!</Text>
-          <Text style={styles.subtitle}>
-            Tu negocio ha sido registrado exitosamente en Slotify.
-            Estás a un paso de revolucionar la forma en que gestionas tus reservas.
+        <Animated.View
+          entering={FadeInDown.duration(800).delay(400)}
+          style={styles.textContainer}
+        >
+          <Text style={[styles.title, { color: colors.text.primary }]}>¡Cuenta Creada!</Text>
+          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+            Tu acceso a Slotify ha sido registrado exitosamente. Ahora configuremos tu negocio en unos sencillos pasos.
           </Text>
         </Animated.View>
-
       </View>
 
       <Animated.View entering={FadeInDown.duration(800).delay(600)} style={styles.footer}>
-        <TouchableOpacity style={styles.button} onPress={handleContinue}>
-          <Text style={styles.buttonText}>Configurar mi Negocio</Text>
-          <SymbolView name={{ ios: 'chevron.right', android: 'arrow_forward', web: 'arrow_forward' }} size={16} tintColor="#FFFFFF" />
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#C57747' }]}
+          onPress={handleContinue}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.buttonText}>
+            Configurar mi Negocio
+          </Text>
+          <Feather
+            name="arrow-right"
+            size={18}
+            color="#FFFFFF"
+            style={styles.buttonIcon}
+          />
         </TouchableOpacity>
       </Animated.View>
-      
     </SafeAreaView>
   );
 }
@@ -73,7 +125,6 @@ export default function RegisterSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
   },
   backgroundBlob1: {
     position: 'absolute',
@@ -82,7 +133,6 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    backgroundColor: 'rgba(66, 153, 225, 0.1)',
   },
   backgroundBlob2: {
     position: 'absolute',
@@ -91,7 +141,6 @@ const styles = StyleSheet.create({
     width: 400,
     height: 400,
     borderRadius: 200,
-    backgroundColor: 'rgba(159, 122, 234, 0.1)',
   },
   content: {
     flex: 1,
@@ -100,63 +149,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   iconContainer: {
-    marginBottom: 40,
-    shadowColor: '#4299E1',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    marginBottom: 36,
   },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#4299E1',
+  iconCircleOuter: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 8,
-    borderColor: 'rgba(66, 153, 225, 0.2)',
+    borderWidth: 2,
+    shadowColor: '#C57747',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  iconCircleInner: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
   },
   textContainer: {
     alignItems: 'center',
+    paddingHorizontal: 10,
   },
   title: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '800',
-    color: '#2D3748',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#718096',
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   footer: {
     padding: 24,
     paddingBottom: 40,
   },
   button: {
-    backgroundColor: '#1A202C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    paddingVertical: 17,
     borderRadius: 100,
-    shadowColor: '#1A202C',
+    shadowColor: '#C57747',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 4,
   },
   buttonText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   buttonIcon: {
-    marginLeft: 12,
-  }
+    marginLeft: 8,
+  },
 });

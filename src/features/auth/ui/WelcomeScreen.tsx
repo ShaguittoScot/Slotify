@@ -11,26 +11,23 @@ export const WelcomeScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        
         {/* Animated Background Cards */}
         <FloatingBackgroundCards />
 
         {/* Foreground Content */}
         <View style={styles.content}>
-          
           <View style={styles.centerSection}>
-            <Animated.View 
-              entering={FadeIn.duration(400).delay(100)} 
+            <Animated.View
+              entering={FadeIn.duration(400).delay(100)}
               style={styles.logoContainer}
             >
-              {/* Replace with your actual Logo Image later */}
               <View style={styles.logoPlaceholder}>
                 <Text style={styles.logoPlaceholderText}>S</Text>
               </View>
             </Animated.View>
 
-            <Animated.Text 
-              entering={FadeInUp.duration(400).delay(200)} 
+            <Animated.Text
+              entering={FadeInUp.duration(400).delay(200)}
               style={styles.title}
             >
               Gestiona tus citas al instante
@@ -39,7 +36,7 @@ export const WelcomeScreen = () => {
 
           <View style={styles.bottomSection}>
             <Animated.View entering={FadeInDown.duration(400).delay(300)}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.primaryButton}
                 activeOpacity={0.8}
                 onPress={() => router.push('/(auth)/register')}
@@ -49,7 +46,7 @@ export const WelcomeScreen = () => {
             </Animated.View>
 
             <Animated.View entering={FadeInDown.duration(400).delay(400)}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.secondaryButton}
                 activeOpacity={0.8}
                 onPress={() => router.push('/(auth)/login')}
@@ -57,15 +54,14 @@ export const WelcomeScreen = () => {
                 <Text style={styles.secondaryButtonText}>Iniciar sesión</Text>
               </TouchableOpacity>
             </Animated.View>
-            
-            <Animated.Text 
-              entering={FadeInDown.duration(400).delay(500)} 
+
+            <Animated.Text
+              entering={FadeInDown.duration(400).delay(500)}
               style={styles.termsText}
             >
               Al continuar, aceptas nuestros términos y condiciones.
             </Animated.Text>
           </View>
-
         </View>
       </View>
     </SafeAreaView>
@@ -128,7 +124,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#1A202C',
-    borderRadius: 100, // Fully rounded like the reference
+    borderRadius: 100,
     paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',

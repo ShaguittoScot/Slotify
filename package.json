@@ -6,6 +6,7 @@
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/ui": "~57.0.17",
+    "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.102.8",
@@ -42,12 +43,11 @@
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "start:back": "cd ../Slotify_back && \"C:\\Users\\evsot\\AppData\\Local\\dotnet\\dotnet.exe\" run --project src/Slotify.API"
+    "start:back": "cd ../Slotify_back && \"$env:USERPROFILE\\.dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
   "private": true
 }

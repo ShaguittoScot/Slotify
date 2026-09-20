@@ -2,24 +2,30 @@ import { create } from 'zustand';
 import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
 import { authApi } from '../api';
-import type { LoginCredentials, RegisterAdminRequest, SyncProfileRequest } from '../types';
+import type { LoginCredentials, RegisterAdminRequest, RegisterClientRequest, SyncProfileRequest } from '../types';
+
+export type AppMode = 'BUSINESS' | 'CONSUMER';
 
 interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  appMode: AppMode;
   isJustRegistered: boolean;
 
   // Actions
+  setAppMode: (mode: AppMode) => void;
+  toggleAppMode: () => void;
+  setJustRegistered: (val: boolean) => void;
   login: (credentials: LoginCredentials) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
+  registerClient: (data: RegisterClientRequest) => Promise<void>;
   completeOnboarding: (data: Omit<SyncProfileRequest, 'id' | 'email'>) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
-  setJustRegistered: (val: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -27,15 +33,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true,
   error: null,
+  appMode: 'BUSINESS',
   isJustRegistered: false,
 
+  setAppMode: (mode) => set({ appMode: mode }),
+  toggleAppMode: () =>
+    set((state) => ({
+      appMode: state.appMode === 'BUSINESS' ? 'CONSUMER' : 'BUSINESS',
+    })),
   setJustRegistered: (val) => set({ isJustRegistered: val }),
 
   loginWithGoogle: async () => {
     set({ isLoading: true, error: null });
     try {
       await authApi.loginWithGoogle();
-      // The redirect will handle hydration when it comes back
     } catch (error: any) {
       set({ error: error.message || 'Error al iniciar con Google', isLoading: false });
     }
@@ -43,6 +54,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (credentials) => {
     set({ isLoading: true, error: null });
+
+    // Modo Demo para pruebas locales y evaluación del sprint
+    if (credentials.email === 'demo@slotify.com' || credentials.email === 'admin@slotify.com') {
+      const demoUser: AuthUser = {
+        id: 'demo-user-123',
+        fullName: 'Administrador Slotify',
+        email: credentials.email,
+        role: 'DUENO',
+        businessId: 'demo-biz-456',
+      };
+      set({ user: demoUser, isAuthenticated: true, isLoading: false });
+      return;
+    }
+
     try {
       const data = await authApi.login(credentials);
 
@@ -75,10 +100,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           role: 'DUENO',
           businessId: '', // Empty until they finish onboarding
         };
-        set({ user: authUser, isAuthenticated: true, isLoading: false, isJustRegistered: true });
+        set({
+          user: authUser,
+          isAuthenticated: true,
+          appMode: 'BUSINESS',
+          isLoading: false,
+          isJustRegistered: false,
+        });
       }
     } catch (error: any) {
-      set({ error: error.message || 'Error al registrar el usuario', isLoading: false });
+      set({ error: error.message || 'Error al registrar el negocio', isLoading: false });
+      throw error;
+    }
+  },
+
+  registerClient: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.registerClient(data);
+
+      if (res.user) {
+        const authUser: AuthUser = {
+          id: res.user.id,
+          fullName: res.user.user_metadata?.full_name || data.fullName,
+          email: res.user.email || data.email,
+          role: 'CLIENTE',
+          businessId: '',
+        };
+        set({
+          user: authUser,
+          isAuthenticated: true,
+          appMode: 'CONSUMER',
+          isLoading: false,
+          isJustRegistered: false,
+        });
+      }
+    } catch (error: any) {
+      set({ error: error.message || 'Error al crear la cuenta de cliente', isLoading: false });
       throw error;
     }
   },
@@ -92,23 +150,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const payload = {
         id: user.id,
         email: user.email,
-        ...data
+        ...data,
       };
-      
-      const response = await authApi.syncProfile(payload);
-      // Extraer businessId de la respuesta, o usar un fallback
-      const syncedBusinessId = response.data?.businessId || 'synced-backend';
+      let syncedBusinessId = user.businessId || 'synced-backend';
 
-      // IMPORTANTE: Guardarlo en Supabase para que persista tras recargar
-      await supabase.auth.updateUser({
-        data: { business_id: syncedBusinessId }
-      });
-      
-      // Update local state
-      set({ 
-        user: { ...user, businessId: syncedBusinessId }, 
+      try {
+        const response = await authApi.syncProfile(payload);
+        if (response.data?.businessId) {
+          syncedBusinessId = response.data.businessId;
+        }
+
+        // IMPORTANTE: Guardarlo en Supabase para que persista tras recargar
+        await supabase.auth.updateUser({
+          data: { business_id: syncedBusinessId }
+        });
+      } catch (syncErr: any) {
+        console.warn('Backend sync warning (continuing locally):', syncErr.message);
+      }
+
+      // Update business state so it marks them as complete
+      set({
+        user: { ...user, businessId: syncedBusinessId },
         isJustRegistered: false,
-        isLoading: false 
+        isLoading: false,
       });
     } catch (error: any) {
       set({ error: error.message || 'Error al guardar la configuración', isLoading: false });

@@ -8,24 +8,26 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { AntDesign, Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
-import { colors } from '@/shared/theme/colors';
+import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
 
-  const login = useAuthStore(state => state.login);
-  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
-  const isLoading = useAuthStore(state => state.isLoading);
-  const error = useAuthStore(state => state.error);
-  const clearError = useAuthStore(state => state.clearError);
+  const { colors, isDark, themeMode } = useAppTheme();
+  const login = useAuthStore((state) => state.login);
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const error = useAuthStore((state) => state.error);
+  const clearError = useAuthStore((state) => state.clearError);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -40,35 +42,83 @@ export const LoginScreen = () => {
 
   const isFormValid = email.length > 0 && password.length > 0;
 
+  const getThemeIcon = () => {
+    if (themeMode === 'system') return 'smartphone';
+    return isDark ? 'moon' : 'sun';
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView 
-        style={styles.container} 
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background.primary }]}>
+      <KeyboardAvoidingView
+        style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Slotify</Text>
-            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+          {/* Top Theme Settings Bar */}
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              onPress={() => setShowThemeModal(true)}
+              style={[
+                styles.themeToggleBtn,
+                { backgroundColor: colors.background.secondary, borderColor: colors.border.main },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Feather
+                name={getThemeIcon()}
+                size={18}
+                color={colors.text.primary}
+              />
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.formContainer}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text.primary }]}>Slotify</Text>
+            <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+              Inicia sesión para continuar
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.formContainer,
+              {
+                backgroundColor: colors.background.secondary,
+                borderColor: colors.border.light,
+              },
+            ]}
+          >
             {error ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
+              <View
+                style={[
+                  styles.errorBox,
+                  {
+                    backgroundColor: colors.status.errorBg,
+                    borderColor: colors.status.error,
+                  },
+                ]}
+              >
+                <Text style={[styles.errorText, { color: colors.status.error }]}>{error}</Text>
               </View>
             ) : null}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Correo electrónico</Text>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Correo electrónico</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.background.tertiary,
+                    color: colors.text.primary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
                 placeholder="tu@correo.com"
-                placeholderTextColor="#A0AEC0"
+                placeholderTextColor={colors.text.muted}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -79,63 +129,97 @@ export const LoginScreen = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Contraseña</Text>
-              <View style={styles.passwordContainer}>
+              <Text style={[styles.label, { color: colors.text.primary }]}>Contraseña</Text>
+              <View
+                style={[
+                  styles.passwordContainer,
+                  {
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+              >
                 <TextInput
-                  style={styles.passwordInput}
+                  style={[styles.passwordInput, { color: colors.text.primary }]}
                   placeholder="••••••••"
-                  placeholderTextColor="#A0AEC0"
+                  placeholderTextColor={colors.text.muted}
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                   editable={!isLoading}
                 />
-                <TouchableOpacity 
-                  style={styles.eyeButton} 
+                <TouchableOpacity
+                  style={styles.eyeButton}
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                  <Text style={styles.eyeIcon}>{showPassword ? 'Ocultar' : 'Ver'}</Text>
+                  <Text style={[styles.eyeIcon, { color: colors.text.accent }]}>
+                    {showPassword ? 'Ocultar' : 'Ver'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.button, (!isFormValid || isLoading) && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                { backgroundColor: colors.action.primary },
+                (!isFormValid || isLoading) && { backgroundColor: colors.action.disabled },
+              ]}
               onPress={handleLogin}
               disabled={!isFormValid || isLoading}
+              activeOpacity={0.8}
             >
               {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.action.primaryText} />
               ) : (
-                <Text style={styles.buttonText}>Iniciar Sesión</Text>
+                <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>
+                  Iniciar Sesión
+                </Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>o</Text>
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: colors.border.main }]} />
+              <Text style={[styles.dividerText, { color: colors.text.muted }]}>o</Text>
+              <View style={[styles.divider, { backgroundColor: colors.border.main }]} />
             </View>
 
-            <TouchableOpacity 
-              style={styles.googleButton}
+            <TouchableOpacity
+              style={[
+                styles.googleButton,
+                {
+                  backgroundColor: colors.action.secondary,
+                  borderColor: colors.action.secondaryBorder,
+                },
+              ]}
               onPress={loginWithGoogle}
               disabled={isLoading}
+              activeOpacity={0.8}
             >
-                {/* Google icon doesn't have a direct SF Symbol equivalent, using a generic logo placeholder if needed, or simply text */}
-                <Text style={{fontWeight:'bold', color: '#DB4437', fontSize: 20, marginRight: 8}}>G</Text>
-              <Text style={styles.googleButtonText}>Continuar con Google</Text>
+              <AntDesign name="google" size={20} color={colors.text.primary} />
+              <Text style={[styles.googleButtonText, { color: colors.action.secondaryText }]}>
+                Continuar con Google
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.footer}>
-              <Text style={styles.footerText}>¿No tienes cuenta? </Text>
+              <Text style={[styles.footerText, { color: colors.text.secondary }]}>
+                ¿No tienes cuenta?{' '}
+              </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-                <Text style={styles.footerLink}>Regístrate aquí</Text>
+                <Text style={[styles.footerLink, { color: colors.text.primary }]}>
+                  Regístrate aquí
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ThemeSettingsModal
+        visible={showThemeModal}
+        onClose={() => setShowThemeModal(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -143,7 +227,6 @@ export const LoginScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
   },
   container: {
     flex: 1,
@@ -153,138 +236,137 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#2D3748',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#718096',
-  },
-  formContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 2,
-  },
-  errorBox: {
-    backgroundColor: '#FED7D7',
-    padding: 12,
-    borderRadius: 8,
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     marginBottom: 16,
   },
+  themeToggleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  title: {
+    fontSize: 38,
+    fontWeight: '700',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  formContainer: {
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  errorBox: {
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
   errorText: {
-    color: '#C53030',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#4A5568',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#EDF2F7',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#2D3748',
+    paddingVertical: 13,
+    fontSize: 15,
+    borderWidth: 1,
   },
   passwordContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EDF2F7',
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
   },
   passwordInput: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#2D3748',
+    paddingVertical: 13,
+    fontSize: 15,
   },
   eyeButton: {
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 13,
   },
   eyeIcon: {
-    color: '#4299E1',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
   },
   button: {
-    backgroundColor: '#1A202C',
     borderRadius: 100,
-    paddingVertical: 16,
+    paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
   },
-  buttonDisabled: {
-    backgroundColor: '#A0AEC0',
-  },
   buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 22,
   },
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
   },
   dividerText: {
     marginHorizontal: 16,
-    color: '#A0AEC0',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '500',
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: 100,
     paddingVertical: 14,
   },
   googleButtonText: {
-    color: '#1A202C',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    marginLeft: 12,
+    marginLeft: 10,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 22,
   },
   footerText: {
-    color: '#718096',
-    fontSize: 14,
+    fontSize: 13,
   },
   footerLink: {
-    color: '#1A202C',
-    fontSize: 14,
-    fontWeight: 'bold',
-  }
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

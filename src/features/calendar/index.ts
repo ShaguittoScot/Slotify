@@ -1,10 +1,7 @@
 /**
- * Feature: Calendar (US-003)
- *
- * Navegación multiformato en calendario táctil.
- * Barrel export del feature completo.
+ * Feature: Calendar (US-003: Navegación Multiformato en Calendario Táctil)
  */
 
-export { useCalendarStore } from './model';
-export { fetchCalendarSlots } from './api';
-// export { CalendarView } from './ui'; // TODO: Descomentar
+export * from './api';
+export * from './model';
+export * from './ui';
