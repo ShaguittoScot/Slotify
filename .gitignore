@@ -51,3 +51,7 @@ example
 *.fls
 *.fdb_latexmk
 
+# Documents
+documentos/
+
+
