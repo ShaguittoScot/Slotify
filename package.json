@@ -47,7 +47,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "start:back": "cd ../Slotify_back && \"$env:USERPROFILE\\.dotnet\\dotnet.exe\" run --project src/Slotify.API"
+    "start:back": "cd ../Slotify_back && \"%LOCALAPPDATA%\\Microsoft\\dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
   "private": true
 }
