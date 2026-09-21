@@ -5,6 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Dimensions,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,19 +14,27 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme } from '@/shared/theme';
-import { DashboardScreen } from '@/features/dashboard/ui/screens/DashboardScreen';
 
-const CONSUMER_APPOINTMENTS = [
-  { id: 'c1', business: 'Barbería Capital', service: 'Corte Degradado', date: 'Hoy', time: '04:00 PM', status: 'confirmed', address: 'Av. Reforma 222' },
-  { id: 'c2', business: 'Clínica Dental Sonrisas', service: 'Limpieza Dental', date: 'Mañana', time: '11:00 AM', status: 'pending', address: 'Calle 10 #45' },
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const BUSINESS_STATS = [
+  { label: 'Citas Hoy', value: '3', icon: 'calendar', color: '#6366F1' },
+  { label: 'Clientes', value: '12', icon: 'users', color: '#10B981' },
+  { label: 'Ingresos Hoy', value: '$1,450', icon: 'dollar-sign', color: '#F59E0B' },
+  { label: 'Pendientes', value: '2', icon: 'clock', color: '#EC4899' },
 ];
 
-export default function MainScreen() {
+const UPCOMING_APPOINTMENTS = [
+  { id: '1', name: 'Carlos Mendoza', service: 'Corte de Cabello & Barba', time: '10:00 AM', status: 'confirmed' },
+  { id: '2', name: 'Laura Gómez', service: 'Tinte & Peinado', time: '11:30 AM', status: 'confirmed' },
+  { id: '3', name: 'Roberto Díaz', service: 'Tratamiento Capilar', time: '02:00 PM', status: 'pending' },
+  { id: '4', name: 'Andrea Ruiz', service: 'Manicura Spa', time: '04:15 PM', status: 'confirmed' },
+];
+
+export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
-  const { user, appMode } = useAuthStore();
-
-  const isBusiness = appMode === 'BUSINESS';
+  const { user } = useAuthStore();
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -33,11 +43,17 @@ export default function MainScreen() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  if (isBusiness) {
-    return <DashboardScreen />;
-  }
+  const handleShareLink = async () => {
+    try {
+      const slug = user?.fullName ? user.fullName.toLowerCase().replace(/\s+/g, '-') : 'tu-negocio';
+      await Share.share({
+        message: `¡Agenda tu cita conmigo en Slotify! Ingresa aquí: https://slotly.app/${slug}`,
+      });
+    } catch {
+      // Ignored
+    }
+  };
 
-  // ─── VISTA PARA CLIENTE SIN NEGOCIO (B2C) ───
   return (
     <View style={[s.screen, { backgroundColor: colors.background.primary }]}>
       <SafeAreaView style={s.safeArea} edges={['top']}>
@@ -46,7 +62,7 @@ export default function MainScreen() {
           contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header Cliente */}
+          {/* ─── HEADER ─── */}
           <View style={s.header}>
             <View style={s.headerLeft}>
               <View style={[s.avatar, { backgroundColor: colors.action.primary }]}>
@@ -56,10 +72,10 @@ export default function MainScreen() {
               </View>
               <View>
                 <Text style={[s.greetingSmall, { color: colors.text.secondary }]}>
-                  ¡Hola!
+                  Panel de Negocio
                 </Text>
                 <Text style={[s.greetingName, { color: colors.text.primary }]}>
-                  {user?.fullName || 'Cliente'}
+                  {user?.fullName || 'Mi Negocio'}
                 </Text>
               </View>
             </View>
@@ -75,11 +91,11 @@ export default function MainScreen() {
               onPress={() => router.push('/(main)/settings' as any)}
               activeOpacity={0.7}
             >
-              <Feather name="user" size={18} color={colors.text.primary} />
+              <Feather name="settings" size={18} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Banner Explorar y Agendar */}
+          {/* ─── HERO CARD ─── */}
           <Animated.View entering={FadeInDown.duration(500)} style={s.heroWrapper}>
             <View
               style={[
@@ -92,22 +108,22 @@ export default function MainScreen() {
             >
               <View style={s.heroContent}>
                 <View style={s.heroBadge}>
-                  <Text style={s.heroBadgeText}>Explorar Servicios</Text>
+                  <Text style={s.heroBadgeText}>Resumen del Día</Text>
                 </View>
-                <Text style={s.heroTitle}>¿Buscas agendar una cita?</Text>
+                <Text style={s.heroTitle}>Tu negocio al día</Text>
                 <Text style={s.heroSub}>
-                  Encuentra barberías, consultorios, spas y más negocios cerca de ti.
+                  Tienes 3 citas programadas para hoy y 2 pendientes de confirmar.
                 </Text>
                 <TouchableOpacity
                   style={[s.heroBtn, { backgroundColor: colors.action.primary }]}
-                  onPress={() => router.push('/(main)/explore' as any)}
+                  onPress={() => router.push('/(main)/agenda' as any)}
                   activeOpacity={0.8}
                 >
                   <Text style={[s.heroBtnText, { color: colors.action.primaryText }]}>
-                    Explorar y Reservar
+                    Ver Agenda Táctil
                   </Text>
                   <Feather
-                    name="compass"
+                    name="arrow-right"
                     size={15}
                     color={colors.action.primaryText}
                   />
@@ -116,21 +132,102 @@ export default function MainScreen() {
             </View>
           </Animated.View>
 
-          {/* Mis Citas Agendadas */}
+          {/* ─── STATS GRID ─── */}
+          <Animated.View entering={FadeInDown.duration(600).delay(100)} style={s.statsGrid}>
+            {BUSINESS_STATS.map((stat, idx) => (
+              <View
+                key={idx}
+                style={[
+                  s.statCard,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+              >
+                <View style={[s.statIconBox, { backgroundColor: stat.color + '18' }]}>
+                  <Feather name={stat.icon as any} size={18} color={stat.color} />
+                </View>
+                <Text style={[s.statValue, { color: colors.text.primary }]}>{stat.value}</Text>
+                <Text style={[s.statLabel, { color: colors.text.secondary }]}>{stat.label}</Text>
+              </View>
+            ))}
+          </Animated.View>
+
+          {/* ─── QUICK ACTIONS ─── */}
           <Animated.View entering={FadeInDown.duration(600).delay(200)}>
+            <Text style={[s.sectionTitle, { color: colors.text.primary }]}>Accesos Rápidos</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.actionsRow}
+            >
+              <TouchableOpacity
+                style={[
+                  s.actionChip,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+                onPress={() => router.push('/(main)/agenda' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBox, { backgroundColor: '#6366F115' }]}>
+                  <Feather name="plus-circle" size={18} color="#6366F1" />
+                </View>
+                <Text style={[s.actionLabel, { color: colors.text.primary }]}>Nueva Cita</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  s.actionChip,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+                onPress={() => router.push('/(main)/clients' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBox, { backgroundColor: '#10B98115' }]}>
+                  <Feather name="user-plus" size={18} color="#10B981" />
+                </View>
+                <Text style={[s.actionLabel, { color: colors.text.primary }]}>Clientes</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  s.actionChip,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+                onPress={handleShareLink}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBox, { backgroundColor: '#F59E0B15' }]}>
+                  <Feather name="share-2" size={18} color="#F59E0B" />
+                </View>
+                <Text style={[s.actionLabel, { color: colors.text.primary }]}>Compartir Link</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+
+          {/* ─── UPCOMING APPOINTMENTS ─── */}
+          <Animated.View entering={FadeInDown.duration(600).delay(300)}>
             <View style={s.sectionHeader}>
-              <Text style={[s.sectionTitle, { color: colors.text.primary }]}>
-                Mis Citas Programadas
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/(main)/explore' as any)}>
-                <Text style={[s.seeAll, { color: colors.action.primary }]}>+ Agendar otra</Text>
+              <Text style={[s.sectionTitle, { color: colors.text.primary }]}>Próximas Citas</Text>
+              <TouchableOpacity onPress={() => router.push('/(main)/agenda' as any)}>
+                <Text style={[s.seeAll, { color: colors.action.primary }]}>Ver todas</Text>
               </TouchableOpacity>
             </View>
 
-            {CONSUMER_APPOINTMENTS.map((apt, idx) => (
+            {UPCOMING_APPOINTMENTS.map((apt, idx) => (
               <Animated.View
                 key={apt.id}
-                entering={FadeInRight.duration(400).delay(250 + idx * 80)}
+                entering={FadeInRight.duration(400).delay(350 + idx * 80)}
                 style={[
                   s.appointmentCard,
                   {
@@ -148,22 +245,20 @@ export default function MainScreen() {
                       },
                     ]}
                   >
-                    <Feather name="calendar" size={18} color={colors.action.primary} />
+                    <Text style={[s.aptAvatarText, { color: colors.text.primary }]}>
+                      {getInitials(apt.name)}
+                    </Text>
                   </View>
                   <View style={s.aptInfo}>
-                    <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.business}</Text>
+                    <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.name}</Text>
                     <Text style={[s.aptService, { color: colors.text.secondary }]}>
                       {apt.service}
-                    </Text>
-                    <Text style={[s.aptSubText, { color: colors.text.muted }]}>
-                      {apt.address}
                     </Text>
                   </View>
                 </View>
 
                 <View style={s.aptRight}>
                   <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
-                  <Text style={[s.aptDateBadge, { color: colors.text.secondary }]}>{apt.date}</Text>
                   <View
                     style={[
                       s.aptBadge,
@@ -216,19 +311,27 @@ const s = StyleSheet.create({
   heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 20, marginBottom: 16 },
   heroBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
   heroBtnText: { fontSize: 14, fontWeight: '700' },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
+  statCard: { width: (SCREEN_WIDTH - 52) / 2, borderRadius: 18, padding: 16, borderWidth: 1 },
+  statIconBox: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  statValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  statLabel: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   sectionTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
+  actionsRow: { gap: 12, paddingBottom: 4, marginBottom: 24 },
+  actionChip: { borderRadius: 16, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', flexDirection: 'row', gap: 10, borderWidth: 1 },
+  actionIconBox: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { fontSize: 13, fontWeight: '600' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   seeAll: { fontSize: 13, fontWeight: '600' },
   appointmentCard: { borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1 },
   aptLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   aptAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  aptAvatarText: { fontSize: 14, fontWeight: '700' },
   aptInfo: { flex: 1 },
   aptName: { fontSize: 15, fontWeight: '700' },
   aptService: { fontSize: 13, marginTop: 2 },
-  aptSubText: { fontSize: 11, marginTop: 2 },
   aptRight: { alignItems: 'flex-end', gap: 4 },
   aptTime: { fontSize: 13, fontWeight: '700' },
-  aptDateBadge: { fontSize: 11, fontWeight: '500' },
   aptBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   aptBadgeText: { fontSize: 11, fontWeight: '700' },
 });
