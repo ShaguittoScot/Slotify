@@ -282,6 +282,47 @@ export function SettingsScreen() {
               <Feather name="chevron-right" size={18} color={colors.text.muted} />
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+              onPress={() =>
+                router.push({
+                  pathname: '/(onboarding)/templates' as any,
+                  params: {
+                    sectorId: '5',
+                    sectorKey: 'barberia',
+                  },
+                })
+              }
+              activeOpacity={0.7}
+            >
+              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(224, 122, 95, 0.15)' }]}>
+                <MaterialCommunityIcons
+                  name="content-cut"
+                  size={18}
+                  color="#E07A5F"
+                />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Servicios y Plantilla de Barbería (SCRUM-105)
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Ajustar precios, duraciones, adicionales y sillones
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.text.muted} />
+            </TouchableOpacity>
+
             <View
               style={[
                 styles.settingItem,

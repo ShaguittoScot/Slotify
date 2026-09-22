@@ -34,7 +34,7 @@ import { FluidButton } from '@/components/ui/FluidButton';
 import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
-import type { SuggestedServiceDto } from '@/features/sector-templates/types';
+import type { SuggestedServiceDto, ServiceAddon, BarberStation } from '@/features/sector-templates/types';
 
 // Tipo para servicios personalizados creados por el usuario en modo Lienzo Libre
 interface CustomService {
@@ -58,6 +58,16 @@ const MODULE_REGISTRY: Record<string, ModuleMeta> = {
     name: 'Agenda y Calendario de Citas',
     desc: 'Gestión de slots, reservaciones en línea y disponibilidad en tiempo real.',
     required: true,
+  },
+  sillones: {
+    id: 'sillones',
+    name: 'Sillones y Puestos de Atención',
+    desc: 'Control de capacidad física, asignación de estaciones y flujo de clientes.',
+  },
+  servicios_adicionales: {
+    id: 'servicios_adicionales',
+    name: 'Servicios Adicionales y Combos',
+    desc: 'Venta sugerida de extras (toalla caliente, mascarillas, tónicos) al agendar.',
   },
   citas_grupales: {
     id: 'citas_grupales',
@@ -231,11 +241,12 @@ const ModuleCardItem: React.FC<ModuleCardItemProps> = ({
   );
 };
 
-// Componente interactivo para tarjetas de servicio sugerido con selección/deselección
+// Componente interactivo para tarjetas de servicio sugerido con selección/deselección y edición
 interface ServiceCardItemProps {
   service: SuggestedServiceDto;
   isSelected: boolean;
   onToggle: () => void;
+  onEdit?: () => void;
   index: number;
 }
 
@@ -243,6 +254,7 @@ const ServiceCardItem: React.FC<ServiceCardItemProps> = ({
   service,
   isSelected,
   onToggle,
+  onEdit,
   index,
 }) => {
   const cardScale = useSharedValue(1);
@@ -333,6 +345,28 @@ const ServiceCardItem: React.FC<ServiceCardItemProps> = ({
           </View>
         </View>
 
+        {/* Botón para editar precio o duración */}
+        {onEdit && (
+          <TouchableOpacity
+            testID={`edit-service-btn-${index}`}
+            onPress={(e: any) => {
+              if (e?.stopPropagation) e.stopPropagation();
+              onEdit();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.serviceEditPill}
+            accessibilityRole="button"
+            accessibilityLabel={`Editar servicio ${service.name}`}
+          >
+            <SymbolView
+              name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }}
+              size={12}
+              tintColor="#E07A5F"
+            />
+            <Text style={styles.serviceEditText}>Editar</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Indicador Checkbox interactivo */}
         <View
           style={[
@@ -350,6 +384,169 @@ const ServiceCardItem: React.FC<ServiceCardItemProps> = ({
           )}
         </View>
       </Pressable>
+    </Animated.View>
+  );
+};
+
+// Componente interactivo para servicios adicionales / complementos (SCRUM-105)
+interface AddonCardItemProps {
+  addon: ServiceAddon;
+  isSelected: boolean;
+  onToggle: () => void;
+  index: number;
+}
+
+const AddonCardItem: React.FC<AddonCardItemProps> = ({
+  addon,
+  isSelected,
+  onToggle,
+  index,
+}) => {
+  const cardScale = useSharedValue(1);
+
+  const handlePressIn = () => {
+    cardScale.value = withSpring(0.985, { damping: 14, stiffness: 240 });
+  };
+
+  const handlePressOut = () => {
+    cardScale.value = withSpring(1, { damping: 14, stiffness: 240 });
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
+  const webGlass = Platform.OS === 'web' ? ({
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    boxShadow: isSelected
+      ? '0 0 20px rgba(224, 122, 95, 0.22), 0 4px 18px rgba(0, 0, 0, 0.35)'
+      : '0 4px 14px rgba(0, 0, 0, 0.2)',
+    transition: 'all 0.22s ease',
+    cursor: 'pointer',
+  } as any) : {};
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 45).springify().damping(16).stiffness(130)}
+      style={[{ width: '100%' }, animatedStyle]}
+    >
+      <Pressable
+        testID={`addon-card-${addon.id}`}
+        accessible={true}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: isSelected }}
+        accessibilityLabel={`${addon.name}. ${addon.durationMinutes} minutos adicionales. Precio ${addon.price} MXN`}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={onToggle}
+        style={[
+          styles.serviceCard,
+          webGlass,
+          isSelected ? styles.addonCardSelected : styles.serviceCardDeselected,
+        ]}
+      >
+        <View
+          style={[
+            styles.serviceIconBox,
+            isSelected ? styles.addonIconBoxSelected : styles.serviceIconBoxDeselected,
+          ]}
+        >
+          <SymbolView
+            name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }}
+            size={18}
+            tintColor={isSelected ? '#E07A5F' : '#4B5563'}
+          />
+        </View>
+
+        <View style={styles.serviceContent}>
+          <View style={styles.addonTitleRow}>
+            <Text
+              style={[styles.serviceName, !isSelected && styles.serviceNameDeselected]}
+            >
+              {addon.name}
+            </Text>
+            {addon.isPopular && (
+              <View style={styles.popularBadge}>
+                <Text style={styles.popularBadgeText}>POPULAR</Text>
+              </View>
+            )}
+          </View>
+
+          {addon.description ? (
+            <Text style={[styles.addonDescText, !isSelected && styles.addonDescTextDeselected]} numberOfLines={2}>
+              {addon.description}
+            </Text>
+          ) : null}
+
+          <View style={styles.serviceMetaRow}>
+            <View style={styles.durationPill}>
+              <SymbolView
+                name={{ ios: 'clock', android: 'schedule', web: 'schedule' }}
+                size={12}
+                tintColor={isSelected ? '#E07A5F' : '#64748B'}
+              />
+              <Text style={[styles.durationText, isSelected && { color: '#E07A5F' }]}>
+                +{addon.durationMinutes} min
+              </Text>
+            </View>
+
+            <View style={[styles.pricePill, isSelected && styles.addonPricePillSelected]}>
+              <Text style={[styles.priceText, isSelected && { color: '#F4F1DE' }]}>
+                +${addon.price} MXN
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.serviceCheckRing,
+            isSelected ? styles.addonCheckRingSelected : styles.serviceCheckRingDeselected,
+          ]}
+        >
+          {isSelected && (
+            <SymbolView
+              name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+              size={13}
+              weight="bold"
+              tintColor="#FFFFFF"
+            />
+          )}
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+};
+
+// Componente de visualización de puestos de atención / sillones (SCRUM-105)
+interface StationCardItemProps {
+  station: BarberStation;
+  index: number;
+}
+
+const StationCardItem: React.FC<StationCardItemProps> = ({ station, index }) => {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 40).springify().damping(16)}
+      style={styles.stationCard}
+    >
+      <View style={styles.stationIconBox}>
+        <SymbolView
+          name={{ ios: 'scissors', android: 'content_cut', web: 'content_cut' }}
+          size={16}
+          tintColor="#E07A5F"
+        />
+      </View>
+      <View style={styles.stationContent}>
+        <Text style={styles.stationName}>{station.name}</Text>
+        <Text style={styles.stationStaff}>
+          Personal asignado: {station.assignedStaffName || 'Atención rotativa'}
+        </Text>
+      </View>
+      <View style={styles.stationStatusBadge}>
+        <Text style={styles.stationStatusText}>HABILITADO</Text>
+      </View>
     </Animated.View>
   );
 };
@@ -381,6 +578,34 @@ export default function TemplatesCatalogRoute() {
     return currentCategory?.suggestedServices ?? [];
   }, [currentCategory]);
 
+  // Lista de servicios editables para la plantilla activa
+  const [editableServices, setEditableServices] = useState<SuggestedServiceDto[]>(() =>
+    categoryServices.map((s) => ({ ...s }))
+  );
+
+  // Lista de servicios adicionales sugeridos para la categoría (ej. Barbería)
+  const categoryAddons = useMemo(() => {
+    return currentCategory?.suggestedAddons ?? [];
+  }, [currentCategory]);
+
+  // IDs de servicios adicionales seleccionados
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(() =>
+    (currentCategory?.suggestedAddons ?? [])
+      .filter((a) => a.isPopular)
+      .map((a) => a.id)
+  );
+
+  // Puestos de atención / sillones para la categoría
+  const categoryStations = useMemo(() => {
+    return currentCategory?.suggestedStations ?? [];
+  }, [currentCategory]);
+
+  // Estado para el modal de personalización de servicio
+  const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
+  const [editServiceName, setEditServiceName] = useState<string>('');
+  const [editServiceDuration, setEditServiceDuration] = useState<string>('30');
+  const [editServicePrice, setEditServicePrice] = useState<string>('');
+
   // Estado interactivo de servicios seleccionados (pre-seleccionados por defecto)
   const [selectedServices, setSelectedServices] = useState<string[]>(() =>
     categoryServices.map((s) => s.name)
@@ -405,12 +630,72 @@ export default function TemplatesCatalogRoute() {
   // Nombre del negocio capturado durante el onboarding (Identidad Visual Adaptable)
   const [businessName, setBusinessName] = useState<string>('');
 
-  // Servicios personalizados creados por el usuario en modo Lienzo Libre
+  // Servicios personalizados creados por el usuario en modo Lienzo Libre o agregados a la plantilla
   const [customServices, setCustomServices] = useState<CustomService[]>([]);
   const [newServiceName, setNewServiceName] = useState<string>('');
   const [newServiceDuration, setNewServiceDuration] = useState<string>('30');
   const [newServicePrice, setNewServicePrice] = useState<string>('');
   const [isAddingService, setIsAddingService] = useState<boolean>(false);
+
+  const handleOpenEditModal = (index: number) => {
+    const svc = editableServices[index];
+    if (!svc) return;
+    setEditingServiceIndex(index);
+    setEditServiceName(svc.name);
+    setEditServiceDuration(String(svc.durationMinutes));
+    setEditServicePrice(svc.price ? String(svc.price) : '');
+  };
+
+  const handleSaveEditedService = () => {
+    if (editingServiceIndex === null) return;
+    const name = editServiceName.trim();
+    if (!name) return;
+    const dur = parseInt(editServiceDuration, 10);
+    if (!dur || dur < 5 || dur > 480) return;
+    const pr = editServicePrice ? parseFloat(editServicePrice) : null;
+
+    const oldName = editableServices[editingServiceIndex].name;
+    const nextServices = [...editableServices];
+    nextServices[editingServiceIndex] = {
+      name,
+      durationMinutes: dur,
+      price: pr,
+    };
+    setEditableServices(nextServices);
+
+    if (oldName !== name && selectedServices.includes(oldName)) {
+      setSelectedServices((prev) => prev.map((n) => (n === oldName ? name : n)));
+    }
+    setEditingServiceIndex(null);
+  };
+
+  const handleRemoveEditedService = () => {
+    if (editingServiceIndex === null) return;
+    const oldName = editableServices[editingServiceIndex].name;
+    setEditableServices((prev) => prev.filter((_, i) => i !== editingServiceIndex));
+    setSelectedServices((prev) => prev.filter((n) => n !== oldName));
+    setEditingServiceIndex(null);
+  };
+
+  const handleAddTemplateService = () => {
+    const name = newServiceName.trim();
+    if (!name) return;
+    const duration = parseInt(newServiceDuration, 10);
+    if (!duration || duration < 5 || duration > 480) return;
+
+    const newSvc: SuggestedServiceDto = {
+      name,
+      durationMinutes: duration,
+      price: newServicePrice ? parseFloat(newServicePrice) : null,
+    };
+
+    setEditableServices((prev) => [...prev, newSvc]);
+    setSelectedServices((prev) => [...prev, name]);
+    setNewServiceName('');
+    setNewServiceDuration('30');
+    setNewServicePrice('');
+    setIsAddingService(false);
+  };
 
   const handleAddCustomService = () => {
     const name = newServiceName.trim();
@@ -436,10 +721,22 @@ export default function TemplatesCatalogRoute() {
     setCustomServices((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const toggleAddon = (addonId: string) => {
+    setSelectedAddonIds((prev) =>
+      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
+    );
+  };
+
   // Sincronización cuando cambia la categoría (ej. al navegar entre giros)
   useEffect(() => {
     if (!isCustomMode && categoryServices.length > 0) {
+      setEditableServices(categoryServices.map((s) => ({ ...s })));
       setSelectedServices(categoryServices.map((s) => s.name));
+      setSelectedAddonIds(
+        (currentCategory?.suggestedAddons ?? [])
+          .filter((a) => a.isPopular)
+          .map((a) => a.id)
+      );
     }
     setActiveModules(
       isCustomMode
@@ -477,13 +774,22 @@ export default function TemplatesCatalogRoute() {
           durationMinutes: s.durationMinutes,
           price: s.price,
         }))
-      : categoryServices
+      : editableServices
           .filter((s) => selectedServices.includes(s.name))
           .map((s) => ({
             name: s.name,
             durationMinutes: s.durationMinutes,
             price: s.price ?? undefined,
           }));
+
+    const finalAddons = categoryAddons
+      .filter((a) => selectedAddonIds.includes(a.id))
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        durationMinutes: a.durationMinutes,
+        price: a.price,
+      }));
 
     // Persiste el resultado consolidado del onboarding en el store global (US-006 output).
     // Este es el "contrato de salida" que el compañero que implemente el dashboard
@@ -493,6 +799,8 @@ export default function TemplatesCatalogRoute() {
       sectorCategory: currentCategory,
       activeModules,
       finalServices,
+      selectedAddons: finalAddons,
+      stations: categoryStations,
       isCustomCanvas: isCustomMode,
     });
 
@@ -534,7 +842,7 @@ export default function TemplatesCatalogRoute() {
     ? `Entrar como ${businessName.trim()}`
     : isCustomMode
       ? `Guardar y Entrar a Slotly (${activeModules.length} mód${customServices.length > 0 ? ` • ${customServices.length} serv` : ''})`
-      : `Aplicar Plantilla (${selectedServices.length} serv • ${activeModules.length} mód)`;
+      : `Aplicar Plantilla (${selectedServices.length} serv${selectedAddonIds.length > 0 ? ` • ${selectedAddonIds.length} extras` : ''} • ${activeModules.length} mód)`;
 
   return (
     <SafeAreaView style={styles.outerScreen}>
@@ -672,34 +980,153 @@ export default function TemplatesCatalogRoute() {
             </View>
           </Animated.View>
 
-          {/* Sección 1a: Servicios Sugeridos (Solo en modo catálogo sectorial) */}
-          {!isCustomMode && categoryServices.length > 0 && (
+          {/* Sección 1a: Servicios de la Plantilla (Editable para el Administrador) */}
+          {!isCustomMode && editableServices.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <View>
-                  <Text style={styles.sectionHeading}>Servicios Sugeridos de Inicio</Text>
+                  <Text style={styles.sectionHeading}>Servicios de la Plantilla</Text>
                   <Text style={styles.sectionSub}>
-                    Desmarca los que no ofrezcas actualmente
+                    Toca para activar/desactivar o pulsa "Editar" para modificar precio y duración
                   </Text>
                 </View>
                 <View style={styles.counterBadge}>
                   <Text style={styles.counterText}>
-                    {selectedServices.length} / {categoryServices.length}
+                    {selectedServices.length} / {editableServices.length}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.servicesList}>
-                {categoryServices.map((service, index) => (
+                {editableServices.map((service, index) => (
                   <ServiceCardItem
-                    key={service.name}
+                    key={`${service.name}-${index}`}
                     service={service}
                     isSelected={selectedServices.includes(service.name)}
                     onToggle={() => toggleService(service.name)}
+                    onEdit={() => handleOpenEditModal(index)}
                     index={index}
                   />
                 ))}
               </View>
+
+              {/* Botón rápido para agregar servicio adicional a la plantilla */}
+              <TouchableOpacity
+                testID="add-template-service-button"
+                style={[
+                  styles.addServiceButton,
+                  { marginTop: 12 },
+                  Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {},
+                ]}
+                onPress={() => setIsAddingService((prev) => !prev)}
+                accessibilityRole="button"
+                accessibilityLabel="Agregar nuevo servicio a la plantilla"
+              >
+                <View style={[styles.addServiceButtonIcon, { backgroundColor: 'rgba(224, 122, 95, 0.15)', borderColor: 'rgba(224, 122, 95, 0.3)' }]}>
+                  <SymbolView
+                    name={{ ios: 'plus', android: 'add', web: 'add' }}
+                    size={16}
+                    tintColor="#E07A5F"
+                  />
+                </View>
+                <Text style={[styles.addServiceButtonText, { color: '#E07A5F' }]}>
+                  {isAddingService ? 'Cerrar formulario' : 'Agregar otro servicio a la plantilla'}
+                </Text>
+              </TouchableOpacity>
+
+              {isAddingService && (
+                <Animated.View
+                  entering={FadeInDown.springify().damping(14)}
+                  style={[
+                    styles.addServiceForm,
+                    { borderColor: 'rgba(224, 122, 95, 0.35)' },
+                    Platform.OS === 'web' ? ({ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' } as any) : {},
+                  ]}
+                >
+                  <View style={styles.addServiceField}>
+                    <Text style={styles.addServiceFieldLabel}>Nombre del nuevo servicio</Text>
+                    <TextInput
+                      testID="new-template-service-name-input"
+                      value={newServiceName}
+                      onChangeText={setNewServiceName}
+                      placeholder="Ej. Diseño de Barba VIP, Masaje Capilar..."
+                      placeholderTextColor="#3D4A5E"
+                      maxLength={60}
+                      autoCorrect={false}
+                      autoFocus
+                      style={[
+                        styles.addServiceInput,
+                        Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                      ]}
+                    />
+                  </View>
+
+                  <View style={styles.addServiceRow}>
+                    <View style={[styles.addServiceField, { flex: 1 }]}>
+                      <Text style={styles.addServiceFieldLabel}>Duración (min)</Text>
+                      <TextInput
+                        testID="new-template-service-duration-input"
+                        value={newServiceDuration}
+                        onChangeText={setNewServiceDuration}
+                        placeholder="30"
+                        placeholderTextColor="#3D4A5E"
+                        keyboardType="number-pad"
+                        maxLength={3}
+                        style={[
+                          styles.addServiceInput,
+                          Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                        ]}
+                      />
+                    </View>
+                    <View style={[styles.addServiceField, { flex: 1 }]}>
+                      <Text style={styles.addServiceFieldLabel}>Precio MXN</Text>
+                      <TextInput
+                        testID="new-template-service-price-input"
+                        value={newServicePrice}
+                        onChangeText={setNewServicePrice}
+                        placeholder="250"
+                        placeholderTextColor="#3D4A5E"
+                        keyboardType="decimal-pad"
+                        maxLength={6}
+                        style={[
+                          styles.addServiceInput,
+                          Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                        ]}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.addServiceActions}>
+                    <TouchableOpacity
+                      style={styles.addServiceCancel}
+                      onPress={() => {
+                        setIsAddingService(false);
+                        setNewServiceName('');
+                        setNewServiceDuration('30');
+                        setNewServicePrice('');
+                      }}
+                    >
+                      <Text style={styles.addServiceCancelText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.addServiceSave,
+                        { backgroundColor: '#E07A5F' },
+                        !newServiceName.trim() && styles.addServiceSaveDisabled,
+                      ]}
+                      onPress={handleAddTemplateService}
+                      disabled={!newServiceName.trim()}
+                    >
+                      <SymbolView
+                        name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                        size={14}
+                        tintColor="#FFFFFF"
+                      />
+                      <Text style={styles.addServiceSaveText}>Guardar en Plantilla</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              )}
             </View>
           )}
 
@@ -896,6 +1323,66 @@ export default function TemplatesCatalogRoute() {
             </View>
           )}
 
+          {/* Sección 1c: Servicios Adicionales / Extras de Barbería (SCRUM-105) */}
+          {!isCustomMode && categoryAddons.length > 0 && (
+            <View style={[styles.section, { marginTop: 26 }]}>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionHeading}>Servicios Adicionales y Extras</Text>
+                  <Text style={styles.sectionSub}>
+                    Complementos recomendados para venta cruzada al agendar
+                  </Text>
+                </View>
+                <View style={[styles.counterBadge, { borderColor: 'rgba(224, 122, 95, 0.35)', backgroundColor: 'rgba(224, 122, 95, 0.12)' }]}>
+                  <Text style={[styles.counterText, { color: '#E07A5F' }]}>
+                    {selectedAddonIds.length} / {categoryAddons.length} ACTIVOS
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.servicesList}>
+                {categoryAddons.map((addon, index) => (
+                  <AddonCardItem
+                    key={addon.id}
+                    addon={addon}
+                    isSelected={selectedAddonIds.includes(addon.id)}
+                    onToggle={() => toggleAddon(addon.id)}
+                    index={index}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Sección 1d: Sillones y Puestos de Atención (SCRUM-105) */}
+          {!isCustomMode && categoryStations.length > 0 && (
+            <View style={[styles.section, { marginTop: 26 }]}>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionHeading}>Sillones & Puestos de Atención</Text>
+                  <Text style={styles.sectionSub}>
+                    Estaciones físicas configuradas para la atención simultánea
+                  </Text>
+                </View>
+                <View style={[styles.counterBadge, { borderColor: 'rgba(224, 122, 95, 0.35)', backgroundColor: 'rgba(224, 122, 95, 0.12)' }]}>
+                  <Text style={[styles.counterText, { color: '#E07A5F' }]}>
+                    {categoryStations.length} SILLONES
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.stationsList}>
+                {categoryStations.map((station, index) => (
+                  <StationCardItem
+                    key={station.id}
+                    station={station}
+                    index={index}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Sección 2: Módulos Interactivos con FluidToggleSwitch (en ambos modos) */}
           <View style={[styles.section, !isCustomMode && { marginTop: 28 }]}>
             <View style={styles.sectionHeaderRow}>
@@ -958,6 +1445,21 @@ export default function TemplatesCatalogRoute() {
                   </Text>
                 </View>
                 <View style={styles.summaryConfirmDivider} />
+                {selectedAddonIds.length > 0 && (
+                  <>
+                    <View style={styles.summaryConfirmItem}>
+                      <SymbolView
+                        name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }}
+                        size={13}
+                        tintColor="#E07A5F"
+                      />
+                      <Text style={styles.summaryConfirmLabel}>
+                        {selectedAddonIds.length} extras
+                      </Text>
+                    </View>
+                    <View style={styles.summaryConfirmDivider} />
+                  </>
+                )}
               </>
             )}
             {/* En modo Lienzo Libre: muestra servicios custom creados */}
@@ -988,6 +1490,119 @@ export default function TemplatesCatalogRoute() {
             </View>
           </View>
         </View>
+
+        {/* Modal Interactivo de Personalización de Servicio (SCRUM-105) */}
+        {editingServiceIndex !== null && (
+          <View style={styles.editModalOverlay}>
+            <View style={[styles.editModalCard, webGlass]}>
+              <View style={styles.editModalHeader}>
+                <View style={styles.editModalTitleRow}>
+                  <SymbolView
+                    name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }}
+                    size={18}
+                    tintColor="#E07A5F"
+                  />
+                  <Text style={styles.editModalTitle}>Personalizar Servicio</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setEditingServiceIndex(null)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <SymbolView
+                    name={{ ios: 'xmark', android: 'close', web: 'close' }}
+                    size={16}
+                    tintColor="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.editModalLabel}>Nombre del Servicio</Text>
+              <TextInput
+                testID="edit-service-name-input"
+                style={styles.editModalInput}
+                value={editServiceName}
+                onChangeText={setEditServiceName}
+                placeholder="Nombre del servicio"
+                placeholderTextColor="#475569"
+                maxLength={60}
+              />
+
+              <Text style={[styles.editModalLabel, { marginTop: 14 }]}>
+                Duración del Servicio
+              </Text>
+              <View style={styles.presetButtonsRow}>
+                {[15, 30, 45, 60, 90].map((dur) => (
+                  <TouchableOpacity
+                    key={dur}
+                    style={[
+                      styles.presetButton,
+                      editServiceDuration === String(dur) && styles.presetButtonActive,
+                    ]}
+                    onPress={() => setEditServiceDuration(String(dur))}
+                  >
+                    <Text
+                      style={[
+                        styles.presetButtonText,
+                        editServiceDuration === String(dur) && styles.presetButtonTextActive,
+                      ]}
+                    >
+                      {dur}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                testID="edit-service-duration-input"
+                style={[styles.editModalInput, { marginTop: 8 }]}
+                value={editServiceDuration}
+                onChangeText={setEditServiceDuration}
+                placeholder="Duración en minutos"
+                placeholderTextColor="#475569"
+                keyboardType="number-pad"
+                maxLength={3}
+              />
+
+              <Text style={[styles.editModalLabel, { marginTop: 14 }]}>
+                Precio Sugerido (MXN)
+              </Text>
+              <TextInput
+                testID="edit-service-price-input"
+                style={styles.editModalInput}
+                value={editServicePrice}
+                onChangeText={setEditServicePrice}
+                placeholder="Precio en MXN"
+                placeholderTextColor="#475569"
+                keyboardType="decimal-pad"
+                maxLength={6}
+              />
+
+              <View style={styles.editModalActions}>
+                <TouchableOpacity
+                  style={styles.editModalDeleteBtn}
+                  onPress={handleRemoveEditedService}
+                >
+                  <Text style={styles.editModalDeleteText}>Eliminar</Text>
+                </TouchableOpacity>
+
+                <View style={{ flex: 1 }} />
+
+                <TouchableOpacity
+                  style={styles.editModalCancelBtn}
+                  onPress={() => setEditingServiceIndex(null)}
+                >
+                  <Text style={styles.editModalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.editModalSaveBtn}
+                  onPress={handleSaveEditedService}
+                >
+                  <Text style={styles.editModalSaveText}>Guardar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Barra de Confirmación Inferior con FluidButton dinámico */}
         <View style={[styles.bottomDock, webGlass]}>
@@ -1625,5 +2240,274 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#34D399',
+  },
+
+  // Botón y pill de edición en tarjeta de servicio
+  serviceEditPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(224, 122, 95, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(224, 122, 95, 0.32)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  serviceEditText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#E07A5F',
+  },
+
+  // Estilos de servicios adicionales (Addons)
+  addonCardSelected: {
+    backgroundColor: 'rgba(26, 20, 24, 0.88)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
+    borderBottomColor: 'rgba(224, 122, 95, 0.45)',
+    borderLeftColor: 'rgba(224, 122, 95, 0.65)',
+    borderRightColor: 'rgba(224, 122, 95, 0.45)',
+    opacity: 1,
+  },
+  addonIconBoxSelected: {
+    backgroundColor: 'rgba(224, 122, 95, 0.20)',
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    borderBottomColor: 'rgba(224, 122, 95, 0.4)',
+    borderLeftColor: 'rgba(224, 122, 95, 0.3)',
+    borderRightColor: 'rgba(224, 122, 95, 0.3)',
+  },
+  addonPricePillSelected: {
+    backgroundColor: 'rgba(224, 122, 95, 0.2)',
+    borderColor: 'rgba(224, 122, 95, 0.4)',
+  },
+  addonCheckRingSelected: {
+    backgroundColor: '#E07A5F',
+    borderColor: '#E07A5F',
+  },
+  addonTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  addonDescText: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    marginBottom: 6,
+    lineHeight: 16,
+  },
+  addonDescTextDeselected: {
+    color: '#64748B',
+  },
+  popularBadge: {
+    backgroundColor: 'rgba(224, 122, 95, 0.18)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(224, 122, 95, 0.35)',
+  },
+  popularBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#E07A5F',
+    letterSpacing: 0.6,
+  },
+
+  // Sillones y Estaciones de Barbería
+  stationsList: {
+    gap: 8,
+  },
+  stationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(20, 24, 34, 0.65)',
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    borderBottomColor: 'rgba(224, 122, 95, 0.25)',
+    borderLeftColor: 'rgba(224, 122, 95, 0.4)',
+    borderRightColor: 'rgba(255, 255, 255, 0.06)',
+    gap: 12,
+  },
+  stationIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(224, 122, 95, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(224, 122, 95, 0.3)',
+  },
+  stationContent: {
+    flex: 1,
+  },
+  stationName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  stationStaff: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  stationStatusBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  stationStatusText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#34D399',
+    letterSpacing: 0.5,
+  },
+
+  // Modal de Personalización de Servicio
+  editModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 100,
+  },
+  editModalCard: {
+    width: '100%',
+    maxWidth: 480,
+    backgroundColor: 'rgba(15, 20, 32, 0.95)',
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.22)',
+    borderBottomColor: 'rgba(224, 122, 95, 0.35)',
+    borderLeftColor: 'rgba(224, 122, 95, 0.25)',
+    borderRightColor: 'rgba(224, 122, 95, 0.25)',
+    borderRadius: 20,
+    padding: 22,
+    ...(Platform.OS === 'web' && {
+      boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(224, 122, 95, 0.15)',
+    } as any),
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  editModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editModalTitle: {
+    fontSize: 16.5,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    letterSpacing: -0.2,
+  },
+  editModalLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  editModalInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.08)',
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.select({ ios: 12, default: 10 }),
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#F8FAFC',
+    minHeight: 46,
+  },
+  presetButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  presetButton: {
+    flex: 1,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  presetButtonActive: {
+    backgroundColor: 'rgba(224, 122, 95, 0.22)',
+    borderColor: '#E07A5F',
+  },
+  presetButtonText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  presetButtonTextActive: {
+    color: '#E07A5F',
+    fontWeight: '700',
+  },
+  editModalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 20,
+  },
+  editModalDeleteBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  editModalDeleteText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  editModalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  editModalCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  editModalSaveBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#E07A5F',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editModalSaveText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -37,6 +37,19 @@ export interface OnboardingResult {
     durationMinutes: number;
     price?: number;
   }>;
+  /** Servicios adicionales seleccionados (ej. en Barbería: lavado, mascarilla, etc.) */
+  selectedAddons?: Array<{
+    id: string;
+    name: string;
+    durationMinutes: number;
+    price: number;
+  }>;
+  /** Sillones o puestos de atención activos */
+  stations?: Array<{
+    id: string;
+    name: string;
+    assignedStaffName?: string;
+  }>;
   /** Si el negocio inició con lienzo modular básico (sin sector predefinido) */
   isCustomCanvas: boolean;
   /** Timestamp ISO de cuando se finalizó el onboarding */
@@ -55,6 +68,16 @@ interface SectorTemplateState {
 
   /** Plantilla activa seleccionada o generada para el negocio */
   selectedTemplate: SectorTemplate | null;
+
+  /** Servicios de la plantilla modificados por el usuario (duraciones, precios, etc.) */
+  customizedServices: Array<{
+    name: string;
+    durationMinutes: number;
+    price?: number;
+  }>;
+
+  /** IDs de servicios adicionales (addons) seleccionados */
+  selectedAddons: string[];
 
   /**
    * Indicador del Escenario 2:
@@ -95,6 +118,24 @@ interface SectorTemplateState {
   /** Selecciona una plantilla específica del catálogo */
   selectTemplate: (template: SectorTemplate) => void;
 
+  /** Actualiza un servicio modificado por índice */
+  updateCustomizedService: (index: number, updated: { name: string; durationMinutes: number; price?: number }) => void;
+
+  /** Agrega un nuevo servicio al catálogo personalizado */
+  addCustomizedService: (service: { name: string; durationMinutes: number; price?: number }) => void;
+
+  /** Elimina un servicio personalizado por índice */
+  removeCustomizedService: (index: number) => void;
+
+  /** Alterna la selección de un servicio adicional (addon) */
+  toggleAddon: (addonId: string) => void;
+
+  /** Reemplaza la lista completa de servicios personalizados */
+  setCustomizedServices: (services: Array<{ name: string; durationMinutes: number; price?: number }>) => void;
+
+  /** Establece los IDs de adicionales activos */
+  setSelectedAddons: (addonIds: string[]) => void;
+
   /** Activa explícitamente el modo Lienzo Libre (Escenario 2) */
   selectCustomCanvasMode: () => void;
 
@@ -117,6 +158,8 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
   templates: [],
   selectedCategory: null,
   selectedTemplate: null,
+  customizedServices: [],
+  selectedAddons: [],
   isCustomCanvas: false,
   isLoading: false,
   error: null,
@@ -146,6 +189,8 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
       set({
         selectedCategory: null,
         selectedTemplate: null,
+        customizedServices: [],
+        selectedAddons: [],
         isCustomCanvas: false,
       });
       return;
@@ -155,10 +200,16 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
 
     if (!category) return;
 
+    const initialAddons = (category.suggestedAddons || [])
+      .filter((a) => a.isPopular)
+      .map((a) => a.id);
+
     if (category.isCustomCanvas) {
       // Escenario 2: Lienzo modular básico sin módulos forzados
       set({
         selectedCategory: category,
+        customizedServices: [],
+        selectedAddons: [],
         isCustomCanvas: true,
         selectedTemplate: {
           id: category.id,
@@ -178,6 +229,8 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
 
       set({
         selectedCategory: category,
+        customizedServices: category.suggestedServices.map((s) => ({ ...s })),
+        selectedAddons: initialAddons,
         isCustomCanvas: false,
         selectedTemplate: matchingTemplate,
       });
@@ -195,12 +248,49 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
   selectTemplate: (template) => {
     const { categories } = get();
     const matchingCategory = categories.find((c) => c.id === template.id) || null;
+    const initialAddons = (matchingCategory?.suggestedAddons || [])
+      .filter((a) => a.isPopular)
+      .map((a) => a.id);
+
     set({
       selectedTemplate: template,
       selectedCategory: matchingCategory,
+      customizedServices: template.suggestedServices.map((s) => ({ ...s })),
+      selectedAddons: initialAddons,
       isCustomCanvas: matchingCategory?.isCustomCanvas ?? false,
     });
   },
+
+  updateCustomizedService: (index, updated) => {
+    const { customizedServices } = get();
+    if (index < 0 || index >= customizedServices.length) return;
+    const next = [...customizedServices];
+    next[index] = { ...next[index], ...updated };
+    set({ customizedServices: next });
+  },
+
+  addCustomizedService: (service) => {
+    const { customizedServices } = get();
+    set({ customizedServices: [...customizedServices, service] });
+  },
+
+  removeCustomizedService: (index) => {
+    const { customizedServices } = get();
+    set({ customizedServices: customizedServices.filter((_, i) => i !== index) });
+  },
+
+  toggleAddon: (addonId) => {
+    const { selectedAddons } = get();
+    if (selectedAddons.includes(addonId)) {
+      set({ selectedAddons: selectedAddons.filter((id) => id !== addonId) });
+    } else {
+      set({ selectedAddons: [...selectedAddons, addonId] });
+    }
+  },
+
+  setCustomizedServices: (services) => set({ customizedServices: services }),
+
+  setSelectedAddons: (addonIds) => set({ selectedAddons: addonIds }),
 
   selectCustomCanvasMode: () => {
     const { categories } = get();
@@ -236,6 +326,8 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
     set({
       selectedCategory: null,
       selectedTemplate: null,
+      customizedServices: [],
+      selectedAddons: [],
       isCustomCanvas: false,
     }),
 
@@ -243,6 +335,8 @@ export const useSectorTemplateStore = create<SectorTemplateState>((set, get) => 
     set({
       selectedCategory: null,
       selectedTemplate: null,
+      customizedServices: [],
+      selectedAddons: [],
       isCustomCanvas: false,
       onboardingResult: null,
       isOnboardingComplete: false,
