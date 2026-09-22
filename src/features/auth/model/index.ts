@@ -152,25 +152,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: user.email,
         ...data,
       };
-      let syncedBusinessId = user.businessId || 'synced-backend';
 
       try {
-        const response = await authApi.syncProfile(payload);
-        if (response.data?.businessId) {
-          syncedBusinessId = response.data.businessId;
-        }
-
-        // IMPORTANTE: Guardarlo en Supabase para que persista tras recargar
-        await supabase.auth.updateUser({
-          data: { business_id: syncedBusinessId }
-        });
+        await authApi.syncProfile(payload);
       } catch (syncErr: any) {
         console.warn('Backend sync warning (continuing locally):', syncErr.message);
       }
 
       // Update business state so it marks them as complete
       set({
-        user: { ...user, businessId: syncedBusinessId },
+        user: { ...user, businessId: user.businessId || 'synced-backend' },
         isJustRegistered: false,
         isLoading: false,
       });

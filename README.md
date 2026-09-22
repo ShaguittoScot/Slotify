@@ -1,56 +1,127 @@
-# Welcome to your Expo app 👋
+# Slotify
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> **Plataforma Integral de Gestión de Citas, Agendas y Turnos Inteligentes**  
+> Solución móvil y web moderna diseñada para optimizar la operativa de negocios de servicios (B2B) y enriquecer la experiencia de reserva de los clientes (B2C).
 
-## Get started
+---
 
-1. Install dependencies
+## Resumen del Proyecto y Metodología
 
-   ```bash
-   npm install
-   ```
+El desarrollo de este proyecto se rige bajo la metodología ágil **Scrum**, gestionando el ciclo de vida de desarrollo a través de tableros **Jira**, entregas iterativas por **Sprints** y control de versiones estructurado por **Feature Branches**.
 
-2. Start the app
+Esta rama (`feature/US-003-US-008-calendario-agenda`) integra los módulos nucleares de experiencia interactiva de turnos y configuración operativa de negocios.
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## Historias de Usuario Implementadas en esta Rama
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Código Jira | Historia de Usuario | Descripción Técnica | Criterios de Aceptación / Estado |
+| :--- | :--- | :--- | :--- |
+| **US-003** | **Calendario Táctil e Interactivo** | Selector táctil de fechas con navegación fluida entre vistas (mensual y diaria). Renderizado de slots con codificación de estados por color (disponible, reservado, bloqueado). | **Cumplido:** Feedback táctil inmediato, micro-animaciones a 60fps con Reanimated, sincronización de fecha seleccionada en store global. |
+| **US-008** | **Agenda y Gestión de Bloques de Turnos** | Configuración operativa de la disponibilidad del negocio. Definición de intervalos de atención, descansos, capacidades máximas por franja horaria y bloqueos de agenda. | **Cumplido:** Creación, edición y eliminación de bloques con validación de solapamiento horario y persistencia de estado. |
+| **US-006** | **Selector de Giros y Plantillas Comerciales** | Módulo de Onboarding inicial para negocios. Permite seleccionar el sector comercial (Barbería, Medicina, Belleza, Consultoría) y precarga plantillas predeterminadas de horarios y servicios. | **Cumplido:** Carrusel interactivo de plantillas, selección visual de giro y configuración modular en store. |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## Arquitectura de Software: Feature-Based Architecture (FBA)
 
-When you're ready, run:
+El frontend está diseñado bajo el patrón arquitectónico **Feature-Based Architecture (FBA)**, promoviendo alta cohesión y bajo acoplamiento:
 
-```bash
-npm run reset-project
+```
+Slotify/
+├── backend/                  # Módulos y servicios de soporte API
+├── frontend/                 # Aplicación móvil React Native / Expo
+│   ├── assets/               # Fuentes tipográficas, iconos e imágenes
+│   ├── scripts/              # Polyfills y utilidades de entorno de desarrollo
+│   ├── src/
+│   │   ├── app/              # Enrutamiento basado en archivos (Expo Router)
+│   │   │   ├── (auth)/       # Flujos de autenticación y bienvenida
+│   │   │   ├── (main)/       # Vistas protegidas principales (Dashboard, Explorador)
+│   │   │   ├── (onboarding)/ # Wizard de configuración inicial de negocio
+│   │   │   └── _layout.tsx   # Layout raíz con proveedores globales
+│   │   ├── components/       # Componentes de UI comunes y reutilizables
+│   │   ├── features/         # Módulos de dominio aislados (FBA)
+│   │   │   ├── auth/         # Lógica, servicios y pantallas de autenticación
+│   │   │   ├── calendar/     # Lógica, modelo y componentes táctiles de US-003
+│   │   │   ├── schedule-blocks/ # Gestión y validación de bloques de US-008
+│   │   │   └── sector-templates/ # Plantillas y selector comercial de US-006
+│   │   ├── shared/           # Capa transversal compartida
+│   │   │   ├── lib/          # Clientes HTTP, adaptadores de almacenamiento y Supabase
+│   │   │   └── theme/        # Tokens de diseño (Colores, Tipografía, Espaciado)
+│   │   └── hooks/            # Custom React Hooks compartidos
+│   ├── app.json              # Configuración del ecosistema Expo SDK
+│   ├── package.json          # Dependencias y scripts de ejecución
+│   └── tsconfig.json         # Configuración de compilación TypeScript estricto
+├── .gitignore                # Reglas estrictas de exclusión de Git
+└── README.md                 # Documentación técnica del proyecto
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-### Other setup steps
+## Stack Tecnológico
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+* **Core:** [React Native](https://reactnative.dev/) `0.86+` & [Expo SDK](https://expo.dev/) `54+`
+* **Navegación:** [Expo Router](https://docs.expo.dev/router/introduction/) (Navegación declarativa nativa por sistema de archivos)
+* **Lenguaje:** [TypeScript](https://www.typescriptlang.org/) (Tipado estricto en interfaces, DTOs y modelos)
+* **Animaciones & Gestos:** [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) y `Gesture Handler` (Micro-interacciones a 60fps)
+* **Gestión de Estado:** [Zustand](https://zustand-demo.pmnd.rs/) (Stores modulares para calendario, agenda y sesión)
+* **Consumo Asíncrono:** [TanStack React Query](https://tanstack.com/query/latest) & [Axios](https://axios-http.com/)
+* **Persistencia Segura:** `expo-secure-store` y `@react-native-async-storage/async-storage`
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## Guía de Instalación y Ejecución Local
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Prerrequisitos
+* **Node.js:** Versión LTS recomendada (`v20.x` o superior)
+* **Gestor de paquetes:** `npm` (`v10.x` o superior)
+* **Dispositivo móvil (Opcional):** Aplicación **Expo Go** instalada desde Google Play Store o Apple App Store.
 
-## Join the community
+### 1. Clonar el Repositorio y Ubicarse en la Rama
+```bash
+git clone https://github.com/ShaguittoScot/Slotify.git
+cd Slotify
+git checkout feature/US-003-US-008-calendario-agenda
+```
 
-Join our community of developers creating universal apps.
+### 2. Instalar Dependencias del Frontend
+```bash
+cd frontend
+npm install
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### 3. Configurar Variables de Entorno
+Copia el archivo de ejemplo para configurar tus variables locales:
+```bash
+cp .env.example .env
+```
+*(Nota: El archivo `.env` está protegido en `.gitignore` y jamás debe subirse a Git).*
+
+### 4. Iniciar el Servidor de Desarrollo Expo
+Puedes ejecutar la aplicación en el modo de tu preferencia:
+
+* **Modo Web (Navegador local):**
+  ```bash
+  npm run web
+  ```
+* **Modo Red / Móvil con Tunnel (Recomendado para Expo Go):**
+  ```bash
+  npm run start:tunnel
+  ```
+* **Modo Android (Emulador):**
+  ```bash
+  npm run android
+  ```
+
+---
+
+## Estándares de Calidad y Buenas Prácticas de Git
+
+1. **Protección de Credenciales:**
+   * Cumplimiento estricto de las directrices de seguridad de OWASP y políticas de Git.
+   * Ningún secreto, API key o cadena de conexión a bases de datos se encuentra rastreado en este repositorio.
+2. **Convención de Commits:**
+   * Uso de [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`).
+3. **Mantenimiento de Código Limpio:**
+   * Modularización mediante FBA.
+   * Cero código acoplado o llamadas directas en componentes de presentación.

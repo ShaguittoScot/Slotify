@@ -36,11 +36,17 @@ export const WeekView: React.FC<WeekViewProps> = ({
     });
   }, [selectedDate]);
 
+  // Compara si dos fechas corresponden al mismo día local (inmune a offsets UTC)
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
   // Slots del día seleccionado
-  const selectedDateStr = selectedDate.toISOString().split('T')[0];
-  const activeDaySlots = slots.filter(
-    (s) => s.startTime.split('T')[0] === selectedDateStr
-  );
+  const activeDaySlots = slots.filter((s) => {
+    const slotDate = new Date(s.startTime);
+    return isSameDay(slotDate, selectedDate);
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
@@ -60,10 +66,9 @@ export const WeekView: React.FC<WeekViewProps> = ({
       >
         <View style={styles.daysRow}>
           {weekDays.map((day, idx) => {
-            const isSelected = day.toDateString() === selectedDate.toDateString();
-            const isToday = day.toDateString() === new Date().toDateString();
-            const dayStr = day.toISOString().split('T')[0];
-            const hasSlots = slots.some((s) => s.startTime.split('T')[0] === dayStr);
+            const isSelected = isSameDay(day, selectedDate);
+            const isToday = isSameDay(day, new Date());
+            const hasSlots = slots.some((s) => isSameDay(new Date(s.startTime), day));
 
             return (
               <TouchableOpacity
@@ -257,7 +262,7 @@ const styles = StyleSheet.create({
   slotsScrollContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 100, // Espacio libre para la barra flotante inferior
+    paddingBottom: 130, // Espacio libre amplio para la barra flotante inferior
   },
   summaryHeader: {
     flexDirection: 'row',
