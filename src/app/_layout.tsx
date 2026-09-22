@@ -56,7 +56,7 @@ export default function RootLayout() {
     const inMainGroup = segments[0] === '(main)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
 
-    if (!isAuthenticated && (inMainGroup || inOnboardingGroup)) {
+    if (!isAuthenticated && inMainGroup) {
       // @ts-ignore
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {

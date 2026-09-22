@@ -55,6 +55,33 @@ export const WelcomeScreen = () => {
               </TouchableOpacity>
             </Animated.View>
 
+            <Animated.View entering={FadeInDown.duration(400).delay(450)}>
+              <TouchableOpacity
+                style={[
+                  styles.secondaryButton,
+                  {
+                    borderColor: '#E07A5F',
+                    backgroundColor: 'rgba(224, 122, 95, 0.12)',
+                    marginTop: 10,
+                  },
+                ]}
+                activeOpacity={0.8}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(onboarding)/templates' as any,
+                    params: {
+                      sectorId: '5',
+                      sectorKey: 'barberia',
+                    },
+                  })
+                }
+              >
+                <Text style={[styles.secondaryButtonText, { color: '#E07A5F', fontWeight: '600' }]}>
+                  Ver Plantilla Barbería (SCRUM-105)
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+
             <Animated.Text
               entering={FadeInDown.duration(400).delay(500)}
               style={styles.termsText}
