@@ -47,6 +47,19 @@ interface CalendarState {
 
   /** Establece los slots manualmente */
   setSlots: (slots: CalendarSlot[]) => void;
+
+  // ── Acciones de Administrador ──────────────────────────
+  /** Actualiza el estado de un slot (ej. 'confirmed' | 'cancelled' | 'completed' | 'pending') */
+  updateSlotStatus: (resourceId: string, status: 'confirmed' | 'cancelled' | 'completed' | 'pending') => void;
+
+  /** Agrega un nuevo slot manualmente (cita walk-in o bloqueo) */
+  addSlot: (slot: CalendarSlot) => void;
+
+  /** Elimina un slot de la agenda (desbloquear horario o eliminar cita) */
+  removeSlot: (resourceId: string) => void;
+
+  /** Reprograma el horario de una cita existente */
+  rescheduleSlot: (resourceId: string, newStartTime: string, newEndTime: string) => void;
 }
 
 /** Calcula el rango ISO [startDate, endDate] para la fecha y vista actuales */
@@ -132,4 +145,30 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   setSlots: (slots) => set({ slots, isLoading: false }),
+
+  updateSlotStatus: (resourceId, status) => {
+    set((state) => ({
+      slots: state.slots.map((s) => (s.resourceId === resourceId ? { ...s, status } : s)),
+    }));
+  },
+
+  addSlot: (slot) => {
+    set((state) => ({
+      slots: [...state.slots, slot],
+    }));
+  },
+
+  removeSlot: (resourceId) => {
+    set((state) => ({
+      slots: state.slots.filter((s) => s.resourceId !== resourceId),
+    }));
+  },
+
+  rescheduleSlot: (resourceId, newStartTime, newEndTime) => {
+    set((state) => ({
+      slots: state.slots.map((s) =>
+        s.resourceId === resourceId ? { ...s, startTime: newStartTime, endTime: newEndTime } : s
+      ),
+    }));
+  },
 }));

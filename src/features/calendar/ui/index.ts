@@ -11,3 +11,7 @@ export { CalendarSlotCard } from './CalendarSlotCard';
 export { DayView } from './DayView';
 export { WeekView } from './WeekView';
 export { MonthView } from './MonthView';
+export { AdminSlotDetailModal } from './AdminSlotDetailModal';
+export { CreateAppointmentModal } from './CreateAppointmentModal';
+export { QuickSearchModal } from './QuickSearchModal';
+export { JumpToDateModal } from './JumpToDateModal';

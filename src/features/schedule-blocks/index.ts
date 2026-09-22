@@ -7,4 +7,4 @@
 
 export { useScheduleBlockStore } from './model';
 export { createScheduleBlock, deleteScheduleBlock } from './api';
-// export { BlockSlotModal } from './ui'; // TODO: Descomentar
+export { BlockSlotModal } from './ui';

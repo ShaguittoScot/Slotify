@@ -99,8 +99,12 @@ export interface CalendarSlot {
   startTime: string;
   endTime: string;
   title: string;
-  status: 'confirmed' | 'cancelled' | 'blocked' | 'available';
+  status: 'confirmed' | 'cancelled' | 'blocked' | 'available' | 'completed' | 'pending';
   clientName?: string;
+  clientPhone?: string;
+  servicePrice?: string;
+  notes?: string;
+  employeeName?: string;
   blockReason?: string;
 }
 

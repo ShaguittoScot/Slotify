@@ -17,6 +17,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const isConfigured = true;
 
+let wsTransport: any = undefined;
+if (typeof globalThis !== 'undefined' && (globalThis as any).WebSocket) {
+  wsTransport = (globalThis as any).WebSocket;
+} else {
+  try {
+    wsTransport = require('ws');
+  } catch (e) {}
+}
+
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: {
@@ -34,6 +43,7 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
     persistSession: isConfigured,
     detectSessionInUrl: false,
   },
+  realtime: wsTransport ? { transport: wsTransport } : undefined,
 });
 
 export { isConfigured as isSupabaseConfigured };

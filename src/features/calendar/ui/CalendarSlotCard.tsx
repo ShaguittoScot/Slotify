@@ -19,9 +19,19 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
 
   const isAppointment = slot.type === 'appointment';
   const isBlock = slot.type === 'block';
+  const isCompleted = slot.status === 'completed';
+  const isCancelled = slot.status === 'cancelled';
 
   // Determinación de superficies Glassmorphism y acentos
-  const cardBg = isAppointment
+  const cardBg = isCompleted
+    ? isDark
+      ? 'rgba(16, 185, 129, 0.12)'
+      : 'rgba(16, 185, 129, 0.06)'
+    : isCancelled
+    ? isDark
+      ? 'rgba(239, 68, 68, 0.08)'
+      : 'rgba(239, 68, 68, 0.04)'
+    : isAppointment
     ? isDark
       ? 'rgba(99, 102, 241, 0.12)'
       : 'rgba(99, 102, 241, 0.06)'
@@ -33,7 +43,15 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
     ? 'rgba(255, 255, 255, 0.035)'
     : 'rgba(0, 0, 0, 0.03)';
 
-  const borderColor = isAppointment
+  const borderColor = isCompleted
+    ? isDark
+      ? 'rgba(16, 185, 129, 0.28)'
+      : 'rgba(16, 185, 129, 0.20)'
+    : isCancelled
+    ? isDark
+      ? 'rgba(239, 68, 68, 0.25)'
+      : 'rgba(239, 68, 68, 0.18)'
+    : isAppointment
     ? isDark
       ? 'rgba(99, 102, 241, 0.28)'
       : 'rgba(99, 102, 241, 0.20)'
@@ -45,11 +63,37 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
     ? 'rgba(255, 255, 255, 0.08)'
     : 'rgba(0, 0, 0, 0.06)';
 
-  const accentColor = isAppointment
+  const accentColor = isCompleted
+    ? '#34D399'
+    : isCancelled
+    ? '#EF4444'
+    : isAppointment
     ? '#818CF8'
     : isBlock
     ? '#F87171'
     : '#34D399';
+
+  const badgeText = isCompleted
+    ? 'COMPLETADA'
+    : isCancelled
+    ? 'CANCELADA'
+    : isAppointment
+    ? 'CONFIRMADA'
+    : isBlock
+    ? 'BLOQUEADO'
+    : 'DISPONIBLE';
+
+  const badgeBg = isCompleted
+    ? isDark
+      ? 'rgba(16, 185, 129, 0.22)'
+      : 'rgba(16, 185, 129, 0.12)'
+    : isCancelled || isBlock
+    ? isDark
+      ? 'rgba(239, 68, 68, 0.22)'
+      : 'rgba(239, 68, 68, 0.12)'
+    : isDark
+    ? 'rgba(99, 102, 241, 0.22)'
+    : 'rgba(99, 102, 241, 0.12)';
 
   return (
     <TouchableOpacity
@@ -92,22 +136,12 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
             style={[
               styles.statusBadge,
               {
-                backgroundColor: isAppointment
-                  ? isDark
-                    ? 'rgba(99, 102, 241, 0.22)'
-                    : 'rgba(99, 102, 241, 0.12)'
-                  : isBlock
-                  ? isDark
-                    ? 'rgba(239, 68, 68, 0.22)'
-                    : 'rgba(239, 68, 68, 0.12)'
-                  : isDark
-                  ? 'rgba(16, 185, 129, 0.22)'
-                  : 'rgba(16, 185, 129, 0.12)',
+                backgroundColor: badgeBg,
               },
             ]}
           >
             <Text style={[styles.statusBadgeText, { color: accentColor }]}>
-              {isAppointment ? 'CONFIRMADA' : isBlock ? 'BLOQUEADO' : 'DISPONIBLE'}
+              {badgeText}
             </Text>
           </View>
         </View>

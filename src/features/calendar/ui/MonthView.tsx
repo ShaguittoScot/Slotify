@@ -55,11 +55,17 @@ export const MonthView: React.FC<MonthViewProps> = ({
     return days;
   }, [currentYear, currentMonth]);
 
+  // Compara si dos fechas corresponden al mismo día local (inmune a offsets UTC)
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
   // Slots del día seleccionado
-  const selectedDateStr = selectedDate.toISOString().split('T')[0];
-  const activeDaySlots = slots.filter(
-    (s) => s.startTime.split('T')[0] === selectedDateStr
-  );
+  const activeDaySlots = slots.filter((s) => {
+    const slotDate = new Date(s.startTime);
+    return isSameDay(slotDate, selectedDate);
+  });
 
   return (
     <ScrollView
@@ -93,10 +99,9 @@ export const MonthView: React.FC<MonthViewProps> = ({
         {/* Días en cuadrícula */}
         <View style={styles.gridContainer}>
           {calendarGrid.map((item, idx) => {
-            const isSelected = item.date.toDateString() === selectedDate.toDateString();
-            const isToday = item.date.toDateString() === new Date().toDateString();
-            const dayStr = item.date.toISOString().split('T')[0];
-            const hasSlots = slots.some((s) => s.startTime.split('T')[0] === dayStr);
+            const isSelected = isSameDay(item.date, selectedDate);
+            const isToday = isSameDay(item.date, new Date());
+            const hasSlots = slots.some((s) => isSameDay(new Date(s.startTime), item.date));
 
             return (
               <TouchableOpacity
@@ -211,7 +216,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Margen de seguridad para la barra de navegación flotante
+    paddingBottom: 130, // Margen de seguridad para la barra de navegación flotante
   },
   monthIslandCard: {
     marginHorizontal: 16,
