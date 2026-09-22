@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { useSectorTemplateStore } from '@/features/sector-templates';
+import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
 
 interface CreateAppointmentModalProps {
   visible: boolean;
@@ -29,11 +31,11 @@ interface CreateAppointmentModalProps {
 }
 
 const PRESET_SERVICES = [
-  { id: 's1', name: 'Corte Clásico', price: '$200 MXN', duration: 30, icon: 'scissors-cutting' },
-  { id: 's2', name: 'Corte + Barba', price: '$280 MXN', duration: 45, icon: 'face-man-shimmer' },
-  { id: 's3', name: 'Tinte / Colorimetría', price: '$450 MXN', duration: 90, icon: 'palette' },
-  { id: 's4', name: 'Tratamiento Capilar', price: '$350 MXN', duration: 60, icon: 'spa' },
-  { id: 's5', name: 'Manicura Spa', price: '$220 MXN', duration: 45, icon: 'hand-peace' },
+  { id: 's1', name: 'Corte Clásico', price: '$200 MXN', priceNum: 200, duration: 30, icon: 'scissors-cutting' },
+  { id: 's2', name: 'Corte + Barba', price: '$320 MXN', priceNum: 320, duration: 45, icon: 'face-man-shimmer' },
+  { id: 's3', name: 'Perfilado de Barba', price: '$150 MXN', priceNum: 150, duration: 30, icon: 'face-man-shimmer' },
+  { id: 's4', name: 'Afeitado Tradicional', price: '$220 MXN', priceNum: 220, duration: 45, icon: 'content-cut' },
+  { id: 's5', name: 'Ritual Toalla Caliente', price: '$420 MXN', priceNum: 420, duration: 60, icon: 'spa' },
 ];
 
 const TIME_OPTIONS = [
@@ -50,23 +52,75 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
   initialHour,
 }) => {
   const { colors, isDark } = useAppTheme();
+  const { onboardingResult, selectedCategory } = useSectorTemplateStore();
+
+  // Resuelve dinámicamente los servicios de la plantilla activa o canónica
+  const activeServices = useMemo(() => {
+    if (onboardingResult?.finalServices && onboardingResult.finalServices.length > 0) {
+      return onboardingResult.finalServices.map((s, idx) => ({
+        id: `svc-${idx}`,
+        name: s.name,
+        price: s.price ? `$${s.price} MXN` : '$200 MXN',
+        priceNum: s.price ?? 200,
+        duration: s.durationMinutes,
+        icon: s.name.toLowerCase().includes('barba') ? 'face-man-shimmer' : 'scissors-cutting',
+      }));
+    }
+    const barberCat = CANONICAL_SECTOR_CATEGORIES.find((c) => c.key === 'barberia');
+    if (barberCat?.suggestedServices) {
+      return barberCat.suggestedServices.map((s, idx) => ({
+        id: `barber-${idx}`,
+        name: s.name,
+        price: `$${s.price ?? 200} MXN`,
+        priceNum: s.price ?? 200,
+        duration: s.durationMinutes,
+        icon: s.name.toLowerCase().includes('barba') ? 'face-man-shimmer' : 'scissors-cutting',
+      }));
+    }
+    return PRESET_SERVICES;
+  }, [onboardingResult, selectedCategory]);
+
+  // Resuelve los servicios adicionales (Add-ons) disponibles
+  const availableAddons = useMemo(() => {
+    if (onboardingResult?.selectedAddons && onboardingResult.selectedAddons.length > 0) {
+      return onboardingResult.selectedAddons;
+    }
+    const barberCat = CANONICAL_SECTOR_CATEGORIES.find((c) => c.key === 'barberia');
+    return barberCat?.suggestedAddons ?? [];
+  }, [onboardingResult, selectedCategory]);
+
+  // Resuelve los puestos de atención / sillones disponibles
+  const availableStations = useMemo(() => {
+    if (onboardingResult?.stations && onboardingResult.stations.length > 0) {
+      return onboardingResult.stations;
+    }
+    const barberCat = CANONICAL_SECTOR_CATEGORIES.find((c) => c.key === 'barberia');
+    return barberCat?.suggestedStations ?? [];
+  }, [onboardingResult, selectedCategory]);
 
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
-  const [selectedService, setSelectedService] = useState(PRESET_SERVICES[0]);
+  const [selectedService, setSelectedService] = useState(activeServices[0] || PRESET_SERVICES[0]);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  const [selectedStationName, setSelectedStationName] = useState<string>(
+    availableStations[0]?.name || 'Sillón 1 (Principal)'
+  );
   const [customServiceName, setCustomServiceName] = useState('');
   const [customPrice, setCustomPrice] = useState('');
   const [startHour, setStartHour] = useState('10:00');
-  const [durationMinutes, setDurationMinutes] = useState(45);
+  const [baseDurationMinutes, setBaseDurationMinutes] = useState(30);
 
   useEffect(() => {
     if (visible) {
       setClientName('');
       setClientPhone('');
-      setSelectedService(PRESET_SERVICES[0]);
+      const firstSvc = activeServices[0] || PRESET_SERVICES[0];
+      setSelectedService(firstSvc);
+      setSelectedAddonIds([]);
+      setSelectedStationName(availableStations[0]?.name || 'Sillón 1 (Principal)');
       setCustomServiceName('');
       setCustomPrice('');
-      setDurationMinutes(PRESET_SERVICES[0].duration);
+      setBaseDurationMinutes(firstSvc.duration);
       if (initialHour && TIME_OPTIONS.includes(initialHour)) {
         setStartHour(initialHour);
       } else {
@@ -75,11 +129,38 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
         setStartHour(nearest);
       }
     }
-  }, [visible, initialDate, initialHour]);
+  }, [visible, initialDate, initialHour, activeServices, availableStations]);
+
+  const toggleAddon = (addonId: string) => {
+    setSelectedAddonIds((prev) =>
+      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
+    );
+  };
+
+  // Cálculo acumulativo de duración (servicio base + minutos adicionales de extras)
+  const totalDuration = useMemo(() => {
+    const base = customServiceName.trim() ? baseDurationMinutes : selectedService.duration;
+    const extrasDuration = availableAddons
+      .filter((a) => selectedAddonIds.includes(a.id))
+      .reduce((acc, a) => acc + a.durationMinutes, 0);
+    return base + extrasDuration;
+  }, [customServiceName, baseDurationMinutes, selectedService, availableAddons, selectedAddonIds]);
+
+  // Cálculo acumulativo de precio (precio base + costo de extras)
+  const totalPriceFormatted = useMemo(() => {
+    if (customPrice.trim()) {
+      return `$${customPrice.replace('$', '')} MXN`;
+    }
+    const basePrice = selectedService.priceNum ?? 200;
+    const extrasPrice = availableAddons
+      .filter((a) => selectedAddonIds.includes(a.id))
+      .reduce((acc, a) => acc + a.price, 0);
+    return `$${basePrice + extrasPrice} MXN`;
+  }, [customPrice, selectedService, availableAddons, selectedAddonIds]);
 
   const endHourFormatted = () => {
     const [h, m] = startHour.split(':').map(Number);
-    const totalMinutes = h * 60 + m + durationMinutes;
+    const totalMinutes = h * 60 + m + totalDuration;
     const endH = Math.floor(totalMinutes / 60) % 24;
     const endM = totalMinutes % 60;
     return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
@@ -95,19 +176,23 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
     const [hours, minutes] = startHour.split(':').map(Number);
     d.setHours(hours, minutes, 0, 0);
 
-    const end = new Date(d.getTime() + durationMinutes * 60 * 1000);
+    const end = new Date(d.getTime() + totalDuration * 60 * 1000);
 
-    const title = customServiceName.trim() ? customServiceName.trim() : selectedService.name;
-    const price = customPrice.trim() ? `$${customPrice.replace('$', '')} MXN` : selectedService.price;
+    const extraNames = availableAddons
+      .filter((a) => selectedAddonIds.includes(a.id))
+      .map((a) => a.name);
+
+    const baseTitle = customServiceName.trim() ? customServiceName.trim() : selectedService.name;
+    const title = extraNames.length > 0 ? `${baseTitle} (+ ${extraNames.join(', ')})` : baseTitle;
 
     onSave({
       title,
       clientName: clientName.trim(),
       clientPhone: clientPhone.trim() || undefined,
-      servicePrice: price,
+      servicePrice: totalPriceFormatted,
       startTime: d.toISOString(),
       endTime: end.toISOString(),
-      employeeName: 'Atención General',
+      employeeName: selectedStationName,
     });
     onClose();
   };
@@ -198,10 +283,10 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
 
             {/* Servicio Selector */}
             <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-              Servicio a Realizar
+              Servicio de Barbería / Atención
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceScroll}>
-              {PRESET_SERVICES.map((srv) => {
+              {activeServices.map((srv) => {
                 const isSelected = selectedService.id === srv.id && !customServiceName;
                 return (
                   <TouchableOpacity
@@ -210,18 +295,18 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                       setSelectedService(srv);
                       setCustomServiceName('');
                       setCustomPrice('');
-                      setDurationMinutes(srv.duration);
+                      setBaseDurationMinutes(srv.duration);
                     }}
                     style={[
                       styles.serviceChip,
                       {
                         backgroundColor: isSelected
-                          ? 'rgba(99, 102, 241, 0.15)'
+                          ? 'rgba(224, 122, 95, 0.18)'
                           : isDark
                           ? 'rgba(255, 255, 255, 0.04)'
                           : 'rgba(0, 0, 0, 0.03)',
                         borderColor: isSelected
-                          ? '#6366F1'
+                          ? '#E07A5F'
                           : isDark
                           ? 'rgba(255, 255, 255, 0.08)'
                           : 'rgba(0, 0, 0, 0.08)',
@@ -231,7 +316,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                     <MaterialCommunityIcons
                       name={srv.icon as any}
                       size={18}
-                      color={isSelected ? '#818CF8' : colors.text.muted}
+                      color={isSelected ? '#E07A5F' : colors.text.muted}
                       style={{ marginRight: 8 }}
                     />
                     <View>
@@ -239,7 +324,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                         style={[
                           styles.serviceChipName,
                           {
-                            color: isSelected ? '#818CF8' : colors.text.primary,
+                            color: isSelected ? '#E07A5F' : colors.text.primary,
                             fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
                           },
                         ]}
@@ -254,6 +339,122 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                 );
               })}
             </ScrollView>
+
+            {/* Selector de Servicios Adicionales (Add-ons de Barbería) */}
+            {availableAddons.length > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
+                  Servicios Adicionales / Extras
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceScroll}>
+                  {availableAddons.map((addon) => {
+                    const isSelected = selectedAddonIds.includes(addon.id);
+                    return (
+                      <TouchableOpacity
+                        key={addon.id}
+                        onPress={() => toggleAddon(addon.id)}
+                        style={[
+                          styles.serviceChip,
+                          {
+                            backgroundColor: isSelected
+                              ? 'rgba(224, 122, 95, 0.20)'
+                              : isDark
+                              ? 'rgba(255, 255, 255, 0.04)'
+                              : 'rgba(0, 0, 0, 0.03)',
+                            borderColor: isSelected
+                              ? '#E07A5F'
+                              : isDark
+                              ? 'rgba(255, 255, 255, 0.08)'
+                              : 'rgba(0, 0, 0, 0.08)',
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="sparkles"
+                          size={16}
+                          color={isSelected ? '#E07A5F' : colors.text.muted}
+                          style={{ marginRight: 6 }}
+                        />
+                        <View>
+                          <Text
+                            style={[
+                              styles.serviceChipName,
+                              {
+                                color: isSelected ? '#E07A5F' : colors.text.primary,
+                                fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                              },
+                            ]}
+                          >
+                            {addon.name}
+                          </Text>
+                          <Text style={[styles.serviceChipPrice, { color: colors.text.muted }]}>
+                            +${addon.price} MXN • +{addon.durationMinutes}m
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+
+            {/* Asignación de Sillón / Barbero */}
+            {availableStations.length > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
+                  Sillón / Barbero Asignado
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceScroll}>
+                  {availableStations.map((station) => {
+                    const isSelected = selectedStationName === station.name;
+                    return (
+                      <TouchableOpacity
+                        key={station.id}
+                        onPress={() => setSelectedStationName(station.name)}
+                        style={[
+                          styles.serviceChip,
+                          {
+                            backgroundColor: isSelected
+                              ? 'rgba(224, 122, 95, 0.20)'
+                              : isDark
+                              ? 'rgba(255, 255, 255, 0.04)'
+                              : 'rgba(0, 0, 0, 0.03)',
+                            borderColor: isSelected
+                              ? '#E07A5F'
+                              : isDark
+                              ? 'rgba(255, 255, 255, 0.08)'
+                              : 'rgba(0, 0, 0, 0.08)',
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="chair-rolling"
+                          size={16}
+                          color={isSelected ? '#E07A5F' : colors.text.muted}
+                          style={{ marginRight: 6 }}
+                        />
+                        <View>
+                          <Text
+                            style={[
+                              styles.serviceChipName,
+                              {
+                                color: isSelected ? '#E07A5F' : colors.text.primary,
+                                fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                              },
+                            ]}
+                          >
+                            {station.name}
+                          </Text>
+                          <Text style={[styles.serviceChipPrice, { color: colors.text.muted }]}>
+                            {station.assignedStaffName || 'Atención general'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
 
             {/* Hora y Duración */}
             <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
@@ -270,12 +471,12 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                       styles.timePill,
                       {
                         backgroundColor: isSelected
-                          ? '#6366F1'
+                          ? '#E07A5F'
                           : isDark
                           ? 'rgba(255, 255, 255, 0.04)'
                           : 'rgba(0, 0, 0, 0.03)',
                         borderColor: isSelected
-                          ? '#6366F1'
+                          ? '#E07A5F'
                           : isDark
                           ? 'rgba(255, 255, 255, 0.08)'
                           : 'rgba(0, 0, 0, 0.08)',
@@ -300,25 +501,25 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
 
             {/* Duración */}
             <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-              Duración
+              Duración Base
             </Text>
             <View style={styles.durationRow}>
               {[30, 45, 60, 90, 120].map((mins) => {
-                const isSelected = durationMinutes === mins;
+                const isSelected = baseDurationMinutes === mins;
                 return (
                   <TouchableOpacity
                     key={mins}
-                    onPress={() => setDurationMinutes(mins)}
+                    onPress={() => setBaseDurationMinutes(mins)}
                     style={[
                       styles.durationBtn,
                       {
                         backgroundColor: isSelected
-                          ? 'rgba(99, 102, 241, 0.15)'
+                          ? 'rgba(224, 122, 95, 0.18)'
                           : isDark
                           ? 'rgba(255, 255, 255, 0.04)'
                           : 'rgba(0, 0, 0, 0.03)',
                         borderColor: isSelected
-                          ? '#6366F1'
+                          ? '#E07A5F'
                           : isDark
                           ? 'rgba(255, 255, 255, 0.08)'
                           : 'rgba(0, 0, 0, 0.08)',
@@ -329,7 +530,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                       style={[
                         styles.durationBtnText,
                         {
-                          color: isSelected ? '#818CF8' : colors.text.secondary,
+                          color: isSelected ? '#E07A5F' : colors.text.secondary,
                           fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_400Regular',
                         },
                       ]}
@@ -346,15 +547,15 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
               style={[
                 styles.rangeSummary,
                 {
-                  backgroundColor: isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.05)',
-                  borderColor: 'rgba(99, 102, 241, 0.20)',
+                  backgroundColor: isDark ? 'rgba(224, 122, 95, 0.08)' : 'rgba(224, 122, 95, 0.05)',
+                  borderColor: 'rgba(224, 122, 95, 0.25)',
                 },
               ]}
             >
-              <Feather name="clock" size={15} color="#818CF8" style={{ marginRight: 8 }} />
+              <Feather name="clock" size={15} color="#E07A5F" style={{ marginRight: 8 }} />
               <Text style={[styles.rangeSummaryText, { color: colors.text.primary }]}>
-                Cita de <Text style={{ fontFamily: 'Inter_700Bold', color: '#818CF8' }}>{startHour}</Text> a{' '}
-                <Text style={{ fontFamily: 'Inter_700Bold', color: '#818CF8' }}>{endHourFormatted()}</Text> ({durationMinutes} min)
+                Cita de <Text style={{ fontFamily: 'Inter_700Bold', color: '#E07A5F' }}>{startHour}</Text> a{' '}
+                <Text style={{ fontFamily: 'Inter_700Bold', color: '#E07A5F' }}>{endHourFormatted()}</Text> ({totalDuration} min) • {totalPriceFormatted}
               </Text>
             </View>
           </ScrollView>

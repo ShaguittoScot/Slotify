@@ -12,10 +12,34 @@ export type SectorCategoryKey =
   | 'belleza-cuidado'
   | 'fitness-deportes'
   | 'servicios-profesionales'
+  | 'barberia'
+  | 'restaurante'
   | 'otro-general';
 
 /**
- * Categoría o Giro Comercial para el selector inicial (US-006)
+ * Servicio adicional o complemento para el sector (ej. Lavado, Mascarilla, Toalla Caliente)
+ */
+export interface ServiceAddon {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  description?: string;
+  isPopular?: boolean;
+}
+
+/**
+ * Sillón o estación de atención para barberías y estéticas
+ */
+export interface BarberStation {
+  id: string;
+  name: string;
+  assignedStaffName?: string;
+  isActive: boolean;
+}
+
+/**
+ * Categoría o Giro Comercial para el selector inicial (US-006 / SCRUM-105)
  */
 export interface SectorCategory {
   /** ID numérico autoincremental de seed en backend .NET */
@@ -24,7 +48,7 @@ export interface SectorCategory {
   key: SectorCategoryKey;
   /** Nombre visible del giro comercial */
   name: string;
-  /** Resumen rápido de sub-rubros (ej. Clínicas, Consultorios, Dentistas) */
+  /** Resumen rápido de sub-rubros (ej. Clínicas, Consultorios, Barberías) */
   tagline: string;
   /** Descripción detallada del flujo y módulos afines */
   description: string;
@@ -34,6 +58,10 @@ export interface SectorCategory {
   defaultModules: string[];
   /** Servicios sugeridos de catálogo para este sector */
   suggestedServices: SuggestedService[];
+  /** Servicios adicionales o complementarios recomendados */
+  suggestedAddons?: ServiceAddon[];
+  /** Sillones o estaciones de atención iniciales */
+  suggestedStations?: BarberStation[];
   /**
    * Si es true, representa "Otro / Servicios Generales" (Escenario 2)
    * que inicializa un lienzo modular básico sin imponer módulos sectoriales.

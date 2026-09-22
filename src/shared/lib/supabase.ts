@@ -9,13 +9,16 @@ import { storage } from './storage';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-console.log('🔗 Configured Supabase URL:', supabaseUrl);
+console.log('[Supabase] Configured Supabase URL:', supabaseUrl);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase credentials not configured. Please check your .env file.');
+const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+if (!isConfigured) {
+  console.warn('[Supabase] Advertencia: Credenciales de Supabase no configuradas en el archivo .env.');
 }
 
-const isConfigured = true;
+const activeUrl = supabaseUrl || 'https://placeholder.supabase.co';
+const activeAnonKey = supabaseAnonKey || 'placeholder-anon-key';
 
 let wsTransport: any = undefined;
 if (typeof globalThis !== 'undefined' && (globalThis as any).WebSocket) {
@@ -26,7 +29,7 @@ if (typeof globalThis !== 'undefined' && (globalThis as any).WebSocket) {
   } catch (e) {}
 }
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase: SupabaseClient = createClient(activeUrl, activeAnonKey, {
   auth: {
     storage: {
       getItem: async (key: string) => {
