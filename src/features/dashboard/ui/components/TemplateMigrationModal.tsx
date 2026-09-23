@@ -4,13 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
 import { useRouter } from 'expo-router';
-import { apiClient } from '@/shared/lib';
-
-interface SectorTemplate {
-  id: number;
-  name: string;
-  defaultModules: string;
-}
+import { fetchSectorTemplates } from '@/features/sector-templates/api';
+import type { SectorTemplate } from '@/shared/types';
 
 interface Props {
   visible: boolean;
@@ -28,15 +23,15 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
 
   useEffect(() => {
     if (visible) {
-      fetchTemplates();
+      loadTemplates();
     }
   }, [visible]);
 
-  const fetchTemplates = async () => {
+  const loadTemplates = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/sector-templates');
-      setTemplates(res.data?.data || []);
+      const data = await fetchSectorTemplates();
+      setTemplates(data || []);
     } catch (error) {
       console.warn('Error fetching templates', error);
     } finally {
@@ -104,7 +99,7 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
                   <Text style={[s.templateName, { color: colors.text.primary }]}>{tpl.name}</Text>
                   <View style={s.modulesBox}>
                     <Text style={{ fontSize: 12, color: colors.text.secondary }}>
-                      Módulos: {tpl.defaultModules}
+                      Módulos: {Array.isArray(tpl.defaultModules) ? tpl.defaultModules.join(', ') : tpl.defaultModules}
                     </Text>
                   </View>
                 </TouchableOpacity>
