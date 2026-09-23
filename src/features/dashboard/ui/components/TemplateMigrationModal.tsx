@@ -62,14 +62,16 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
 
     // Redirigir a la vista previa de la plantilla creada por Ricardo
     onClose();
-    router.push({
-      pathname: '/(onboarding)/templates' as any,
-      params: {
-        sectorId: selectedTemplate.id.toString(),
-        sectorKey: selectedTemplate.name.toLowerCase().replace(/\s+/g, '-'),
-        isMigration: 'true'
-      }
-    });
+    setTimeout(() => {
+      router.push({
+        pathname: '/(onboarding)/templates' as any,
+        params: {
+          sectorId: selectedTemplate.id.toString(),
+          sectorKey: selectedTemplate.name.toLowerCase().replace(/\s+/g, '-'),
+          isMigration: 'true'
+        }
+      });
+    }, 300);
   };
 
   return (
