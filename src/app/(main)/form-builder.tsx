@@ -12,7 +12,7 @@ export default function FormBuilderRoute() {
           title: 'Configurar Formulario',
           headerStyle: { backgroundColor: colors.background.primary },
           headerTintColor: colors.text.primary,
-          headerBackTitleVisible: false,
+          headerBackVisible: false,
         }}
       />
       <FormBuilderScreen />

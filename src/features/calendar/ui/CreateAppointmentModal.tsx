@@ -370,7 +370,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                         ]}
                       >
                         <MaterialCommunityIcons
-                          name="sparkles"
+                          name="star-four-points"
                           size={16}
                           color={isSelected ? '#E07A5F' : colors.text.muted}
                           style={{ marginRight: 6 }}

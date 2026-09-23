@@ -31,15 +31,15 @@ export function FormBuilderScreen() {
   });
 
   useEffect(() => {
-    if (user?.slug) {
-      fetchCurrentConfig(user.slug);
+    if (user?.businessId) {
+      fetchCurrentConfig(user.businessId);
     }
   }, [user]);
 
-  const fetchCurrentConfig = async (slug: string) => {
+  const fetchCurrentConfig = async (businessId: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/businesses/${slug}/booking-config`);
+      const res = await fetch(`${API_URL}/businesses/${businessId}/booking-config`);
       if (res.ok) {
         const data = await res.json();
         setConfig(data);

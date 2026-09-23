@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Ale
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { useRouter } from 'expo-router';
 
 // Se utiliza la variable de entorno para la URL de la API
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:5272/api';
@@ -21,6 +22,7 @@ interface Props {
 export function TemplateMigrationModal({ visible, onClose }: Props) {
   const { colors } = useAppTheme();
   const { user } = useAuthStore();
+  const router = useRouter();
   const [templates, setTemplates] = useState<SectorTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [migrating, setMigrating] = useState(false);
@@ -55,42 +57,19 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
       return;
     }
 
-    Alert.alert(
-      'Atención',
-      'Al cambiar la plantilla, algunos servicios actuales que no sean compatibles podrían desactivarse. Tu información de contacto y reservas pasadas se mantendrán. ¿Deseas continuar?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Confirmar Migración', 
-          style: 'destructive',
-          onPress: performMigration 
-        }
-      ]
-    );
-  };
+    const selectedTemplate = templates.find(t => t.id === selectedId);
+    if (!selectedTemplate) return;
 
-  const performMigration = async () => {
-    try {
-      setMigrating(true);
-      const res = await fetch(`${API_URL}/businesses/${user?.businessId}/template`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newTemplateId: selectedId })
-      });
-
-      if (res.ok) {
-        Alert.alert('Éxito', 'Plantilla migrada correctamente.');
-        onClose();
-      } else {
-        const errorData = await res.json();
-        Alert.alert('Error', errorData?.error || 'Ocurrió un error en la migración.');
+    // Redirigir a la vista previa de la plantilla creada por Ricardo
+    onClose();
+    router.push({
+      pathname: '/(onboarding)/templates' as any,
+      params: {
+        sectorId: selectedTemplate.id.toString(),
+        sectorKey: selectedTemplate.name.toLowerCase().replace(/\s+/g, '-'),
+        isMigration: 'true'
       }
-    } catch (error) {
-      console.warn('Error in migration', error);
-      Alert.alert('Error', 'No se pudo conectar con el servidor.');
-    } finally {
-      setMigrating(false);
-    }
+    });
   };
 
   return (
