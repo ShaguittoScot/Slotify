@@ -33,6 +33,7 @@ import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
 import { useAuthStore } from '@/features/auth/model';
+import { apiClient } from '@/shared/lib';
 import type { SuggestedServiceDto, ServiceAddon, BarberStation } from '@/features/sector-templates/types';
 
 // Metadatos descriptivos de los modulos del sistema
@@ -543,24 +544,16 @@ export default function SectorTemplatesScreen() {
       
       try {
         setMigrating(true);
-        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:5272/api';
-        const res = await fetch(`${API_URL}/businesses/${user?.businessId}/template`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ newTemplateId: currentCategory.id })
+        const res = await apiClient.put(`/businesses/${user?.businessId}/template`, {
+          newTemplateId: currentCategory.id 
         });
         
-        if (res.ok) {
-          Alert.alert('Éxito', 'Plantilla migrada correctamente.', [
-            { text: 'OK', onPress: () => router.replace('/(main)' as any) }
-          ]);
-        } else {
-          const errorData = await res.json();
-          Alert.alert('Error', errorData?.error || 'Ocurrió un error en la migración.');
-        }
-      } catch (error) {
-        console.warn('Error in migration', error);
-        Alert.alert('Error', 'No se pudo conectar con el servidor.');
+        Alert.alert('Éxito', 'Plantilla migrada correctamente.', [
+          { text: 'OK', onPress: () => router.replace('/(main)' as any) }
+        ]);
+      } catch (error: any) {
+        console.warn('Migration error', error);
+        Alert.alert('Error', error?.response?.data?.error || 'No se pudo migrar la plantilla.');
       } finally {
         setMigrating(false);
       }

@@ -4,9 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
 import { useRouter } from 'expo-router';
-
-// Se utiliza la variable de entorno para la URL de la API
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:5272/api';
+import { apiClient } from '@/shared/lib';
 
 interface SectorTemplate {
   id: number;
@@ -37,12 +35,8 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/sector-templates`);
-      if (res.ok) {
-        const jsonRes = await res.json();
-        // El servidor retorna { success: true, data: [...] }
-        setTemplates(jsonRes?.data || []);
-      }
+      const res = await apiClient.get('/sector-templates');
+      setTemplates(res.data?.data || []);
     } catch (error) {
       console.warn('Error fetching templates', error);
     } finally {

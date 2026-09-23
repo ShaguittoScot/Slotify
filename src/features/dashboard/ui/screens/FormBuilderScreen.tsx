@@ -4,10 +4,9 @@ import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { apiClient } from '@/shared/lib';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:5272/api';
-
-interface BookingFormConfig {
+export interface BookingFormConfig {
   requiresProfessional: boolean;
   requiresService: boolean;
   requiresGuestCount: boolean;
@@ -39,13 +38,10 @@ export function FormBuilderScreen() {
   const fetchCurrentConfig = async (businessId: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/businesses/${businessId}/booking-config`);
-      if (res.ok) {
-        const data = await res.json();
-        setConfig(data);
-      }
+      const res = await apiClient.get(`/businesses/${businessId}/booking-config`);
+      setConfig(res.data?.data || res.data);
     } catch (error) {
-      console.warn('Error fetching config:', error);
+      console.warn('Error fetching config', error);
     } finally {
       setLoading(false);
     }
@@ -55,22 +51,16 @@ export function FormBuilderScreen() {
     if (!user?.businessId) return;
     try {
       setSaving(true);
-      const res = await fetch(`${API_URL}/businesses/${user.businessId}/booking-config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formConfig: config })
+      await apiClient.put(`/businesses/${user.businessId}/booking-config`, {
+        formConfig: config
       });
-
-      if (res.ok) {
-        Alert.alert('Éxito', 'Formulario actualizado correctamente.', [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
-      } else {
-        Alert.alert('Error', 'No se pudo guardar la configuración.');
-      }
-    } catch (error) {
+      
+      Alert.alert('Éxito', 'Formulario actualizado correctamente.', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    } catch (error: any) {
       console.warn('Error saving config', error);
-      Alert.alert('Error', 'Fallo de conexión.');
+      Alert.alert('Error', error?.response?.data?.error || 'No se pudo guardar la configuración.');
     } finally {
       setSaving(false);
     }
