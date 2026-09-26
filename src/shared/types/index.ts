@@ -37,8 +37,9 @@ export interface AuthUser {
   id: string;
   fullName: string;
   email: string;
-  role: 'DUENO' | 'EMPLEADO';
-  businessId: string;
+  role: 'DUENO' | 'EMPLEADO' | 'CLIENTE';
+  businessId?: string;
+  businessName?: string;
 }
 
 /** Respuesta de login/register del backend */
@@ -98,8 +99,12 @@ export interface CalendarSlot {
   startTime: string;
   endTime: string;
   title: string;
-  status: 'confirmed' | 'cancelled' | 'blocked' | 'available';
+  status: 'confirmed' | 'cancelled' | 'blocked' | 'available' | 'completed' | 'pending';
   clientName?: string;
+  clientPhone?: string;
+  servicePrice?: string;
+  notes?: string;
+  employeeName?: string;
   blockReason?: string;
 }
 

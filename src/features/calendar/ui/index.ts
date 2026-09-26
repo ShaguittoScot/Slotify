@@ -1,20 +1,17 @@
 /**
  * US-003: Calendar — UI Layer
  *
- * Componentes de UI para el calendario táctil multiformato.
- *
- * TODO: Implementar los componentes:
- * - CalendarView: Contenedor principal con header de navegación
- * - DayView: Vista diaria con franjas horarias verticales
- * - WeekView: Vista semanal con columnas por día
- * - MonthView: Vista mensual con cuadrícula
- * - CalendarSlotCard: Card de un slot individual (cita/bloqueo)
- * - ViewModeSelector: Tabs para cambiar entre Day/Week/Month
+ * Exportación de los componentes de UI del calendario táctil multiformato.
  */
 
-// export { CalendarView } from './CalendarView';
-// export { DayView } from './DayView';
-// export { WeekView } from './WeekView';
-// export { MonthView } from './MonthView';
-
-export {};
+export { CalendarView } from './CalendarView';
+export { CalendarHeader } from './CalendarHeader';
+export { ViewModeSelector } from './ViewModeSelector';
+export { CalendarSlotCard } from './CalendarSlotCard';
+export { DayView } from './DayView';
+export { WeekView } from './WeekView';
+export { MonthView } from './MonthView';
+export { AdminSlotDetailModal } from './AdminSlotDetailModal';
+export { CreateAppointmentModal } from './CreateAppointmentModal';
+export { QuickSearchModal } from './QuickSearchModal';
+export { JumpToDateModal } from './JumpToDateModal';

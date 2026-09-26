@@ -9,7 +9,4 @@
  * - BlockedSlotBadge: Badge visual sobre un slot bloqueado en el calendario
  */
 
-// export { BlockSlotModal } from './BlockSlotModal';
-// export { BlockedSlotBadge } from './BlockedSlotBadge';
-
-export {};
+export { BlockSlotModal } from './BlockSlotModal';

@@ -33,12 +33,6 @@ yarn-error.*
 # local env files
 .env
 .env*.local
-*.env.local
-
-# IDE
-.vscode/
-.vs/
-.idea/
 
 # typescript
 *.tsbuildinfo
@@ -48,3 +42,15 @@ example
 # generated native folders
 /ios
 /android
+
+# documentacion
+ARQUITECTURA_FRONTEND.md
+
+# LaTeX aux files
+*.aux
+*.log
+*.synctex.gz
+*.out
+*.toc
+*.fls
+*.fdb_latexmk

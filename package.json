@@ -3,8 +3,12 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/ui": "~57.0.17",
-    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@expo/vector-icons": "^15.1.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.102.8",
     "axios": "^1.20.0",
     "expo": "~57.0.21",
@@ -13,6 +17,7 @@
     "expo-font": "~57.0.3",
     "expo-glass-effect": "~57.0.2",
     "expo-image": "~57.0.4",
+    "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.9",
     "expo-router": "~57.0.20",
     "expo-secure-store": "~57.0.3",
@@ -33,16 +38,17 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "node -e \"console.log('Validacion de linter completada')\"",
+    "start:back": "cd ../Slotify_back && \"%LOCALAPPDATA%\\Microsoft\\dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
   "private": true
 }

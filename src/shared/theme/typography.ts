@@ -1,9 +1,19 @@
 /**
  * Slotify Typography
  * Font families, sizes, and text styles
+ * 
+ * Design system:
+ * - Poppins: Used for headings and display text (bold, impactful)
+ * - Inter: Used for body text, labels, and UI elements (clean, readable)
  */
 
 export const fontFamilies = {
+  // Poppins — Headings & Display
+  heading: 'Poppins_700Bold',
+  headingSemiBold: 'Poppins_600SemiBold',
+  headingMedium: 'Poppins_500Medium',
+
+  // Inter — Body & UI
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semiBold: 'Inter_600SemiBold',
@@ -38,22 +48,22 @@ export const textStyles = {
   h1: {
     fontSize: fontSizes['4xl'],
     lineHeight: lineHeights['4xl'],
-    fontFamily: fontFamilies.bold,
+    fontFamily: fontFamilies.heading,
   },
   h2: {
     fontSize: fontSizes['3xl'],
     lineHeight: lineHeights['3xl'],
-    fontFamily: fontFamilies.bold,
+    fontFamily: fontFamilies.heading,
   },
   h3: {
     fontSize: fontSizes['2xl'],
     lineHeight: lineHeights['2xl'],
-    fontFamily: fontFamilies.semiBold,
+    fontFamily: fontFamilies.headingSemiBold,
   },
   h4: {
     fontSize: fontSizes.xl,
     lineHeight: lineHeights.xl,
-    fontFamily: fontFamilies.semiBold,
+    fontFamily: fontFamilies.headingSemiBold,
   },
   body: {
     fontSize: fontSizes.md,
