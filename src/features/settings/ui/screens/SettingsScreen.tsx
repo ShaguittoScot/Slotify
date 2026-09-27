@@ -314,7 +314,7 @@ export function SettingsScreen() {
               </View>
               <View style={styles.settingTextContent}>
                 <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Servicios y Plantilla de Barbería (SCRUM-105)
+                  Servicios y Plantilla de Barbería
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
                   Ajustar precios, duraciones, adicionales y sillones
