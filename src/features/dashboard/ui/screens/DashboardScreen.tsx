@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme } from '@/shared/theme';
+import { TemplateMigrationModal } from '../components/TemplateMigrationModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -35,6 +36,7 @@ export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
+  const [migrationModalVisible, setMigrationModalVisible] = React.useState(false);
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -212,6 +214,40 @@ export function DashboardScreen() {
                 </View>
                 <Text style={[s.actionLabel, { color: colors.text.primary }]}>Compartir Link</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  s.actionChip,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+                onPress={() => setMigrationModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBox, { backgroundColor: '#8B5CF615' }]}>
+                  <Feather name="refresh-cw" size={18} color="#8B5CF6" />
+                </View>
+                <Text style={[s.actionLabel, { color: colors.text.primary }]}>Plantilla</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  s.actionChip,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+                onPress={() => router.push('/(main)/form-builder' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIconBox, { backgroundColor: '#F43F5E15' }]}>
+                  <Feather name="edit-3" size={18} color="#F43F5E" />
+                </View>
+                <Text style={[s.actionLabel, { color: colors.text.primary }]}>Formulario</Text>
+              </TouchableOpacity>
             </ScrollView>
           </Animated.View>
 
@@ -286,6 +322,11 @@ export function DashboardScreen() {
           <View style={{ height: 110 }} />
         </ScrollView>
       </SafeAreaView>
+
+      <TemplateMigrationModal 
+        visible={migrationModalVisible} 
+        onClose={() => setMigrationModalVisible(false)} 
+      />
     </View>
   );
 }

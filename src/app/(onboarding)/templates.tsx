@@ -22,6 +22,8 @@ import {
   StyleSheet,
   Platform,
   Modal,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,6 +32,8 @@ import { useAppTheme } from '@/shared/theme';
 import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
+import { useAuthStore } from '@/features/auth/model';
+import { apiClient } from '@/shared/lib';
 import type { SuggestedServiceDto, ServiceAddon, BarberStation } from '@/features/sector-templates/types';
 
 // Metadatos descriptivos de los modulos del sistema
@@ -345,6 +349,7 @@ export default function SectorTemplatesScreen() {
     sectorId?: string;
     sectorKey?: string;
     isCustom?: string;
+    isMigration?: string;
   }>();
 
   const { colors, isDark } = useAppTheme();
@@ -353,7 +358,7 @@ export default function SectorTemplatesScreen() {
     categories,
     selectedCategory,
     isCustomCanvas,
-    saveOnboardingResult,
+    finalizeOnboarding,
   } = useSectorTemplateStore();
 
   const isCustomMode = params.isCustom === 'true' || isCustomCanvas || params.sectorKey === 'otro-general';
@@ -521,17 +526,49 @@ export default function SectorTemplatesScreen() {
     setShowAddModal(false);
   };
 
+  // Estado para migration
+  const [migrating, setMigrating] = useState(false);
+  const { user } = useAuthStore();
+  const isMigrationMode = params.isMigration === 'true';
+
   // Finalizar y guardar plantilla
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const finalServices = editableServices.filter((s) => selectedServices.includes(s.name));
     const finalAddons = categoryAddons.filter((a) => selectedAddonIds.includes(a.id));
 
-    saveOnboardingResult({
+    if (isMigrationMode) {
+      if (!user?.businessId) {
+        Alert.alert('Error', 'No tienes un negocio asignado para migrar.');
+        return;
+      }
+      
+      try {
+        setMigrating(true);
+        const res = await apiClient.put(`/businesses/${user?.businessId}/template`, {
+          newTemplateId: currentCategory.id 
+        });
+        
+        Alert.alert('Éxito', 'Plantilla migrada correctamente.', [
+          { text: 'OK', onPress: () => router.replace('/(main)' as any) }
+        ]);
+      } catch (error: any) {
+        console.warn('Migration error', error);
+        Alert.alert('Error', error?.response?.data?.error || 'No se pudo migrar la plantilla.');
+      } finally {
+        setMigrating(false);
+      }
+      return;
+    }
+
+    finalizeOnboarding({
       businessName: currentCategory.name,
-      selectedCategoryId: currentCategory.id,
-      selectedCategoryKey: currentCategory.key,
+      sectorCategory: currentCategory,
       activeModules,
-      finalServices,
+      finalServices: finalServices.map(s => ({
+        name: s.name,
+        durationMinutes: s.durationMinutes,
+        price: s.price ?? undefined,
+      })),
       selectedAddons: finalAddons,
       stations: categoryStations,
       isCustomCanvas: isCustomMode,
@@ -540,7 +577,7 @@ export default function SectorTemplatesScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(main)');
+      router.replace('/(main)' as any);
     }
   };
 
@@ -813,13 +850,23 @@ export default function SectorTemplatesScreen() {
           <TouchableOpacity
             testID="apply-template-button"
             onPress={handleFinish}
-            style={styles.primaryActionButton}
+            disabled={migrating}
+            style={[
+              styles.primaryActionButton,
+              migrating && { opacity: 0.7 }
+            ]}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryActionText}>
-              Aplicar Plantilla ({selectedServices.length} serv • {selectedAddonIds.length} extras • {activeModules.length} mod)
-            </Text>
-            <Feather name="arrow-right" size={18} color="#FFFFFF" />
+            {migrating ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={styles.primaryActionText}>
+                  {isMigrationMode ? 'Migrar Plantilla' : 'Aplicar Plantilla'} ({selectedServices.length} serv • {selectedAddonIds.length} extras • {activeModules.length} mod)
+                </Text>
+                <Feather name="arrow-right" size={18} color="#FFFFFF" />
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
