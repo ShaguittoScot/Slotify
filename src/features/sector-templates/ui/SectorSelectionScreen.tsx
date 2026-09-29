@@ -19,7 +19,7 @@ import {
   Platform,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FluidButton } from '@/components/ui/FluidButton';
@@ -36,6 +36,8 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
   onContinueNavigation,
 }) => {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const isMigrationMode = params.isMigration === 'true';
   const insets = useSafeAreaInsets();
 
   const {
@@ -81,6 +83,7 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
         sectorId: selectedCategory.id.toString(),
         sectorKey: selectedCategory.key,
         isCustom: selectedCategory.isCustomCanvas ? 'true' : 'false',
+        isMigration: isMigrationMode ? 'true' : 'false',
       },
     });
   };

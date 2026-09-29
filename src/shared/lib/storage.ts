@@ -91,9 +91,11 @@ export const storage = {
         }
         return null;
       }
-      return await SecureStore.getItemAsync(key);
+      return await SecureStore.getItemAsync(key, { 
+        keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK 
+      });
     } catch (error) {
-      console.error(`Error getting from secure storage [${key}]:`, error);
+      console.warn(`[Storage] Secure storage locked/unavailable for [${key}]`);
       return null;
     }
   },
@@ -106,9 +108,11 @@ export const storage = {
         }
         return;
       }
-      await SecureStore.setItemAsync(key, value);
+      await SecureStore.setItemAsync(key, value, { 
+        keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK 
+      });
     } catch (error) {
-      console.error(`Error saving to secure storage [${key}]:`, error);
+      console.warn(`[Storage] Error saving to secure storage [${key}]`);
     }
   },
 

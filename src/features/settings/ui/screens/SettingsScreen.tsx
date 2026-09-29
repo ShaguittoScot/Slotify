@@ -300,6 +300,7 @@ export function SettingsScreen() {
                   params: {
                     sectorId: '5',
                     sectorKey: 'barberia',
+                    isMigration: 'true',
                   },
                 })
               }

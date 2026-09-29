@@ -1,796 +1,376 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
   Alert,
-  Dimensions,
+  Modal,
 } from 'react-native';
 import Animated, {
   FadeInDown,
-  FadeInUp,
-  FadeOut,
   Layout,
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
+  FadeOutUp,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FormViewer } from '../components/FormViewer';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+// ─── Tipos del Modelo Dinámico ──────────────────────────────────────
+export type FieldType = 'short_text' | 'paragraph' | 'single_choice' | 'multiple_choice' | 'rating_stars';
+export type PresentationStyle = 'classic_scroll' | 'interactive_slides';
 
-// ─── Tipos ────────────────────────────────────────────────
-export interface BookingFormConfig {
-  requiresProfessional: boolean;
-  requiresService: boolean;
-  requiresGuestCount: boolean;
-  requiresTable: boolean;
-  requiresSpecialRequests: boolean;
+export interface FormField {
+  id: string;
+  type: FieldType;
+  question: string;
+  required: boolean;
+  options?: string[];
 }
 
-type RestaurantSize = 'small' | 'large';
-
-// ─── Metadata de cada opción ──────────────────────────────
-interface ConfigOption {
-  key: keyof BookingFormConfig;
-  icon: string;
-  iconPack: 'feather' | 'material';
+export interface FormSchema {
   title: string;
   description: string;
-  descLarge: string;
-  gradient: [string, string];
-  previewLabel: string;
-  previewPlaceholder: string;
-  previewPlaceholderLarge: string;
+  presentationStyle: PresentationStyle;
+  accentColor: string;
+  fields: FormField[];
 }
 
-const CONFIG_OPTIONS: ConfigOption[] = [
-  {
-    key: 'requiresProfessional',
-    icon: 'chef-hat',
-    iconPack: 'material',
-    title: 'Seleccionar Chef / Mesero',
-    description: 'El comensal puede elegir quién lo atiende.',
-    descLarge: 'El comensal elige su mesero o chef de estación favorito.',
-    gradient: ['#F97316', '#FB923C'],
-    previewLabel: '👨‍🍳 Chef / Mesero',
-    previewPlaceholder: 'Ej. Chef Martínez',
-    previewPlaceholderLarge: 'Ej. Sección de Chef Ramírez',
-  },
-  {
-    key: 'requiresService',
-    icon: 'silverware-fork-knife',
-    iconPack: 'material',
-    title: 'Tipo de Experiencia',
-    description: 'Menú del día, carta regular, brunch…',
-    descLarge: 'Menú degustación, maridaje, buffet, carta à la carte…',
-    gradient: ['#8B5CF6', '#A78BFA'],
-    previewLabel: '🍽️ Experiencia',
-    previewPlaceholder: 'Ej. Menú del día',
-    previewPlaceholderLarge: 'Ej. Menú degustación 7 tiempos',
-  },
-  {
-    key: 'requiresGuestCount',
-    icon: 'users',
-    iconPack: 'feather',
-    title: 'Número de Comensales',
-    description: '¿Cuántas personas vendrán a la mesa?',
-    descLarge: '¿Cuántas personas? Ideal para grupos y eventos.',
-    gradient: ['#10B981', '#34D399'],
-    previewLabel: '👥 Comensales',
-    previewPlaceholder: '2 personas',
-    previewPlaceholderLarge: '12 personas',
-  },
-  {
-    key: 'requiresTable',
-    icon: 'map-pin',
-    iconPack: 'feather',
-    title: 'Zona / Mesa Preferida',
-    description: 'Terraza, salón, barra, ventana…',
-    descLarge: 'Salón privado, terraza VIP, jardín, rooftop…',
-    gradient: ['#EC4899', '#F472B6'],
-    previewLabel: '🪑 Zona preferida',
-    previewPlaceholder: 'Terraza',
-    previewPlaceholderLarge: 'Salón Privado VIP',
-  },
-  {
-    key: 'requiresSpecialRequests',
-    icon: 'file-text',
-    iconPack: 'feather',
-    title: 'Peticiones Especiales',
-    description: 'Alergias, cumpleaños, dietas especiales…',
-    descLarge: 'Alergias, celebraciones, requerimientos corporativos…',
-    gradient: ['#6366F1', '#818CF8'],
-    previewLabel: '📝 Notas especiales',
-    previewPlaceholder: 'Ej. Sin gluten, cumpleaños',
-    previewPlaceholderLarge: 'Ej. Evento corporativo, menú vegetariano',
-  },
-];
+const FIELD_TYPE_META: Record<FieldType, { icon: any; label: string }> = {
+  short_text: { icon: 'type', label: 'Texto corto' },
+  paragraph: { icon: 'align-left', label: 'Párrafo' },
+  single_choice: { icon: 'check-circle', label: 'Opción Única' },
+  multiple_choice: { icon: 'check-square', label: 'Opción Múltiple' },
+  rating_stars: { icon: 'star', label: 'Calificación' },
+};
 
-// ═══════════════════════════════════════════════════════════
-// ConfigCard — Tarjeta de opción animada
-// ═══════════════════════════════════════════════════════════
-function ConfigCard({
-  option,
-  active,
-  onToggle,
-  index,
-  isDark,
-  colors,
-  size,
-}: {
-  option: ConfigOption;
-  active: boolean;
-  onToggle: () => void;
-  index: number;
-  isDark: boolean;
-  colors: any;
-  size: RestaurantSize;
-}) {
-  const scale = useSharedValue(1);
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-  };
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const desc = size === 'large' ? option.descLarge : option.description;
-
-  const IconComponent = option.iconPack === 'material' ? MaterialCommunityIcons : Feather;
-
-  return (
-    <Animated.View
-      entering={FadeInDown.duration(450).delay(120 + index * 90).springify()}
-      layout={Layout.springify()}
-      style={animatedCardStyle}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={onToggle}
-        style={[
-          styles.configCard,
-          {
-            backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
-            borderColor: active
-              ? option.gradient[0] + '60'
-              : isDark
-              ? 'rgba(255,255,255,0.06)'
-              : 'rgba(0,0,0,0.06)',
-            shadowColor: active ? option.gradient[0] : '#000',
-            shadowOpacity: active ? 0.15 : 0.04,
-          },
-        ]}
-      >
-        {/* Icono con gradiente */}
-        <LinearGradient
-          colors={active ? option.gradient : [isDark ? '#3A3A3A' : '#E5E5E5', isDark ? '#525252' : '#D4D4D4']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.configIconBox}
-        >
-          <IconComponent name={option.icon as any} size={20} color="#FFFFFF" />
-        </LinearGradient>
-
-        {/* Texto */}
-        <View style={styles.configTextBox}>
-          <Text
-            style={[
-              styles.configTitle,
-              { color: active ? colors.text.primary : colors.text.secondary },
-            ]}
-          >
-            {option.title}
-          </Text>
-          <Text
-            style={[styles.configDesc, { color: colors.text.muted }]}
-            numberOfLines={2}
-          >
-            {desc}
-          </Text>
-        </View>
-
-        {/* Toggle */}
-        <FluidToggleSwitch
-          value={active}
-          onValueChange={onToggle}
-          activeColor={option.gradient[0]}
-        />
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
-// LivePreviewCard — Vista previa reactiva
-// ═══════════════════════════════════════════════════════════
-function LivePreviewCard({
-  config,
-  isDark,
-  colors,
-  businessName,
-  size,
-}: {
-  config: BookingFormConfig;
-  isDark: boolean;
-  colors: any;
-  businessName: string;
-  size: RestaurantSize;
-}) {
-  const activeOptions = CONFIG_OPTIONS.filter((opt) => config[opt.key]);
-
-  return (
-    <Animated.View
-      entering={FadeInDown.duration(500).delay(700)}
-      style={styles.previewWrapper}
-    >
-      <View style={styles.previewHeaderRow}>
-        <Text style={[styles.previewTitle, { color: colors.text.primary }]}>
-          Vista Previa en Vivo
-        </Text>
-        <View style={[styles.previewBadge, { backgroundColor: '#10B98118' }]}>
-          <View style={styles.previewDot} />
-          <Text style={styles.previewBadgeText}>En vivo</Text>
-        </View>
-      </View>
-
-      <View
-        style={[
-          styles.previewPhone,
-          {
-            backgroundColor: isDark ? '#1A1A1A' : '#FAFAFA',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-          },
-        ]}
-      >
-        {/* Header del "formulario" */}
-        <LinearGradient
-          colors={isDark ? ['#262626', '#1E1E1E'] : ['#171717', '#262626']}
-          style={styles.previewPhoneHeader}
-        >
-          <Text style={styles.previewBizName}>
-            {businessName || 'Mi Restaurante'}
-          </Text>
-          <Text style={styles.previewBizSub}>Reservación en línea</Text>
-        </LinearGradient>
-
-        <View style={styles.previewBody}>
-          {/* Campo siempre visible: Fecha y Hora */}
-          <Animated.View layout={Layout.springify()} style={styles.previewField}>
-            <Text style={[styles.previewFieldLabel, { color: isDark ? '#A3A3A3' : '#525252' }]}>
-              📅 Fecha y Hora
-            </Text>
-            <View
-              style={[
-                styles.previewFieldInput,
-                { backgroundColor: isDark ? '#262626' : '#F2F2F2' },
-              ]}
-            >
-              <Text style={{ color: isDark ? '#737373' : '#A3A3A3', fontSize: 13 }}>
-                Sábado 28 Sep, 8:00 PM
-              </Text>
-            </View>
-          </Animated.View>
-
-          {/* Campos dinámicos */}
-          {activeOptions.map((opt) => (
-            <Animated.View
-              key={opt.key}
-              entering={FadeInUp.duration(350).springify()}
-              exiting={FadeOut.duration(200)}
-              layout={Layout.springify()}
-              style={styles.previewField}
-            >
-              <Text
-                style={[styles.previewFieldLabel, { color: isDark ? '#A3A3A3' : '#525252' }]}
-              >
-                {opt.previewLabel}
-              </Text>
-              <View
-                style={[
-                  styles.previewFieldInput,
-                  { backgroundColor: isDark ? '#262626' : '#F2F2F2' },
-                ]}
-              >
-                <Text style={{ color: isDark ? '#737373' : '#A3A3A3', fontSize: 13 }}>
-                  {size === 'large' ? opt.previewPlaceholderLarge : opt.previewPlaceholder}
-                </Text>
-              </View>
-            </Animated.View>
-          ))}
-
-          {/* Botón simulado */}
-          <LinearGradient
-            colors={['#6366F1', '#8B5CF6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.previewCTA}
-          >
-            <Text style={styles.previewCTAText}>Reservar Mesa 🍽️</Text>
-          </LinearGradient>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
-// SizeSelector — Selector de tamaño de restaurante
-// ═══════════════════════════════════════════════════════════
-function SizeSelector({
-  size,
-  onSelect,
-  isDark,
-  colors,
-}: {
-  size: RestaurantSize;
-  onSelect: (s: RestaurantSize) => void;
-  isDark: boolean;
-  colors: any;
-}) {
-  return (
-    <Animated.View entering={FadeInDown.duration(400).delay(50)} style={styles.sizeRow}>
-      <TouchableOpacity
-        style={[
-          styles.sizeOption,
-          {
-            backgroundColor: size === 'small'
-              ? (isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)')
-              : (isDark ? 'rgba(255,255,255,0.03)' : '#F9F9F9'),
-            borderColor: size === 'small' ? '#6366F1' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
-            borderWidth: size === 'small' ? 1.5 : 1,
-          },
-        ]}
-        onPress={() => onSelect('small')}
-        activeOpacity={0.7}
-      >
-        <Text style={{ fontSize: 24, marginBottom: 4 }}>🏠</Text>
-        <Text style={[styles.sizeLabel, { color: size === 'small' ? '#6366F1' : colors.text.secondary }]}>
-          Pequeño
-        </Text>
-        <Text style={[styles.sizeSub, { color: colors.text.muted }]}>1-30 mesas</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.sizeOption,
-          {
-            backgroundColor: size === 'large'
-              ? (isDark ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.08)')
-              : (isDark ? 'rgba(255,255,255,0.03)' : '#F9F9F9'),
-            borderColor: size === 'large' ? '#8B5CF6' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
-            borderWidth: size === 'large' ? 1.5 : 1,
-          },
-        ]}
-        onPress={() => onSelect('large')}
-        activeOpacity={0.7}
-      >
-        <Text style={{ fontSize: 24, marginBottom: 4 }}>🏢</Text>
-        <Text style={[styles.sizeLabel, { color: size === 'large' ? '#8B5CF6' : colors.text.secondary }]}>
-          Grande
-        </Text>
-        <Text style={[styles.sizeSub, { color: colors.text.muted }]}>30+ mesas</Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
-// FormBuilderScreen — Pantalla Principal
-// ═══════════════════════════════════════════════════════════
+// ─── Componente Principal ──────────────────────────────────────────
 export function FormBuilderScreen() {
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  const [restaurantSize, setRestaurantSize] = useState<RestaurantSize>('small');
-  const [saving, setSaving] = useState(false);
-  const [config, setConfig] = useState<BookingFormConfig>({
-    requiresProfessional: false,
-    requiresService: false,
-    requiresGuestCount: true,
-    requiresTable: true,
-    requiresSpecialRequests: false,
+  const [schema, setSchema] = useState<FormSchema>({
+    title: 'Nueva Reservación',
+    description: 'Por favor, completa los siguientes datos para confirmar tu mesa.',
+    presentationStyle: 'classic_scroll',
+    accentColor: '#6366F1',
+    fields: [
+      { id: 'f1', type: 'short_text', question: 'Nombre completo', required: true },
+      { id: 'f2', type: 'single_choice', question: 'Zona preferida', required: false, options: ['Terraza', 'Salón Principal', 'Jardín'] },
+    ],
   });
 
-  const toggleOption = useCallback((key: keyof BookingFormConfig) => {
-    setConfig((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    // Simular guardado local (backend aún no tiene endpoint)
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    Alert.alert(
-      '✅ Formulario Guardado',
-      'Tu formulario de reservación ha sido actualizado. Cuando el backend esté listo, se sincronizará automáticamente.',
-      [{ text: 'Perfecto', onPress: () => router.back() }]
-    );
+  // Funciones de utilidad
+  const addField = (type: FieldType) => {
+    const newField: FormField = {
+      id: Math.random().toString(36).substr(2, 9),
+      type,
+      question: 'Nueva Pregunta',
+      required: false,
+      options: type.includes('choice') ? ['Opción 1', 'Opción 2'] : undefined,
+    };
+    setSchema((prev) => ({ ...prev, fields: [...prev.fields, newField] }));
+    setEditingFieldId(newField.id);
   };
 
-  const handlePreview = () => {
-    router.push({
-      pathname: '/(main)/form-preview' as any,
-      params: {
-        config: JSON.stringify(config),
-        size: restaurantSize,
-        businessName: user?.businessName || user?.fullName || 'Mi Restaurante',
-      },
-    });
+  const removeField = (id: string) => {
+    setSchema((prev) => ({ ...prev, fields: prev.fields.filter(f => f.id !== id) }));
+    if (editingFieldId === id) setEditingFieldId(null);
   };
 
-  const activeCount = Object.values(config).filter(Boolean).length;
+  const updateField = (id: string, updates: Partial<FormField>) => {
+    setSchema((prev) => ({
+      ...prev,
+      fields: prev.fields.map(f => f.id === id ? { ...f, ...updates } : f),
+    }));
+  };
+
+  const setPresentationStyle = (style: PresentationStyle) => {
+    setSchema((prev) => ({ ...prev, presentationStyle: style }));
+  };
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const saveForm = async () => {
+    try {
+      setIsSaving(true);
+      const businessId = user?.businessId;
+      
+      // Si estamos en modo demo local, simulamos
+      if (!businessId || businessId.startsWith('demo') || businessId === 'synced-backend') {
+        await new Promise(r => setTimeout(r, 800));
+        Alert.alert('Guardado Local', 'El esquema del formulario ha sido guardado exitosamente (Modo Demo).');
+        return;
+      }
+
+      // Conexión real al backend
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/businesses/${businessId}/booking-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formConfig: schema })
+      });
+
+      if (res.ok) {
+        Alert.alert('¡Éxito!', 'El esquema se ha guardado permanentemente en la base de datos.');
+      } else {
+        const data = await res.json();
+        Alert.alert('Error', data.error || 'No se pudo guardar la configuración.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Problema de conexión con el servidor.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background.primary }]}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <>
+      <Modal visible={isPreviewing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIsPreviewing(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
+          <View style={{ paddingTop: Platform.OS === 'ios' ? 20 : 40, paddingBottom: 10, paddingHorizontal: 20, backgroundColor: colors.background.primary }}>
+            <TouchableOpacity onPress={() => setIsPreviewing(false)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="x" size={24} color={colors.text.primary} />
+              <Text style={{ marginLeft: 8, color: colors.text.primary, fontWeight: '600', fontSize: 16 }}>Cerrar Vista Previa</Text>
+            </TouchableOpacity>
+          </View>
+          <FormViewer 
+            schema={schema} 
+            onSubmit={(answers) => {
+              Alert.alert('Formulario Enviado', JSON.stringify(answers, null, 2));
+              setIsPreviewing(false);
+            }}
+          />
+        </View>
+      </Modal>
+
+      <KeyboardAvoidingView 
+        style={[styles.container, { backgroundColor: colors.background.primary }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* ─── Hero ─── */}
-        <Animated.View entering={FadeInDown.duration(500)}>
-          <Text style={[styles.heroTitle, { color: colors.text.primary }]}>
-            Personaliza tu Formulario
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.text.secondary }]}>
-            Diseña la experiencia que vivirán tus comensales al reservar. Cada
-            opción que actives aparecerá en el formulario de tu cliente.
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        {/* ─── Cabecera del Creador ─── */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <Text style={[styles.title, { color: colors.text.primary }]}>Generador de Formularios</Text>
+          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+            Diseña la estructura de tu formulario y cómo se le presentará al cliente.
           </Text>
         </Animated.View>
 
-        {/* ─── Selector de Tamaño ─── */}
-        <Animated.View entering={FadeInDown.duration(400).delay(60)}>
-          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>
-            Tamaño de tu Restaurante
-          </Text>
-        </Animated.View>
-        <SizeSelector
-          size={restaurantSize}
-          onSelect={setRestaurantSize}
-          isDark={isDark}
-          colors={colors}
-        />
+        {/* ─── Estilo de Presentación ─── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Modo de Presentación</Text>
+          <View style={styles.styleSelectorRow}>
+            <TouchableOpacity
+              style={[
+                styles.styleCard,
+                { backgroundColor: isDark ? '#1E1E1E' : '#F4F4F5' },
+                schema.presentationStyle === 'classic_scroll' && { borderColor: schema.accentColor, borderWidth: 2 }
+              ]}
+              onPress={() => setPresentationStyle('classic_scroll')}
+            >
+              <Feather name="list" size={24} color={schema.presentationStyle === 'classic_scroll' ? schema.accentColor : colors.text.secondary} />
+              <Text style={[styles.styleCardText, { color: colors.text.primary }]}>Clásico (Scroll)</Text>
+            </TouchableOpacity>
 
-        {/* ─── Opciones ─── */}
-        <Animated.View entering={FadeInDown.duration(400).delay(100)}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>
-              Opciones del Formulario
-            </Text>
-            <View style={[styles.countBadge, { backgroundColor: '#6366F118' }]}>
-              <Text style={styles.countBadgeText}>{activeCount} activas</Text>
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.styleCard,
+                { backgroundColor: isDark ? '#1E1E1E' : '#F4F4F5' },
+                schema.presentationStyle === 'interactive_slides' && { borderColor: schema.accentColor, borderWidth: 2 }
+              ]}
+              onPress={() => setPresentationStyle('interactive_slides')}
+            >
+              <Feather name="layers" size={24} color={schema.presentationStyle === 'interactive_slides' ? schema.accentColor : colors.text.secondary} />
+              <Text style={[styles.styleCardText, { color: colors.text.primary }]}>Typeform (Slides)</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
 
-        {CONFIG_OPTIONS.map((opt, idx) => (
-          <ConfigCard
-            key={opt.key}
-            option={opt}
-            active={config[opt.key]}
-            onToggle={() => toggleOption(opt.key)}
-            index={idx}
-            isDark={isDark}
-            colors={colors}
-            size={restaurantSize}
+        {/* ─── Configuración General del Formulario ─── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Datos del Formulario</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : '#F4F4F5', color: colors.text.primary }]}
+            value={schema.title}
+            onChangeText={(text) => setSchema({ ...schema, title: text })}
+            placeholder="Título principal..."
+            placeholderTextColor={colors.text.muted}
           />
-        ))}
+          <TextInput
+            style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : '#F4F4F5', color: colors.text.primary, height: 80 }]}
+            value={schema.description}
+            onChangeText={(text) => setSchema({ ...schema, description: text })}
+            placeholder="Descripción o instrucciones..."
+            placeholderTextColor={colors.text.muted}
+            multiline
+          />
+        </Animated.View>
 
-        {/* ─── Vista Previa en Vivo ─── */}
-        <LivePreviewCard
-          config={config}
-          isDark={isDark}
-          colors={colors}
-          businessName={user?.businessName || user?.fullName || 'Mi Restaurante'}
-          size={restaurantSize}
-        />
+        {/* ─── Campos del Formulario ─── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(300)}>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary, marginTop: 10 }]}>Preguntas del Formulario</Text>
+          
+          {schema.fields.map((field, index) => (
+            <Animated.View
+              key={field.id}
+              layout={Layout.springify()}
+              entering={FadeInDown.duration(300)}
+              exiting={FadeOutUp.duration(200)}
+              style={[
+                styles.fieldCard,
+                { backgroundColor: isDark ? '#171717' : '#FFFFFF', borderColor: isDark ? '#262626' : '#E5E5E5' }
+              ]}
+            >
+              <View style={styles.fieldHeader}>
+                <View style={styles.fieldTypeBadge}>
+                  <Feather name={FIELD_TYPE_META[field.type].icon} size={14} color="#8B5CF6" />
+                  <Text style={styles.fieldTypeText}>{FIELD_TYPE_META[field.type].label}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeField(field.id)}>
+                  <Feather name="trash-2" size={18} color={colors.status.error} />
+                </TouchableOpacity>
+              </View>
 
-        {/* Espaciado inferior para el footer */}
-        <View style={{ height: 120 }} />
+              <TextInput
+                style={[styles.questionInput, { color: colors.text.primary }]}
+                value={field.question}
+                onChangeText={(text) => updateField(field.id, { question: text })}
+                placeholder="Escribe la pregunta..."
+                placeholderTextColor={colors.text.muted}
+              />
+
+              {/* Si es de opciones múltiples, mostrar editor básico de opciones */}
+              {field.options && (
+                <View style={styles.optionsContainer}>
+                  {field.options.map((opt, oIdx) => (
+                    <View key={oIdx} style={styles.optionRow}>
+                      <Feather name={field.type === 'single_choice' ? 'circle' : 'square'} size={14} color={colors.text.muted} />
+                      <Text style={[styles.optionText, { color: colors.text.secondary }]}>{opt}</Text>
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.addOptionBtn}>
+                    <Feather name="plus" size={14} color={schema.accentColor} />
+                    <Text style={{ color: schema.accentColor, fontSize: 13, marginLeft: 4 }}>Añadir opción</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <View style={styles.fieldFooter}>
+                <TouchableOpacity 
+                  style={styles.toggleReq}
+                  onPress={() => updateField(field.id, { required: !field.required })}
+                >
+                  <Feather name={field.required ? "toggle-right" : "toggle-left"} size={20} color={field.required ? schema.accentColor : colors.text.muted} />
+                  <Text style={[styles.reqText, { color: colors.text.secondary }]}>Obligatorio</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          ))}
+        </Animated.View>
+
+        {/* ─── Botones para Agregar Nuevos Campos ─── */}
+        <Animated.View layout={Layout.springify()} style={styles.addButtonsContainer}>
+          <Text style={[styles.addButtonsTitle, { color: colors.text.secondary }]}>Agregar nuevo bloque:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addButtonsScroll}>
+            {Object.entries(FIELD_TYPE_META).map(([type, meta]) => (
+              <TouchableOpacity
+                key={type}
+                style={[styles.addTypeBtn, { backgroundColor: isDark ? '#262626' : '#F4F4F5' }]}
+                onPress={() => addField(type as FieldType)}
+              >
+                <Feather name={meta.icon as any} size={16} color={schema.accentColor} />
+                <Text style={[styles.addTypeText, { color: colors.text.primary }]}>{meta.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ─── Footer Fijo ─── */}
-      <View
-        style={[
-          styles.footer,
-          {
-            backgroundColor: isDark ? 'rgba(18,18,18,0.96)' : 'rgba(255,255,255,0.96)',
-            borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-          },
-        ]}
-      >
-        {/* Botón Vista Previa */}
-        <TouchableOpacity
-          style={[
-            styles.previewBtn,
-            {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-              borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-            },
-          ]}
-          onPress={handlePreview}
-          activeOpacity={0.7}
-        >
-          <Feather name="eye" size={16} color={colors.text.secondary} />
-          <Text style={[styles.previewBtnText, { color: colors.text.secondary }]}>
-            Vista Previa
-          </Text>
+      {/* ─── Footer Flotante de Acciones ─── */}
+      <View style={[styles.footer, { backgroundColor: isDark ? 'rgba(18,18,18,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border.main }]} onPress={() => setIsPreviewing(true)}>
+          <View style={[styles.saveBtnGradient, { backgroundColor: 'transparent' }]}>
+            <Feather name="eye" size={18} color={colors.text.primary} />
+            <Text style={[styles.saveBtnText, { color: colors.text.primary }]}>Vista Previa</Text>
+          </View>
         </TouchableOpacity>
-
-        {/* Botón Guardar */}
-        <TouchableOpacity
-          style={styles.saveBtn}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={saving ? ['#737373', '#525252'] : ['#6366F1', '#8B5CF6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.saveBtnGradient}
-          >
-            {saving ? (
-              <Text style={styles.saveBtnText}>Guardando…</Text>
-            ) : (
-              <>
-                <Feather name="check" size={16} color="#FFFFFF" />
-                <Text style={styles.saveBtnText}>Guardar Configuración</Text>
-              </>
-            )}
+        <TouchableOpacity style={styles.saveBtn} onPress={saveForm}>
+          <LinearGradient colors={['#6366F1', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveBtnGradient}>
+            <Feather name="save" size={18} color="#FFF" />
+            <Text style={styles.saveBtnText}>Guardar</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
+    </>
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// Styles
-// ═══════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  scroll: { flex: 1 },
+  container: { flex: 1 },
   scrollContent: { padding: 20 },
+  header: { marginBottom: 24 },
+  title: { fontSize: 26, fontWeight: '800', marginBottom: 6 },
+  subtitle: { fontSize: 14, lineHeight: 20 },
+  section: { marginBottom: 24 },
+  sectionLabel: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  
+  styleSelectorRow: { flexDirection: 'row', gap: 12 },
+  styleCard: {
+    flex: 1, padding: 20, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'transparent'
+  },
+  styleCardText: { marginTop: 8, fontSize: 14, fontWeight: '600' },
+  
+  input: {
+    borderRadius: 12, padding: 16, fontSize: 15, marginBottom: 12,
+  },
+  
+  fieldCard: {
+    borderRadius: 16, padding: 16, borderWidth: 1, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  fieldHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  fieldTypeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF615', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 6 },
+  fieldTypeText: { fontSize: 12, fontWeight: '600', color: '#8B5CF6' },
+  questionInput: { fontSize: 16, fontWeight: '600', marginBottom: 12, paddingVertical: 4 },
+  
+  optionsContainer: { marginBottom: 12, gap: 8, paddingLeft: 8 },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  optionText: { fontSize: 14 },
+  addOptionBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 4, paddingVertical: 4 },
+  
+  fieldFooter: { flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: 1, borderTopColor: 'rgba(150,150,150,0.1)', paddingTop: 12, marginTop: 4 },
+  toggleReq: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  reqText: { fontSize: 13, fontWeight: '500' },
+  
+  addButtonsContainer: { marginTop: 10 },
+  addButtonsTitle: { fontSize: 13, marginBottom: 10, fontWeight: '500' },
+  addButtonsScroll: { gap: 10, paddingBottom: 10 },
+  addTypeBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, gap: 8 },
+  addTypeText: { fontSize: 13, fontWeight: '600' },
 
-  // Hero
-  heroTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  heroSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-
-  // Section
-  sectionLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 12,
-    letterSpacing: -0.2,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  countBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  countBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6366F1',
-  },
-
-  // Size Selector
-  sizeRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
-  },
-  sizeOption: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-  },
-  sizeLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  sizeSub: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  // ConfigCard
-  configCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 10,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  configIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  configTextBox: {
-    flex: 1,
-    marginRight: 8,
-  },
-  configTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-    letterSpacing: -0.2,
-  },
-  configDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-
-  // Preview
-  previewWrapper: {
-    marginTop: 28,
-  },
-  previewHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  previewTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  previewBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
-  },
-  previewDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  previewBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-
-  previewPhone: {
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  previewPhoneHeader: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  previewBizName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  previewBizSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  previewBody: {
-    padding: 16,
-  },
-  previewField: {
-    marginBottom: 12,
-  },
-  previewFieldLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 5,
-  },
-  previewFieldInput: {
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  previewCTA: {
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  previewCTAText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  // Footer
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    gap: 10,
+    padding: 16, paddingBottom: 32,
+    borderTopWidth: 1, borderTopColor: 'rgba(150,150,150,0.1)', flexDirection: 'row', gap: 12
   },
-  previewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 6,
-  },
-  previewBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  saveBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  saveBtnGradient: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  saveBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  saveBtn: { flex: 1, borderRadius: 14, overflow: 'hidden', height: 50 },
+  saveBtnGradient: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  saveBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' }
 });
