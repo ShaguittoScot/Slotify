@@ -46,6 +46,20 @@ export default function AppTabs() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="form-builder"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' }
+        }}
+      />
+      <Tabs.Screen
+        name="form-preview"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' }
+        }}
+      />
     </Tabs>
   );
 }

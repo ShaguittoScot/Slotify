@@ -20,6 +20,8 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormViewer } from '../components/FormViewer';
 
 // ─── Tipos del Modelo Dinámico ──────────────────────────────────────
@@ -54,6 +56,8 @@ const FIELD_TYPE_META: Record<FieldType, { icon: any; label: string }> = {
 export function FormBuilderScreen() {
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [schema, setSchema] = useState<FormSchema>({
     title: 'Nueva Reservación',
@@ -363,7 +367,7 @@ const styles = StyleSheet.create({
   addTypeText: { fontSize: 13, fontWeight: '600' },
 
   footer: {
-    padding: 16, paddingBottom: 110,
+    padding: 16, paddingBottom: 32,
     borderTopWidth: 1, borderTopColor: 'rgba(150,150,150,0.1)', flexDirection: 'row', gap: 12
   },
   saveBtn: { flex: 1, borderRadius: 14, overflow: 'hidden', height: 50 },

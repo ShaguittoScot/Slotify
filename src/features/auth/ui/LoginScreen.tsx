@@ -15,16 +15,12 @@ import { useRouter } from 'expo-router';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
-import { isFeatureEnabled } from '@/shared/config/FeatureFlags';
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
-
-  const isBeta = isFeatureEnabled('BETA_PREVIEW_CHANNEL');
-  const showNewDashboard = isFeatureEnabled('ENABLE_NEW_DASHBOARD');
 
   const { colors, isDark, themeMode } = useAppTheme();
   const login = useAuthStore((state) => state.login);
@@ -82,16 +78,6 @@ export const LoginScreen = () => {
 
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text.primary }]}>Slotify</Text>
-            {isBeta && (
-              <Text style={{ color: colors.status?.warning || 'orange', fontWeight: 'bold', marginBottom: 10 }}>
-                🚀 VERSIÓN BETA ACTIVA
-              </Text>
-            )}
-            {showNewDashboard && (
-              <Text style={{ color: colors.status?.info || '#3b82f6', fontWeight: 'bold', marginBottom: 10 }}>
-                ✨ NUEVO DASHBOARD HABILITADO
-              </Text>
-            )}
             <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
               Inicia sesión para continuar
             </Text>

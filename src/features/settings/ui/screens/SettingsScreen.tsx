@@ -261,7 +261,7 @@ export function SettingsScreen() {
                     : 'rgba(0, 0, 0, 0.05)',
                 },
               ]}
-              onPress={() => router.push('/(onboarding)/sector-selection' as any)}
+              onPress={() => router.push({ pathname: '/(onboarding)/sector-selection' as any, params: { isMigration: 'true' } })}
               activeOpacity={0.7}
             >
               <View style={styles.settingIconWrapper}>
@@ -300,6 +300,7 @@ export function SettingsScreen() {
                   params: {
                     sectorId: '5',
                     sectorKey: 'barberia',
+                    isMigration: 'true',
                   },
                 })
               }

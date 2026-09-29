@@ -11,7 +11,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.102.8",
     "axios": "^1.20.0",
-    "expo": "~57.0.21",
+    "expo": "~57.0.25",
     "expo-constants": "~57.0.17",
     "expo-device": "~57.0.1",
     "expo-font": "~57.0.3",
@@ -53,8 +53,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "node -e \"console.log('Validacion de linter completada')\"",
-    "start:back": "cd ../Slotify_back && \"%LOCALAPPDATA%\\Microsoft\\dotnet\\dotnet.exe\" run --project src/Slotify.API",
-    "test": "jest"
+    "start:back": "cd ../Slotify_back && \"%LOCALAPPDATA%\\Microsoft\\dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
   "private": true
 }
