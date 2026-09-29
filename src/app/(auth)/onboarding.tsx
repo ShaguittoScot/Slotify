@@ -38,7 +38,9 @@ export default function OnboardingScreen() {
         businessName,
         businessPhone,
         sectorTemplateId: selectedSector,
-        fullName: useAuthStore.getState().user?.fullName || 'Pendiente' // Si no capturamos fullName antes
+        firstName: useAuthStore.getState().user?.firstName || useAuthStore.getState().user?.fullName?.split(' ')[0] || 'Administrador',
+        lastName: useAuthStore.getState().user?.lastName || useAuthStore.getState().user?.fullName?.split(' ').slice(1).join(' ') || '',
+        fullName: useAuthStore.getState().user?.fullName || 'Administrador'
       });
       // Routing is automatic via _layout.tsx based on businessId
     } catch (e) {

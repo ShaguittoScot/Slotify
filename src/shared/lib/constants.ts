@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   USER_DATA: 'userData',
   THEME_MODE: 'themeMode',
   ONBOARDING_COMPLETE: 'onboardingComplete',
+  CONSUMER_ONBOARDING_COMPLETE: 'consumerOnboardingComplete',
 } as const;
 
 export const API_ENDPOINTS = {
@@ -18,6 +19,7 @@ export const API_ENDPOINTS = {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
     SYNC: '/auth/sync',
+    SYNC_CLIENT: '/auth/sync-client',
     REFRESH: '/auth/refresh',
     LOGOUT: '/auth/logout',
     ME: '/auth/me',

@@ -6,7 +6,9 @@ export interface LoginCredentials {
 }
 
 export interface RegisterAdminRequest {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  fullName?: string;
   email: string;
   password: string;
   businessName: string;
@@ -15,7 +17,9 @@ export interface RegisterAdminRequest {
 }
 
 export interface RegisterClientRequest {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  fullName?: string;
   email: string;
   password: string;
   phone?: string;
@@ -32,7 +36,9 @@ export interface AuthResponse {
  */
 export interface SyncProfileRequest {
   id: string;
-  fullName: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
   email: string;
   businessName: string;
   businessPhone?: string;

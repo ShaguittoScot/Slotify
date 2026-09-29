@@ -35,7 +35,8 @@ export const RegisterScreen = () => {
 
   // Form State
   const [role, setRole] = useState<SelectedRole>('CLIENTE');
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -46,12 +47,12 @@ export const RegisterScreen = () => {
   const isBusiness = role === 'NEGOCIO';
 
   const isClientValid =
-    fullName.trim().length > 0 &&
+    firstName.trim().length > 0 &&
     email.trim().length > 0 &&
     password.length >= 6;
 
   const isBusinessValid =
-    fullName.trim().length > 0 &&
+    firstName.trim().length > 0 &&
     email.trim().length > 0 &&
     password.length >= 6 &&
     businessName.trim().length > 0 &&
@@ -69,21 +70,29 @@ export const RegisterScreen = () => {
     if (!isFormValid) return;
     try {
       clearError();
+      const sanitizedPhone = phone.trim() || undefined;
+      const cleanFirstName = firstName.trim();
+      const cleanLastName = lastName.trim();
+
       if (isBusiness) {
         await register({
-          fullName,
-          email,
+          firstName: cleanFirstName,
+          lastName: cleanLastName,
+          fullName: `${cleanFirstName} ${cleanLastName}`.trim(),
+          email: email.trim().toLowerCase(),
           password,
-          businessName,
-          businessPhone: phone,
+          businessName: businessName.trim(),
+          businessPhone: sanitizedPhone,
           sectorTemplateId: selectedCategory?.id ?? 1,
         });
       } else {
         await registerClient({
-          fullName,
-          email,
+          firstName: cleanFirstName,
+          lastName: cleanLastName,
+          fullName: `${cleanFirstName} ${cleanLastName}`.trim(),
+          email: email.trim().toLowerCase(),
           password,
-          phone: phone.trim() || undefined,
+          phone: sanitizedPhone,
         });
       }
     } catch {
@@ -119,45 +128,45 @@ export const RegisterScreen = () => {
           {/* Top Bar con botón de regreso y selector de tema */}
           <View style={styles.topBar}>
             <TouchableOpacity
-              onPress={() => router.back()}
               style={[
                 styles.topBtn,
-                { backgroundColor: colors.background.secondary, borderColor: colors.border.main },
+                {
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.light,
+                },
               ]}
+              onPress={() => router.back()}
               activeOpacity={0.7}
             >
               <Feather name="arrow-left" size={18} color={colors.text.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setShowThemeModal(true)}
               style={[
                 styles.topBtn,
-                { backgroundColor: colors.background.secondary, borderColor: colors.border.main },
+                {
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.light,
+                },
               ]}
+              onPress={() => setShowThemeModal(true)}
               activeOpacity={0.7}
             >
-              <Feather
-                name={getThemeIcon()}
-                size={18}
-                color={colors.text.primary}
-              />
+              <Feather name={getThemeIcon()} size={16} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Header Minimalista */}
+          {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text.primary }]}>
-              {isBusiness ? 'Crear Negocio' : 'Crear Cuenta'}
-            </Text>
+            <Text style={[styles.title, { color: colors.text.primary }]}>Crea tu cuenta</Text>
             <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
               {isBusiness
-                ? 'Gestiona tu agenda, clientes y reservas online.'
-                : 'Agenda tus citas y descubre servicios al instante.'}
+                ? 'Gestiona tu negocio y recibe citas sin fricción.'
+                : 'Encuentra y agenda tus servicios favoritos en segundos.'}
             </Text>
           </View>
 
-          {/* ─── SELECTOR DUAL COMPACTO (SEGMENTED CONTROL) ─── */}
+          {/* Segmented Control */}
           <View
             style={[
               styles.segmentedContainer,
@@ -232,7 +241,7 @@ export const RegisterScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* ─── FORMULARIO DINÁMICO ─── */}
+          {/* FORMULARIO DINÁMICO */}
           <View
             style={[
               styles.formContainer,
@@ -256,24 +265,45 @@ export const RegisterScreen = () => {
               </View>
             ) : null}
 
-            {/* Nombre Completo */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Nombre completo</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background.tertiary,
-                    color: colors.text.primary,
-                    borderColor: colors.border.main,
-                  },
-                ]}
-                placeholder={isBusiness ? 'Ej. Juan Pérez (Administrador)' : 'Ej. Juan Pérez'}
-                placeholderTextColor={colors.text.muted}
-                value={fullName}
-                onChangeText={setFullName}
-                editable={!isLoading}
-              />
+            {/* Nombre y Apellido (Campos Separados) */}
+            <View style={styles.nameRow}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: 6 }]}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Nombre</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.background.tertiary,
+                      color: colors.text.primary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                  placeholder="Ej. Juan"
+                  placeholderTextColor={colors.text.muted}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  editable={!isLoading}
+                />
+              </View>
+
+              <View style={[styles.inputGroup, { flex: 1, marginLeft: 6 }]}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Apellido</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.background.tertiary,
+                      color: colors.text.primary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                  placeholder="Ej. Pérez"
+                  placeholderTextColor={colors.text.muted}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
             {/* Correo Electrónico */}
@@ -337,7 +367,7 @@ export const RegisterScreen = () => {
               >
                 <TextInput
                   style={[styles.passwordInput, { color: colors.text.primary }]}
-                  placeholder="•••••••• (mínimo 6 caracteres)"
+                  placeholder="Mínimo 6 caracteres"
                   placeholderTextColor={colors.text.muted}
                   secureTextEntry={!showPassword}
                   value={password}
@@ -345,30 +375,31 @@ export const RegisterScreen = () => {
                   editable={!isLoading}
                 />
                 <TouchableOpacity
-                  style={styles.eyeBtn}
                   onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeBtn}
+                  activeOpacity={0.7}
                 >
                   <Feather
                     name={showPassword ? 'eye-off' : 'eye'}
-                    size={16}
+                    size={18}
                     color={colors.text.muted}
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* ─── CAMPOS EXCLUSIVOS DE NEGOCIO (EXPANSIÓN FLUIDA) ─── */}
+            {/* Campos de Negocio */}
             {isBusiness && (
-              <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)}>
-                <View style={[styles.sectionDivider, { borderColor: colors.border.main }]}>
-                  <Text style={[styles.sectionDividerText, { color: colors.text.secondary }]}>
-                    DATOS DE TU NEGOCIO
+              <Animated.View entering={FadeInDown.duration(200)} exiting={FadeOut.duration(150)}>
+                <View style={[styles.sectionDivider, { borderColor: colors.border.light }]}>
+                  <Text style={[styles.sectionDividerText, { color: colors.text.muted }]}>
+                    DATOS DEL ESTABLECIMIENTO
                   </Text>
                 </View>
 
-                {selectedCategory ? (
-                  <TouchableOpacity
-                    onPress={() => router.push('/(onboarding)/sector-selection' as any)}
+                {/* Categoría Seleccionada */}
+                {selectedCategory && (
+                  <View
                     style={[
                       styles.sectorBadge,
                       {
@@ -376,28 +407,32 @@ export const RegisterScreen = () => {
                         borderColor: colors.border.main,
                       },
                     ]}
-                    activeOpacity={0.7}
                   >
                     <View style={styles.sectorBadgeLeft}>
-                      <MaterialCommunityIcons
-                        name="shape-outline"
-                        size={16}
-                        color={colors.action.primary}
-                      />
-                      <Text style={[styles.sectorBadgeText, { color: colors.text.primary }]}>
-                        Giro: <Text style={{ fontWeight: '700' }}>{selectedCategory.name}</Text>
+                      <MaterialCommunityIcons name={(selectedCategory.iconName as any) || 'storefront'} size={18} color={colors.action.primary} />
+                      <Text
+                        style={[
+                          styles.sectorBadgeText,
+                          { color: colors.text.primary, fontWeight: '600' },
+                        ]}
+                      >
+                        {selectedCategory.name}
                       </Text>
                     </View>
-                    <Text style={[styles.sectorBadgeChange, { color: colors.action.primary }]}>
-                      Cambiar
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
+                    <TouchableOpacity
+                      onPress={() => router.push('/(onboarding)/templates')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.sectorBadgeChange, { color: colors.action.primary }]}>
+                        Cambiar
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
+                {/* Nombre del Negocio */}
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: colors.text.primary }]}>
-                    Nombre comercial del negocio
-                  </Text>
+                  <Text style={[styles.label, { color: colors.text.primary }]}>Nombre del negocio</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -407,7 +442,7 @@ export const RegisterScreen = () => {
                         borderColor: colors.border.main,
                       },
                     ]}
-                    placeholder="Ej. Barbería Central o Clínica Dental"
+                    placeholder="Ej. Barbería Elite"
                     placeholderTextColor={colors.text.muted}
                     value={businessName}
                     onChangeText={setBusinessName}
@@ -453,7 +488,7 @@ export const RegisterScreen = () => {
                 <ActivityIndicator color={colors.action.primaryText} />
               ) : (
                 <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>
-                  {isBusiness ? 'Continuar a Configuración ➔' : 'Crear Cuenta de Cliente'}
+                  {isBusiness ? 'Continuar a Configuración' : 'Crear Cuenta de Cliente'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -601,6 +636,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   sectionDivider: {
     borderTopWidth: 1,

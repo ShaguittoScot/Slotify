@@ -11,7 +11,7 @@ tags:
 # 🗄️ Modelo de Base de Datos del Proyecto (ERD)
 
 > [!abstract] Resumen del Modelo
-> Esquema relacional multi-inquilino (*multi-tenant*) diseñado para una plataforma de gestión de citas, servicios, horarios, módulos configurables y autenticación de usuarios y empleados, con soporte para notificaciones push y auditoría histórica de reservas.
+> Esquema relacional multi-inquilino (*multi-tenant*) diseñado para una plataforma de gestión de citas, servicios, horarios, módulos configurables y autenticación de usuarios, empleados y clientes, con soporte para CRM multi-negocio, notificaciones push y auditoría histórica de reservas.
 
 ---
 
@@ -36,6 +36,7 @@ erDiagram
     empleados ||--o{ bloqueos_agenda : "aplica_a"
     negocios ||--o{ citas : "recibe"
     empleados ||--o{ citas : "atiende"
+    clientes ||--o{ citas : "reserva"
     citas ||--o{ citas_servicios : "contiene"
     servicios ||--o{ citas_servicios : "incluido_en"
 
@@ -62,7 +63,8 @@ erDiagram
     usuarios {
         uuid id PK
         uuid id_negocio FK
-        varchar nombre_completo
+        varchar nombre
+        varchar apellido
         varchar correo UK
         varchar password_hash
         varchar rol
@@ -96,6 +98,17 @@ erDiagram
         uuid id_negocio FK
         varchar especialidad
         boolean esta_activo
+    }
+
+    clientes {
+        uuid id PK
+        uuid supabase_id UK
+        varchar nombre
+        varchar apellido
+        varchar correo UK
+        varchar telefono
+        timestamp fecha_creacion
+        timestamp fecha_actualizacion
     }
 
     marca_negocio {
@@ -157,11 +170,9 @@ erDiagram
         uuid id PK
         uuid id_negocio FK
         uuid id_empleado FK
+        uuid id_cliente FK
         timestamptz hora_inicio
         timestamptz hora_fin
-        varchar nombre_cliente
-        varchar correo_cliente
-        varchar telefono_cliente
         varchar estado
         varchar token_cancelacion UK
         decimal total_pactado
@@ -180,7 +191,7 @@ erDiagram
 
 ---
 
-## 🏛️ 2. Módulos y Dominios del Sistema
+## 🗂️ 2. Módulos y Dominios del Sistema
 
 El esquema se divide en 5 dominios de negocio claramente delimitados:
 
@@ -189,8 +200,8 @@ graph LR
     D1["🏢 Core & Multi-tenancy\n(negocios, marca, plantillas)"]
     D2["🔐 Identidad y Sesiones\n(usuarios, sesiones, push)"]
     D3["👥 Staff & Capacidades\n(empleados, servicios_empleados)"]
-    D4["⚙️ Catálogo & Modularidad\n(modulos, servicios)"]
-    D5["📅 Agenda & Citas\n(horarios, bloqueos, citas)"]
+    D4["📦 Catálogo & Modularidad\n(modulos, servicios)"]
+    D5["🗓️ Clientes & Agenda\n(clientes, horarios, bloqueos, citas)"]
 
     D1 --> D2
     D1 --> D3
@@ -199,11 +210,12 @@ graph LR
     D2 --> D3
     D3 --> D5
     D4 --> D5
+    D5 --> D1
 ```
 
 ---
 
-## 📋 3. Diccionario de Entidades y Estructura
+## 📖 3. Diccionario de Entidades y Estructura
 
 ### 🏢 A. Núcleo de Negocio y Multi-inquilino (*Multi-tenancy*)
 
@@ -235,12 +247,14 @@ Identidad visual y personalización de marca (*White-label*). Relación 1:1 con 
 ### 🔐 B. Identidad, Autenticación y Dispositivos Móviles
 
 #### `usuarios`
-Cuentas de acceso al sistema para administradores, recepcionistas y empleados.
+Cuentas de acceso al sistema para administradores, recepcionistas y empleados vinculados a un negocio.
 - `id` (UUID PK): Identificador de usuario.
-- `id_negocio` (UUID FK): Inquilino al que pertenece.
+- `id_negocio` (UUID FK): Inquilino al que pertenece el colaborador (`NOT NULL`).
+- `nombre` (VARCHAR): Nombre del colaborador.
+- `apellido` (VARCHAR): Apellido del colaborador.
 - `correo` (VARCHAR UK): Correo único para login.
-- `password_hash` (VARCHAR): Hash seguro mediante Argon2id o bcrypt.
-- `rol` (VARCHAR): Rol del sistema (`ADMIN`, `RECEPCION`, `EMPLEADO`).
+- `password_hash` (VARCHAR): Hash de contraseña gestionado por proveedor de identidad o cifrado.
+- `rol` (VARCHAR): Rol operativo del sistema (`ADMIN`, `RECEPCION`, `EMPLEADO`, `DUENO`).
 - `esta_activo`, `correo_verificado`: Estados de cuenta.
 
 #### `sesiones_usuario`
@@ -261,39 +275,83 @@ Registro de dispositivos móviles para notificaciones push vía FCM / APNs.
 
 ---
 
-### ⚙️ C. Módulos y Catálogo de Servicios
+### 👥 C. Staff y Capacidades
+
+#### `empleados`
+Perfil operativo del personal del negocio.
+- `id` (UUID PK): Identificador único del perfil.
+- `id_usuario` (UUID FK, UK): Usuario de acceso asociado.
+- `id_negocio` (UUID FK): Establecimiento de trabajo.
+- `especialidad` (VARCHAR): Cargo o destreza principal.
+- `esta_activo` (BOOLEAN): Estado operativo del colaborador.
+
+#### `servicios_empleados`
+Tabla puente M:N para asignar qué colaboradores realizan qué servicios específicos.
+- `id_empleado` (UUID PK, FK): Colaborador asignado.
+- `id_servicio` (UUID PK, FK): Servicio que está habilitado para prestar.
+
+---
+
+### 📦 D. Módulos y Catálogo de Servicios
 
 #### `modulos` & `modulos_negocio`
 Sistema de activación de funciones a la medida (*Feature Flags* y suscripción por módulos).
 - `modulos`: Catálogo maestro de módulos del sistema (`FACTURACION`, `RECORDATORIOS_SMS`, `MARKETING`).
 - `modulos_negocio`: Tabla asociativa con campo `configuracion` (JSON) para almacenar ajustes específicos por negocio.
 
-#### `servicios` & `servicios_empleados`
-- `servicios`: Catálogo de prestaciones con control de `duracion_minutos`, `tiempo_colchon_minutos` (tiempo de limpieza/preparación entre citas), `precio` y borrado lógico mediante `fecha_eliminacion` (*Soft Delete*).
-- `servicios_empleados`: Tabla puente M:N para asignar qué colaboradores realizan qué servicios específicos.
+#### `servicios`
+Catálogo de prestaciones ofrecidas:
+- `id` (UUID PK): Identificador del servicio.
+- `id_negocio` (UUID FK): Negocio que ofrece el servicio.
+- `nombre` (VARCHAR): Nombre del servicio.
+- `duracion_minutos` (INT): Tiempo estimado de ejecución.
+- `tiempo_colchon_minutos` (INT): Margen de limpieza o preparación posterior.
+- `precio` (DECIMAL): Tarifa base.
+- `esta_activo` (BOOLEAN) / `fecha_eliminacion` (TIMESTAMP): Borrado lógico (*Soft Delete*).
 
 ---
 
-### 📅 D. Agenda, Disponibilidad y Citas
+### 🗓️ E. Clientes, Agenda y Citas
+
+#### `clientes`
+Registro global de clientes consumidores de la plataforma (**Opción 2: Separación de Dominios Staff vs Clientes**). Opera desacoplado del tenant para posibilitar una experiencia **CRM Multi-negocio**:
+- `id` (UUID PK): Identificador relacional único del cliente.
+- `supabase_id` (UUID UK): Enlace único con el registro de identidad en `auth.users` de Supabase Auth.
+- `nombre` (VARCHAR): Nombre del cliente.
+- `apellido` (VARCHAR): Apellido del cliente.
+- `correo` (VARCHAR UK): Correo electrónico del cliente para notificaciones y envío de comprobantes.
+- `telefono` (VARCHAR): Teléfono de contacto / WhatsApp para recordatorios automatizados.
+- `fecha_creacion`, `fecha_actualizacion`: Marcas de tiempo de auditoría.
+- **Propósito Arquitectónico:** Permite a un mismo usuario final agendar citas en diferentes negocios de la red sin duplicar identidades, habilitando historial unificado de citas, perfiles de fidelización y trazabilidad centralizada.
 
 #### `horarios_disponibilidad`
 Matriz de jornada laboral semanal recurrente por colaborador o negocio.
+- `id` (BIGINT PK): Identificador de la franja.
+- `id_negocio` (UUID FK): Negocio al que aplica.
+- `id_empleado` (UUID FK, Nullable): Colaborador asignado (null para horario general del negocio).
 - `dia_semana` (SMALLINT): 0 (Domingo) a 6 (Sábado) o 1 a 7 según norma ISO.
 - `hora_inicio`, `hora_fin` (TIME): Rango de disponibilidad horaria.
 
 #### `bloqueos_agenda`
 Excepciones puntuales a la disponibilidad (vacaciones, citas médicas, mantenimiento).
+- `id` (BIGINT PK): Identificador del bloqueo.
+- `id_negocio` (UUID FK): Negocio donde se aplica.
+- `id_empleado` (UUID FK, Nullable): Colaborador afectado.
 - `fecha_hora_inicio`, `fecha_hora_fin` (TIMESTAMPTZ): Intervalo exacto con zona horaria UTC.
 - `motivo` (VARCHAR): Razón del bloqueo.
 
 #### `citas` & `citas_servicios`
 Núcleo transaccional de reservas:
 - `citas`:
+  - `id` (UUID PK): Identificador único de la cita.
+  - `id_negocio` (UUID FK): Negocio donde se realiza la atención.
+  - `id_empleado` (UUID FK, Nullable): Colaborador asignado a la atención.
+  - `id_cliente` (UUID FK): Clave foránea estricta referenciando a `clientes(id)`.
   - `hora_inicio`, `hora_fin` (TIMESTAMPTZ): Período pactado de atención.
-  - `nombre_cliente`, `correo_cliente`, `telefono_cliente`: Datos de contacto del cliente final.
   - `estado`: `PENDIENTE`, `CONFIRMADA`, `CANCELADA`, `COMPLETADA`, `NO_ASISTIO`.
   - `token_cancelacion` (VARCHAR UK): Token seguro e irrepetible para que el cliente gestione o cancele su cita sin login.
-  - `total_pactado`: Monto total de la reserva.
+  - `total_pactado` (DECIMAL): Monto total de la reserva.
+  - `fecha_creacion`, `fecha_actualizacion`: Marcas de tiempo de auditoría.
 - `citas_servicios`:
   - **Inmutabilidad y Auditoría Histórica:** Almacena `precio_historico` y `duracion_historica_minutos` para evitar que futuras modificaciones del catálogo alteren citas pasadas o en curso.
 
@@ -302,16 +360,19 @@ Núcleo transaccional de reservas:
 ## 💡 4. Decisiones de Arquitectura y Buenas Prácticas Aplicadas
 
 > [!tip] 1. Multi-inquilino con Aislamiento Lógico (Multi-tenancy)
-> Todas las tablas principales poseen `id_negocio` como clave foránea, permitiendo consultas seguras con filtrado por inquilino y soporte de Row Level Security (RLS) en PostgreSQL.
+> Todas las tablas operativas principales poseen `id_negocio` como clave foránea, permitiendo consultas seguras con filtrado por inquilino y soporte de Row Level Security (RLS) en PostgreSQL.
 
-> [!tip] 2. Manejo de Zonas Horarias (`TIMESTAMPTZ`)
+> [!tip] 2. Desacoplamiento B2C y CRM Multi-negocio (`clientes`)
+> La entidad `clientes` no posee `id_negocio`, actuando como una entidad transversal vinculada a Supabase Auth (`supabase_id`). Esto permite a los consumidores interactuar con cualquier negocio de la plataforma con una única identidad de acceso.
+
+> [!tip] 3. Manejo de Zonas Horarias (`TIMESTAMPTZ`)
 > Las citas y bloqueos utilizan marcas de tiempo con zona horaria integrada (`TIMESTAMPTZ`) almacenadas en UTC en el backend y convertidas a la `zona_horaria` del negocio en las vistas cliente.
 
-> [!tip] 3. Integridad y Auditoría Histórica
+> [!tip] 4. Integridad y Auditoría Histórica
 > La tabla `citas_servicios` congela el precio y la duración pactados en el momento de la creación de la cita, desacoplando el histórico contable de cambios futuros en la tabla `servicios`.
 
-> [!tip] 4. Seguridad "Zero Trust" en Autenticación
-> Las contraseñas y tokens de refresco nunca se guardan en texto plano (`password_hash`, `token_refresco_hash`). La revocación de sesiones es inmediata mediante la columna `revocado`.
+> [!tip] 5. Seguridad "Zero Trust" en Autenticación
+> Las credenciales y tokens de refresco nunca se guardan en texto plano (`password_hash`, `token_refresco_hash`). La revocación de sesiones es inmediata mediante la columna `revocado`.
 
 ---
 
@@ -321,6 +382,6 @@ Núcleo transaccional de reservas:
 - 🛡️ Autenticación stateless y Zero Trust: [[Seguridad]]
 - 🌐 Consumo y endpoints RESTful: [[Api rest y rest full]]
 - 📱 Ciclo de vida y refresco de estado en móvil: [[ciclo de vida de la aplicación]]
-- 📐 Arquitectura de capas y repositorios: [[Arquitecturas de Software Movil y Backend]]
-- 🤖 Reglas y directrices de desarrollo: [[AGENTS.md]]
-- 🏠 Mapa de Contenidos Principal: [[Desarrollo movil integral]]
+- 🏗️ Arquitectura de capas y repositorios: [[Arquitecturas de Software Movil y Backend]]
+- 📋 Reglas y directrices de desarrollo: [[AGENTS.md]]
+- 🗺️ Mapa de Contenidos Principal: [[Desarrollo movil integral]]
