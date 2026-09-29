@@ -18,7 +18,7 @@ export default function FormBuilderRoute() {
           headerBackVisible: false,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(main)' as any)}>
-              <Feather name="x" size={24} color={colors.text.primary} style={{ marginRight: 40 }} />
+              <Feather name="x" size={24} color={colors.text.primary} style={{ marginRight: 10 }} />
             </TouchableOpacity>
           ),
         }}
