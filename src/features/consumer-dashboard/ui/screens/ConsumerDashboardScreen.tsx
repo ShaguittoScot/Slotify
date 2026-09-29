@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
+import { useCalendarStore } from '@/features/calendar/model';
 import { useAppTheme } from '@/shared/theme';
 
-const CONSUMER_APPOINTMENTS = [
+const DEMO_CONSUMER_APPOINTMENTS = [
   { id: 'c1', business: 'Barbería Capital', service: 'Corte Degradado', date: 'Hoy', time: '04:00 PM', status: 'confirmed', address: 'Av. Reforma 222' },
   { id: 'c2', business: 'Clínica Dental Sonrisas', service: 'Limpieza Dental', date: 'Mañana', time: '11:00 AM', status: 'pending', address: 'Calle 10 #45' },
 ];
@@ -22,6 +23,54 @@ export function ConsumerDashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
+  const { slots, loadSlots } = useCalendarStore();
+
+  useEffect(() => {
+    loadSlots();
+  }, []);
+
+  const isDemo =
+    user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
+
+  const appointmentsList = useMemo(() => {
+    const validSlots = slots.filter((s) => s.type === 'appointment' && s.status !== 'cancelled');
+
+    if (validSlots.length > 0) {
+      return validSlots.map((apt) => {
+        const d = new Date(apt.startTime);
+        const isToday =
+          d.getDate() === new Date().getDate() &&
+          d.getMonth() === new Date().getMonth() &&
+          d.getFullYear() === new Date().getFullYear();
+
+        const dateStr = isToday
+          ? 'Hoy'
+          : d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
+
+        const timeStr = d.toLocaleTimeString('es-MX', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        return {
+          id: apt.resourceId,
+          business: apt.employeeName || 'Slotify Business',
+          service: apt.title || 'Cita programada',
+          date: dateStr,
+          time: timeStr,
+          status: apt.status || 'confirmed',
+          address: 'Ubicación registrada',
+        };
+      });
+    }
+
+    if (isDemo) {
+      return DEMO_CONSUMER_APPOINTMENTS;
+    }
+
+    return [];
+  }, [slots, isDemo]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -119,65 +168,103 @@ export function ConsumerDashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            {CONSUMER_APPOINTMENTS.map((apt, idx) => (
+            {appointmentsList.length > 0 ? (
+              appointmentsList.map((apt, idx) => (
+                <Animated.View
+                  key={apt.id}
+                  entering={FadeInRight.duration(400).delay(250 + idx * 80)}
+                  style={[
+                    s.appointmentCard,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <View style={s.aptLeft}>
+                    <View
+                      style={[
+                        s.aptAvatar,
+                        {
+                          backgroundColor: colors.background.tertiary,
+                        },
+                      ]}
+                    >
+                      <Feather name="calendar" size={18} color={colors.action.primary} />
+                    </View>
+                    <View style={s.aptInfo}>
+                      <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.business}</Text>
+                      <Text style={[s.aptService, { color: colors.text.secondary }]}>
+                        {apt.service}
+                      </Text>
+                      <Text style={[s.aptSubText, { color: colors.text.muted }]}>
+                        {apt.address}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={s.aptRight}>
+                    <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
+                    <Text style={[s.aptDateBadge, { color: colors.text.secondary }]}>{apt.date}</Text>
+                    <View
+                      style={[
+                        s.aptBadge,
+                        apt.status === 'confirmed'
+                          ? { backgroundColor: '#10B98120' }
+                          : { backgroundColor: '#F59E0B20' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          s.aptBadgeText,
+                          apt.status === 'confirmed'
+                            ? { color: '#10B981' }
+                            : { color: '#F59E0B' },
+                        ]}
+                      >
+                        {apt.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
+                      </Text>
+                    </View>
+                  </View>
+                </Animated.View>
+              ))
+            ) : (
               <Animated.View
-                key={apt.id}
-                entering={FadeInRight.duration(400).delay(250 + idx * 80)}
+                entering={FadeInDown.duration(400)}
                 style={[
-                  s.appointmentCard,
+                  s.emptyStateCard,
                   {
                     backgroundColor: colors.background.secondary,
                     borderColor: colors.border.main,
                   },
                 ]}
               >
-                <View style={s.aptLeft}>
-                  <View
-                    style={[
-                      s.aptAvatar,
-                      {
-                        backgroundColor: colors.background.tertiary,
-                      },
-                    ]}
-                  >
-                    <Feather name="calendar" size={18} color={colors.action.primary} />
-                  </View>
-                  <View style={s.aptInfo}>
-                    <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.business}</Text>
-                    <Text style={[s.aptService, { color: colors.text.secondary }]}>
-                      {apt.service}
-                    </Text>
-                    <Text style={[s.aptSubText, { color: colors.text.muted }]}>
-                      {apt.address}
-                    </Text>
-                  </View>
+                <View
+                  style={[
+                    s.emptyIconCircle,
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F3F4F6' },
+                  ]}
+                >
+                  <Feather name="calendar" size={26} color={colors.text.muted} />
                 </View>
-
-                <View style={s.aptRight}>
-                  <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
-                  <Text style={[s.aptDateBadge, { color: colors.text.secondary }]}>{apt.date}</Text>
-                  <View
-                    style={[
-                      s.aptBadge,
-                      apt.status === 'confirmed'
-                        ? { backgroundColor: '#10B98120' }
-                        : { backgroundColor: '#F59E0B20' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        s.aptBadgeText,
-                        apt.status === 'confirmed'
-                          ? { color: '#10B981' }
-                          : { color: '#F59E0B' },
-                      ]}
-                    >
-                      {apt.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={[s.emptyStateTitle, { color: colors.text.primary }]}>
+                  Aún no tienes citas programadas
+                </Text>
+                <Text style={[s.emptyStateSubtitle, { color: colors.text.secondary }]}>
+                  Encuentra negocios, servicios y reserva tu próxima cita fácilmente en segundos.
+                </Text>
+                <TouchableOpacity
+                  style={[s.emptyActionBtn, { backgroundColor: colors.action.primary }]}
+                  onPress={() => router.push('/(main)/explore' as any)}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="compass" size={15} color={colors.action.primaryText} />
+                  <Text style={[s.emptyActionBtnText, { color: colors.action.primaryText }]}>
+                    Explorar Servicios
+                  </Text>
+                </TouchableOpacity>
               </Animated.View>
-            ))}
+            )}
           </Animated.View>
 
           <View style={{ height: 110 }} />
@@ -223,4 +310,10 @@ const s = StyleSheet.create({
   aptDateBadge: { fontSize: 11, fontWeight: '500' },
   aptBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   aptBadgeText: { fontSize: 11, fontWeight: '700' },
+  emptyStateCard: { borderRadius: 20, padding: 24, alignItems: 'center', borderWidth: 1, marginTop: 4 },
+  emptyIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyStateTitle: { fontSize: 16, fontWeight: '700', marginBottom: 6, textAlign: 'center' },
+  emptyStateSubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 18, paddingHorizontal: 16 },
+  emptyActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 },
+  emptyActionBtnText: { fontSize: 14, fontWeight: '700' },
 });

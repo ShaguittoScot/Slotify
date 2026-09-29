@@ -28,6 +28,28 @@ interface AuthState {
   clearError: () => void;
 }
 
+const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
+  const meta = user.user_metadata || {};
+  const firstName = meta.first_name || fallback?.firstName || '';
+  const lastName = meta.last_name || fallback?.lastName || '';
+  const fullName =
+    meta.full_name ||
+    fallback?.fullName ||
+    (firstName ? `${firstName} ${lastName}`.trim() : user.email || 'Usuario');
+  const role = (meta.role as 'DUENO' | 'EMPLEADO' | 'CLIENTE') || fallback?.role || 'DUENO';
+  const businessId = meta.business_id || fallback?.businessId || '';
+
+  return {
+    id: user.id,
+    firstName,
+    lastName,
+    fullName,
+    email: user.email || '',
+    role,
+    businessId,
+  };
+};
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -59,6 +81,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (credentials.email === 'demo@slotify.com' || credentials.email === 'admin@slotify.com') {
       const demoUser: AuthUser = {
         id: 'demo-user-123',
+        firstName: 'Administrador',
+        lastName: 'Slotify',
         fullName: 'Administrador Slotify',
         email: credentials.email,
         role: 'DUENO',
@@ -72,14 +96,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const data = await authApi.login(credentials);
 
       if (data.user) {
-        const authUser: AuthUser = {
-          id: data.user.id,
-          fullName: data.user.user_metadata?.full_name || '',
-          email: data.user.email || '',
-          role: 'DUENO',
-          businessId: data.user.user_metadata?.business_id || '',
-        };
-        set({ user: authUser, isAuthenticated: true, isLoading: false });
+        const authUser = buildAuthUser(data.user);
+        set({
+          user: authUser,
+          isAuthenticated: true,
+          appMode: authUser.role === 'CLIENTE' ? 'CONSUMER' : 'BUSINESS',
+          isLoading: false,
+        });
       }
     } catch (error: any) {
       set({ error: error.message || 'Error al iniciar sesión', isLoading: false });
@@ -93,13 +116,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const res = await authApi.register(data);
 
       if (res.user) {
-        const authUser: AuthUser = {
-          id: res.user.id,
-          fullName: res.user.user_metadata?.full_name || data.fullName,
-          email: res.user.email || data.email,
+        const authUser = buildAuthUser(res.user, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          fullName: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
           role: 'DUENO',
-          businessId: '', // Empty until they finish onboarding
-        };
+          businessId: '',
+        });
         set({
           user: authUser,
           isAuthenticated: true,
@@ -120,13 +143,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const res = await authApi.registerClient(data);
 
       if (res.user) {
-        const authUser: AuthUser = {
-          id: res.user.id,
-          fullName: res.user.user_metadata?.full_name || data.fullName,
-          email: res.user.email || data.email,
+        const authUser = buildAuthUser(res.user, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          fullName: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
           role: 'CLIENTE',
           businessId: '',
-        };
+        });
         set({
           user: authUser,
           isAuthenticated: true,
@@ -147,10 +170,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) throw new Error('No hay usuario autenticado');
 
-      const payload = {
+      const payload: SyncProfileRequest = {
         id: user.id,
         email: user.email,
-        ...data,
+        firstName: data.firstName || user.firstName || user.fullName.split(' ')[0] || 'Usuario',
+        lastName: data.lastName || user.lastName || user.fullName.split(' ').slice(1).join(' '),
+        fullName: data.fullName || user.fullName,
+        businessName: data.businessName,
+        businessPhone: data.businessPhone,
+        sectorTemplateId: data.sectorTemplateId,
       };
 
       try {
@@ -186,14 +214,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const session = await authApi.getSession();
 
       if (session?.user) {
-        const authUser: AuthUser = {
-          id: session.user.id,
-          fullName: session.user.user_metadata?.full_name || '',
-          email: session.user.email || '',
-          role: 'DUENO',
-          businessId: session.user.user_metadata?.business_id || '',
-        };
-        set({ user: authUser, isAuthenticated: true, isLoading: false });
+        const authUser = buildAuthUser(session.user);
+        set({
+          user: authUser,
+          isAuthenticated: true,
+          appMode: authUser.role === 'CLIENTE' ? 'CONSUMER' : 'BUSINESS',
+          isLoading: false,
+        });
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
@@ -210,13 +237,11 @@ supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
     useAuthStore.setState({ user: null, isAuthenticated: false });
   } else if (event === 'SIGNED_IN' && session?.user) {
-    const authUser: AuthUser = {
-      id: session.user.id,
-      fullName: session.user.user_metadata?.full_name || '',
-      email: session.user.email || '',
-      role: 'DUENO',
-      businessId: session.user.user_metadata?.business_id || '',
-    };
-    useAuthStore.setState({ user: authUser, isAuthenticated: true });
+    const authUser = buildAuthUser(session.user);
+    useAuthStore.setState({
+      user: authUser,
+      isAuthenticated: true,
+      appMode: authUser.role === 'CLIENTE' ? 'CONSUMER' : 'BUSINESS',
+    });
   }
 });

@@ -14,9 +14,11 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme } from '@/shared/theme';
+import { STORAGE_KEYS } from '@/shared/lib/constants';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
 SplashScreen.preventAutoHideAsync();
@@ -61,7 +63,13 @@ export default function RootLayout() {
       router.replace('/(auth)');
     } else if (isAuthenticated && inAuthGroup) {
       if (segments[1] === 'register-client' || appMode === 'CONSUMER') {
-        router.replace('/(main)/explore' as any);
+        AsyncStorage.getItem(STORAGE_KEYS.CONSUMER_ONBOARDING_COMPLETE).then((completed) => {
+          if (completed === 'true') {
+            router.replace('/(main)/explore' as any);
+          } else {
+            router.replace('/(onboarding)/consumer' as any);
+          }
+        });
       } else if (!user?.businessId) {
         router.replace('/(onboarding)/wizard');
       } else {

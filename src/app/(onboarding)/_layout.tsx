@@ -9,6 +9,7 @@ export default function OnboardingLayout() {
       }}
     >
       <Stack.Screen name="wizard" />
+      <Stack.Screen name="consumer" />
     </Stack>
   );
 }
