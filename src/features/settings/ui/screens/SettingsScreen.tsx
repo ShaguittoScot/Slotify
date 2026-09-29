@@ -6,25 +6,34 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
+import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
+import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
+import { EditProfileModal } from '../components/EditProfileModal';
+import { BusinessInfoModal } from '../components/BusinessInfoModal';
 
 export function SettingsScreen() {
   const router = useRouter();
   const { colors, isDark, themeMode } = useAppTheme();
   const { user, logout, appMode, toggleAppMode } = useAuthStore();
+
   const [showThemeModal, setShowThemeModal] = useState(false);
+  const [showMigrationModal, setShowMigrationModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showBusinessInfoModal, setShowBusinessInfoModal] = useState(false);
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
 
   const handleLogout = () => {
     Alert.alert(
       'Cerrar Sesión',
-      '¿Estás seguro de que deseas salir de tu cuenta?',
+      '¿Estás seguro de que deseas salir de tu cuenta de Slotify?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -44,8 +53,12 @@ export function SettingsScreen() {
     return 'Modo Oscuro (Neutral Black)';
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'AD';
+  const displayName =
+    user?.fullName && user.fullName !== 'Pendiente'
+      ? user.fullName
+      : user?.businessName || 'Ricardo Alcantar';
+
+  const getInitials = (name: string) => {
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
@@ -59,26 +72,40 @@ export function SettingsScreen() {
       style={[styles.safeArea, { backgroundColor: colors.background.secondary }]}
     >
       <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-        {/* Cabecera Glassmorphism */}
+        {/* Cabecera Estilizada */}
         <View
           style={[
             styles.header,
             {
               backgroundColor: isDark
-                ? 'rgba(26, 26, 26, 0.90)'
-                : 'rgba(255, 255, 255, 0.94)',
+                ? 'rgba(26, 26, 26, 0.92)'
+                : 'rgba(255, 255, 255, 0.95)',
               borderBottomColor: isDark
                 ? 'rgba(255, 255, 255, 0.08)'
                 : 'rgba(0, 0, 0, 0.06)',
             },
           ]}
         >
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Ajustes
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.text.muted }]}>
-            Configuración general de tu cuenta y negocio
-          </Text>
+          <View>
+            <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+              Ajustes
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.text.muted }]}>
+              Configuración general de tu cuenta y negocio
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.headerBadgeIcon,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(255, 255, 255, 0.08)'
+                  : 'rgba(0, 0, 0, 0.04)',
+              },
+            ]}
+          >
+            <Feather name="settings" size={20} color={colors.text.primary} />
+          </View>
         </View>
 
         <ScrollView
@@ -86,14 +113,14 @@ export function SettingsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Tarjeta de Perfil de Usuario */}
+          {/* Tarjeta de Perfil y Negocio Activo */}
           <View
             style={[
               styles.profileCard,
               {
                 backgroundColor: isDark
                   ? 'rgba(26, 26, 26, 0.85)'
-                  : 'rgba(255, 255, 255, 0.90)',
+                  : 'rgba(255, 255, 255, 0.92)',
                 borderColor: isDark
                   ? 'rgba(255, 255, 255, 0.08)'
                   : 'rgba(0, 0, 0, 0.06)',
@@ -101,26 +128,69 @@ export function SettingsScreen() {
             ]}
           >
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{getInitials(user?.fullName)}</Text>
+              <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
             </View>
 
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: colors.text.primary }]}>
-                {user?.fullName || (appMode === 'BUSINESS' ? 'Administrador' : 'Cliente Slotify')}
-              </Text>
-              <Text style={[styles.profileEmail, { color: colors.text.muted }]}>
-                {user?.email || 'usuario@slotify.com'}
-              </Text>
-
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleBadgeText}>
-                  {appMode === 'BUSINESS' ? 'PROPIETARIO / ADMIN' : 'CLIENTE / CONSUMIDOR'}
+              <View style={styles.nameRow}>
+                <Text style={[styles.profileName, { color: colors.text.primary }]} numberOfLines={1}>
+                  {displayName}
                 </Text>
               </View>
+
+              <Text style={[styles.profileEmail, { color: colors.text.muted }]} numberOfLines={1}>
+                {user?.email || 'richialcantar68428@gmail.com'}
+              </Text>
+
+              <View style={styles.badgesRow}>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    {
+                      backgroundColor:
+                        appMode === 'BUSINESS'
+                          ? 'rgba(99, 102, 241, 0.16)'
+                          : 'rgba(16, 185, 129, 0.16)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roleBadgeText,
+                      {
+                        color: appMode === 'BUSINESS' ? '#818CF8' : '#34D399',
+                      },
+                    ]}
+                  >
+                    {appMode === 'BUSINESS' ? 'PROPIETARIO / ADMIN' : 'CLIENTE / EXPLORADOR'}
+                  </Text>
+                </View>
+
+                {user?.businessName ? (
+                  <View style={styles.businessBadge}>
+                    <Text style={[styles.businessBadgeText, { color: colors.text.muted }]} numberOfLines={1}>
+                      {user.businessName}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
+
+            <TouchableOpacity
+              style={[
+                styles.editProfileBtn,
+                {
+                  backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                },
+              ]}
+              onPress={() => setShowProfileModal(true)}
+              activeOpacity={0.7}
+            >
+              <Feather name="edit-2" size={16} color={colors.text.primary} />
+            </TouchableOpacity>
           </View>
 
-          {/* Tarjeta de Cambio Rápido de Modo (Seamless Switch B2B / B2C) */}
+          {/* Tarjeta de Cambio Rápido de Modo (B2B / B2C) */}
           <TouchableOpacity
             style={[
               styles.modeSwitcherCard,
@@ -171,7 +241,158 @@ export function SettingsScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Sección: Preferencias de Apariencia */}
+          {/* Sección: GESTIÓN DE NEGOCIO */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
+              GESTIÓN DE NEGOCIO
+            </Text>
+
+            {/* Giro Comercial y Plantillas */}
+            <TouchableOpacity
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+              onPress={() => setShowMigrationModal(true)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.12)' }]}>
+                <MaterialCommunityIcons
+                  name="shape-outline"
+                  size={18}
+                  color="#818CF8"
+                />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Giro Comercial y Módulos
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Cambiar sector comercial y capacidades del negocio
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.text.muted} />
+            </TouchableOpacity>
+
+            {/* Catálogo y Plantilla de Barbería / Servicios */}
+            <TouchableOpacity
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+              onPress={() =>
+                router.push({
+                  pathname: '/(onboarding)/templates' as any,
+                  params: {
+                    sectorId: '5',
+                    sectorKey: 'barberia',
+                  },
+                })
+              }
+              activeOpacity={0.7}
+            >
+              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(224, 122, 95, 0.15)' }]}>
+                <MaterialCommunityIcons
+                  name="content-cut"
+                  size={18}
+                  color="#E07A5F"
+                />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Servicios y Catálogo Base
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Ajustar precios, duraciones, adicionales y sillones
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.text.muted} />
+            </TouchableOpacity>
+
+            {/* Constructor de Formulario de Reservas */}
+            <TouchableOpacity
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+              onPress={() => router.push('/(main)/form-builder' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+                <MaterialCommunityIcons
+                  name="form-select"
+                  size={18}
+                  color="#10B981"
+                />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Formulario de Reservación
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Configurar campos dinámicos, comensales y preguntas
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.text.muted} />
+            </TouchableOpacity>
+
+            {/* Información del Negocio y Enlace de Reserva */}
+            <TouchableOpacity
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+              onPress={() => setShowBusinessInfoModal(true)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}>
+                <MaterialCommunityIcons
+                  name="store-outline"
+                  size={18}
+                  color="#EC4899"
+                />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Información del Negocio
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Horarios, sucursal y enlace de reserva compartible
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.text.muted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Sección: APARIENCIA & SISTEMA */}
           <View style={styles.section}>
             <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
               APARIENCIA & SISTEMA
@@ -231,22 +452,52 @@ export function SettingsScreen() {
                   Notificaciones de Citas
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Recordatorios de agenda y avisos
+                  Recordatorios de agenda, avisos y cancelaciones
                 </Text>
               </View>
-              <Switch
+              <FluidToggleSwitch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#3A3A3A', true: '#818CF8' }}
-                thumbColor="#FFFFFF"
+                activeColor="#818CF8"
+              />
+            </View>
+
+            <View
+              style={[
+                styles.settingItem,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(26, 26, 26, 0.75)'
+                    : 'rgba(255, 255, 255, 0.85)',
+                  borderColor: isDark
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'rgba(0, 0, 0, 0.05)',
+                },
+              ]}
+            >
+              <View style={styles.settingIconWrapper}>
+                <Feather name="activity" size={18} color={colors.text.primary} />
+              </View>
+              <View style={styles.settingTextContent}>
+                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                  Respuesta Háptica
+                </Text>
+                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                  Vibración táctil al interactuar y confirmar citas
+                </Text>
+              </View>
+              <FluidToggleSwitch
+                value={hapticsEnabled}
+                onValueChange={setHapticsEnabled}
+                activeColor="#10B981"
               />
             </View>
           </View>
 
-          {/* Sección: Negocio y Servicios */}
+          {/* Sección: SOPORTE & CUENTA */}
           <View style={styles.section}>
             <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
-              GESTIÓN DE NEGOCIO
+              SOPORTE & SEGURIDAD
             </Text>
 
             <TouchableOpacity
@@ -261,22 +512,23 @@ export function SettingsScreen() {
                     : 'rgba(0, 0, 0, 0.05)',
                 },
               ]}
-              onPress={() => router.push('/(onboarding)/sector-selection' as any)}
+              onPress={() =>
+                Alert.alert(
+                  'Centro de Ayuda',
+                  'Para dudas o soporte técnico escribe a soporte@slotify.app o contacta a tu asesor de implementación.'
+                )
+              }
               activeOpacity={0.7}
             >
               <View style={styles.settingIconWrapper}>
-                <MaterialCommunityIcons
-                  name="shape-outline"
-                  size={18}
-                  color={colors.text.primary}
-                />
+                <Feather name="help-circle" size={18} color={colors.text.primary} />
               </View>
               <View style={styles.settingTextContent}>
                 <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Giro Comercial y Plantillas (US-006)
+                  Centro de Ayuda
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Explorar sectores y módulos preconfigurados
+                  Guías de uso, preguntas frecuentes y asistencia
                 </Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.text.muted} />
@@ -295,67 +547,29 @@ export function SettingsScreen() {
                 },
               ]}
               onPress={() =>
-                router.push({
-                  pathname: '/(onboarding)/templates' as any,
-                  params: {
-                    sectorId: '5',
-                    sectorKey: 'barberia',
-                  },
-                })
+                Alert.alert(
+                  'Términos y Privacidad',
+                  'Slotify cumple con estándares de cifrado de grado bancario para la protección de tus datos comerciales y clientes.'
+                )
               }
               activeOpacity={0.7}
             >
-              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(224, 122, 95, 0.15)' }]}>
-                <MaterialCommunityIcons
-                  name="content-cut"
-                  size={18}
-                  color="#E07A5F"
-                />
+              <View style={styles.settingIconWrapper}>
+                <Feather name="shield" size={18} color={colors.text.primary} />
               </View>
               <View style={styles.settingTextContent}>
                 <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Servicios y Plantilla de Barbería
+                  Términos y Privacidad
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Ajustar precios, duraciones, adicionales y sillones
+                  Políticas de servicio y seguridad de datos
                 </Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.text.muted} />
             </TouchableOpacity>
-
-            <View
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-            >
-              <View style={styles.settingIconWrapper}>
-                <MaterialCommunityIcons
-                  name="store-outline"
-                  size={18}
-                  color={colors.text.primary}
-                />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Información del Negocio
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Horarios de atención y servicios
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </View>
           </View>
 
-          {/* Botón Destructivo: Cerrar Sesión */}
+          {/* Botón Destructivo: Cerrar Sesión con margen holgado para la barra flotante */}
           <View style={styles.logoutSection}>
             <TouchableOpacity
               style={[
@@ -377,15 +591,31 @@ export function SettingsScreen() {
             </TouchableOpacity>
 
             <Text style={[styles.appVersionText, { color: colors.text.muted }]}>
-              Slotify v1.0.0 • Gridflow Architecture
+              Slotify v1.0.0 (Build 402) • Enterprise Suite
             </Text>
           </View>
         </ScrollView>
 
-        {/* Modal de Configuración de Apariencia */}
+        {/* Modales de Configuración */}
         <ThemeSettingsModal
           visible={showThemeModal}
           onClose={() => setShowThemeModal(false)}
+        />
+
+        <TemplateMigrationModal
+          visible={showMigrationModal}
+          onClose={() => setShowMigrationModal(false)}
+        />
+
+        <EditProfileModal
+          visible={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+        />
+
+        <BusinessInfoModal
+          visible={showBusinessInfoModal}
+          onClose={() => setShowBusinessInfoModal(false)}
+          onOpenMigration={() => setShowMigrationModal(true)}
         />
       </View>
     </SafeAreaView>
@@ -400,19 +630,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 16,
     borderBottomWidth: 1,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: 13,
     marginTop: 2,
+  },
+  headerBadgeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scroll: {
     flex: 1,
@@ -420,7 +660,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 110, // Margen holgado para la barra flotante inferior
+    paddingBottom: 160, // Margen holgado para que la barra flotante NUNCA tape el botón
   },
   profileCard: {
     flexDirection: 'row',
@@ -434,7 +674,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#818CF8',
+    backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -447,6 +687,10 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   profileName: {
     fontSize: 17,
     fontWeight: '700',
@@ -454,12 +698,17 @@ const styles = StyleSheet.create({
   },
   profileEmail: {
     fontSize: 13,
-    marginTop: 1,
+    marginTop: 2,
     marginBottom: 6,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(99, 102, 241, 0.16)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 100,
@@ -467,8 +716,25 @@ const styles = StyleSheet.create({
   roleBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#818CF8',
     letterSpacing: 0.5,
+  },
+  businessBadge: {
+    backgroundColor: 'rgba(150, 150, 150, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  businessBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  editProfileBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
   },
   modeSwitcherCard: {
     flexDirection: 'row',
@@ -539,6 +805,7 @@ const styles = StyleSheet.create({
   },
   settingTextContent: {
     flex: 1,
+    marginRight: 8,
   },
   settingLabel: {
     fontSize: 14,
@@ -546,7 +813,8 @@ const styles = StyleSheet.create({
   },
   settingValue: {
     fontSize: 12,
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 16,
   },
   logoutSection: {
     marginTop: 10,
