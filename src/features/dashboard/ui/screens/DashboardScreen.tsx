@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,17 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
+import { useCalendarStore } from '@/features/calendar/model';
 import { useAppTheme } from '@/shared/theme';
 import { TemplateMigrationModal } from '../components/TemplateMigrationModal';
-import { useCalendarStore } from '@/features/calendar/model';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const BUSINESS_STATS = [
-  { label: 'Citas Hoy', value: '3', icon: 'calendar', color: '#6366F1' },
-  { label: 'Clientes', value: '12', icon: 'users', color: '#10B981' },
-  { label: 'Ingresos Hoy', value: '$1,450', icon: 'dollar-sign', color: '#F59E0B' },
-  { label: 'Pendientes', value: '2', icon: 'clock', color: '#EC4899' },
+const DEMO_UPCOMING_APPOINTMENTS = [
+  { id: '1', name: 'Carlos Mendoza', service: 'Corte de Cabello & Barba', time: '10:00 AM', status: 'confirmed' },
+  { id: '2', name: 'Laura Gómez', service: 'Tinte & Peinado', time: '11:30 AM', status: 'confirmed' },
+  { id: '3', name: 'Roberto Díaz', service: 'Tratamiento Capilar', time: '02:00 PM', status: 'pending' },
+  { id: '4', name: 'Andrea Ruiz', service: 'Manicura Spa', time: '04:15 PM', status: 'confirmed' },
 ];
 
 export function DashboardScreen() {
@@ -31,30 +31,148 @@ export function DashboardScreen() {
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
   const { slots, loadSlots } = useCalendarStore();
-  const [migrationModalVisible, setMigrationModalVisible] = React.useState(false);
+  const [migrationModalVisible, setMigrationModalVisible] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadSlots();
-  }, [loadSlots]);
+  }, []);
 
-  const upcomingAppointments = React.useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const isDemo =
+    user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
 
-    const isToday = (d: Date) =>
-      d.getFullYear() === today.getFullYear() &&
-      d.getMonth() === today.getMonth() &&
-      d.getDate() === today.getDate();
-
-    return slots
-      .filter((s) => s.type === 'appointment' && (s.status === 'confirmed' || s.status === 'pending'))
-      .filter((s) => {
-        const d = new Date(s.startTime);
-        return isToday(d) && new Date(s.endTime) > now;
-      })
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-      .slice(0, 5); // próximas 3 a 5
+  const appointments = useMemo(() => {
+    return slots.filter((s) => s.type === 'appointment');
   }, [slots]);
+
+  // Lista de citas para mostrar en "Próximas Citas"
+  const upcomingAppointmentsList = useMemo(() => {
+    if (appointments.length > 0) {
+      const validAppointments = appointments
+        .filter((s) => s.status !== 'cancelled')
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+      return validAppointments.slice(0, 5).map((apt) => {
+        const startDate = new Date(apt.startTime);
+        const timeStr = startDate.toLocaleTimeString('es-MX', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        return {
+          id: apt.resourceId,
+          name: apt.clientName || 'Cliente',
+          service: apt.title || 'Servicio agendado',
+          time: timeStr,
+          status: apt.status || 'confirmed',
+        };
+      });
+    }
+
+    if (isDemo) {
+      return DEMO_UPCOMING_APPOINTMENTS;
+    }
+
+    return [];
+  }, [appointments, isDemo]);
+
+  // Cálculo dinámico de métricas del negocio
+  const stats = useMemo(() => {
+    if (appointments.length > 0) {
+      const isSameDay = (d1: Date, d2: Date) =>
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate();
+
+      const today = new Date();
+      const todayAppointments = appointments.filter(
+        (s) => isSameDay(new Date(s.startTime), today) && s.status !== 'cancelled'
+      );
+
+      const uniqueClients = new Set(
+        appointments.map((s) => s.clientName || s.clientPhone).filter(Boolean)
+      ).size;
+
+      const todayRevenue = todayAppointments
+        .filter((s) => s.status === 'completed' || s.status === 'confirmed')
+        .reduce((sum, s) => {
+          if (!s.servicePrice) return sum;
+          const num = parseFloat(s.servicePrice.replace(/[^0-9.]/g, ''));
+          return sum + (isNaN(num) ? 0 : num);
+        }, 0);
+
+      const pendingCount = appointments.filter((s) => s.status === 'pending').length;
+
+      return [
+        {
+          label: 'Citas Hoy',
+          value: String(todayAppointments.length),
+          icon: 'calendar',
+          color: '#6366F1',
+        },
+        {
+          label: 'Clientes',
+          value: String(uniqueClients),
+          icon: 'users',
+          color: '#10B981',
+        },
+        {
+          label: 'Ingresos Hoy',
+          value: todayRevenue > 0 ? `$${todayRevenue.toLocaleString('es-MX')}` : '$0',
+          icon: 'dollar-sign',
+          color: '#F59E0B',
+        },
+        {
+          label: 'Pendientes',
+          value: String(pendingCount),
+          icon: 'clock',
+          color: '#EC4899',
+        },
+      ];
+    }
+
+    if (isDemo) {
+      return [
+        { label: 'Citas Hoy', value: '3', icon: 'calendar', color: '#6366F1' },
+        { label: 'Clientes', value: '12', icon: 'users', color: '#10B981' },
+        { label: 'Ingresos Hoy', value: '$1,450', icon: 'dollar-sign', color: '#F59E0B' },
+        { label: 'Pendientes', value: '2', icon: 'clock', color: '#EC4899' },
+      ];
+    }
+
+    return [
+      { label: 'Citas Hoy', value: '0', icon: 'calendar', color: '#6366F1' },
+      { label: 'Clientes', value: '0', icon: 'users', color: '#10B981' },
+      { label: 'Ingresos Hoy', value: '$0', icon: 'dollar-sign', color: '#F59E0B' },
+      { label: 'Pendientes', value: '0', icon: 'clock', color: '#EC4899' },
+    ];
+  }, [appointments, isDemo]);
+
+  const heroSubtitle = useMemo(() => {
+    if (appointments.length > 0) {
+      const isSameDay = (d1: Date, d2: Date) =>
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate();
+      const todayCount = appointments.filter(
+        (s) => isSameDay(new Date(s.startTime), new Date()) && s.status !== 'cancelled'
+      ).length;
+      const pendingCount = appointments.filter((s) => s.status === 'pending').length;
+
+      if (todayCount === 0) {
+        return 'No tienes citas programadas para hoy. ¡Comparte tu enlace o crea una cita!';
+      }
+      return `Tienes ${todayCount} ${todayCount === 1 ? 'cita programada' : 'citas programadas'} para hoy${
+        pendingCount > 0 ? ` y ${pendingCount} pendiente(s)` : ''
+      }.`;
+    }
+
+    if (isDemo) {
+      return 'Tienes 3 citas programadas para hoy y 2 pendientes de confirmar.';
+    }
+
+    return 'Aún no tienes citas registradas. Comparte tu link para que tus clientes comiencen a agendar.';
+  }, [appointments, isDemo]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -131,9 +249,7 @@ export function DashboardScreen() {
                   <Text style={s.heroBadgeText}>Resumen del Día</Text>
                 </View>
                 <Text style={s.heroTitle}>Tu negocio al día</Text>
-                <Text style={s.heroSub}>
-                  Tienes 3 citas programadas para hoy y 2 pendientes de confirmar.
-                </Text>
+                <Text style={s.heroSub}>{heroSubtitle}</Text>
                 <TouchableOpacity
                   style={[s.heroBtn, { backgroundColor: colors.action.primary }]}
                   onPress={() => router.push('/(main)/agenda' as any)}
@@ -154,7 +270,7 @@ export function DashboardScreen() {
 
           {/* ─── STATS GRID ─── */}
           <Animated.View entering={FadeInDown.duration(600).delay(100)} style={s.statsGrid}>
-            {BUSINESS_STATS.map((stat, idx) => (
+            {stats.map((stat, idx) => (
               <View
                 key={idx}
                 style={[
@@ -274,93 +390,130 @@ export function DashboardScreen() {
             <View style={s.sectionHeader}>
               <Text style={[s.sectionTitle, { color: colors.text.primary }]}>Próximas Citas</Text>
               <TouchableOpacity onPress={() => router.push('/(main)/agenda' as any)}>
-                <Text style={[s.seeAll, { color: colors.action.primary }]}>Ver todas</Text>
+                <Text style={[s.seeAll, { color: colors.action.primary }]}>Ver agenda</Text>
               </TouchableOpacity>
             </View>
 
-            {upcomingAppointments.length === 0 ? (
+            {upcomingAppointmentsList.length > 0 ? (
+              upcomingAppointmentsList.map((apt, idx) => (
+                <Animated.View
+                  key={apt.id}
+                  entering={FadeInRight.duration(400).delay(350 + idx * 80)}
+                  style={[
+                    s.appointmentCard,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <View style={s.aptLeft}>
+                    <View
+                      style={[
+                        s.aptAvatar,
+                        {
+                          backgroundColor: colors.background.tertiary,
+                        },
+                      ]}
+                    >
+                      <Text style={[s.aptAvatarText, { color: colors.text.primary }]}>
+                        {getInitials(apt.name)}
+                      </Text>
+                    </View>
+                    <View style={s.aptInfo}>
+                      <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.name}</Text>
+                      <Text style={[s.aptService, { color: colors.text.secondary }]}>
+                        {apt.service}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={s.aptRight}>
+                    <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
+                    <View
+                      style={[
+                        s.aptBadge,
+                        apt.status === 'confirmed'
+                          ? { backgroundColor: '#10B98120' }
+                          : apt.status === 'completed'
+                          ? { backgroundColor: '#6366F120' }
+                          : { backgroundColor: '#F59E0B20' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          s.aptBadgeText,
+                          apt.status === 'confirmed'
+                            ? { color: '#10B981' }
+                            : apt.status === 'completed'
+                            ? { color: '#6366F1' }
+                            : { color: '#F59E0B' },
+                        ]}
+                      >
+                        {apt.status === 'confirmed'
+                          ? 'Confirmada'
+                          : apt.status === 'completed'
+                          ? 'Completada'
+                          : 'Pendiente'}
+                      </Text>
+                    </View>
+                  </View>
+                </Animated.View>
+              ))
+            ) : (
               <Animated.View
-                entering={FadeInRight.duration(400).delay(350)}
+                entering={FadeInDown.duration(400)}
                 style={[
-                  s.appointmentCard,
+                  s.emptyStateCard,
                   {
                     backgroundColor: colors.background.secondary,
                     borderColor: colors.border.main,
-                    paddingVertical: 24,
-                    justifyContent: 'center',
                   },
                 ]}
               >
-                <Feather name="coffee" size={24} color={colors.text.secondary} style={{ marginBottom: 8, alignSelf: 'center' }} />
-                <Text style={{ color: colors.text.secondary, fontSize: 14, textAlign: 'center', fontWeight: '500' }}>
-                  ¡Jornada terminada! No tienes más citas por hoy.
-                </Text>
-              </Animated.View>
-            ) : (
-              upcomingAppointments.map((apt, idx) => (
-                <Animated.View
-                  key={apt.resourceId}
-                  entering={FadeInRight.duration(400).delay(350 + idx * 80)}
+                <View
+                  style={[
+                    s.emptyIconCircle,
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F3F4F6' },
+                  ]}
                 >
+                  <Feather name="calendar" size={26} color={colors.text.muted} />
+                </View>
+                <Text style={[s.emptyStateTitle, { color: colors.text.primary }]}>
+                  Aún no tienes citas registradas
+                </Text>
+                <Text style={[s.emptyStateSubtitle, { color: colors.text.secondary }]}>
+                  Las citas que agenden tus clientes o agregues desde la agenda aparecerán aquí.
+                </Text>
+                <View style={s.emptyActionsRow}>
+                  <TouchableOpacity
+                    style={[s.emptyActionBtn, { backgroundColor: colors.action.primary }]}
+                    onPress={() => router.push('/(main)/agenda' as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="plus-circle" size={15} color={colors.action.primaryText} />
+                    <Text style={[s.emptyActionBtnText, { color: colors.action.primaryText }]}>
+                      Crear Cita
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={[
-                      s.appointmentCard,
+                      s.emptyShareBtn,
                       {
-                        backgroundColor: colors.background.secondary,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F9FAFB',
                         borderColor: colors.border.main,
                       },
                     ]}
+                    onPress={handleShareLink}
                     activeOpacity={0.7}
-                    onPress={() => router.push('/(main)/agenda' as any)}
                   >
-                    <View style={s.aptLeft}>
-                      <View
-                        style={[
-                          s.aptAvatar,
-                          {
-                            backgroundColor: colors.background.tertiary,
-                          },
-                        ]}
-                      >
-                        <Text style={[s.aptAvatarText, { color: colors.text.primary }]}>
-                          {getInitials(apt.clientName)}
-                        </Text>
-                      </View>
-                      <View style={s.aptInfo}>
-                        <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.clientName || 'Cliente'}</Text>
-                        <Text style={[s.aptService, { color: colors.text.secondary }]}>
-                          {apt.title}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={s.aptRight}>
-                      <Text style={[s.aptTime, { color: colors.text.primary }]}>
-                        {new Date(apt.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                      <View
-                        style={[
-                          s.aptBadge,
-                          apt.status === 'confirmed'
-                            ? { backgroundColor: '#10B98120' }
-                            : { backgroundColor: '#F59E0B20' },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            s.aptBadgeText,
-                            apt.status === 'confirmed'
-                              ? { color: '#10B981' }
-                              : { color: '#F59E0B' },
-                          ]}
-                        >
-                          {apt.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
-                        </Text>
-                      </View>
-                    </View>
+                    <Feather name="share-2" size={15} color={colors.text.primary} />
+                    <Text style={[s.emptyShareBtnText, { color: colors.text.primary }]}>
+                      Compartir
+                    </Text>
                   </TouchableOpacity>
-                </Animated.View>
-              ))
+                </View>
+              </Animated.View>
             )}
           </Animated.View>
 
@@ -420,4 +573,13 @@ const s = StyleSheet.create({
   aptTime: { fontSize: 13, fontWeight: '700' },
   aptBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   aptBadgeText: { fontSize: 11, fontWeight: '700' },
+  emptyStateCard: { borderRadius: 20, padding: 22, alignItems: 'center', borderWidth: 1, marginTop: 4 },
+  emptyIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyStateTitle: { fontSize: 16, fontWeight: '700', marginBottom: 6, textAlign: 'center' },
+  emptyStateSubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 18, paddingHorizontal: 16 },
+  emptyActionsRow: { flexDirection: 'row', gap: 10 },
+  emptyActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+  emptyActionBtnText: { fontSize: 13, fontWeight: '700' },
+  emptyShareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1 },
+  emptyShareBtnText: { fontSize: 13, fontWeight: '600' },
 });

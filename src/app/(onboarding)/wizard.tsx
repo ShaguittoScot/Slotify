@@ -94,7 +94,9 @@ export default function UnifiedOnboardingScreen() {
       try {
         const selectedCat = CANONICAL_SECTOR_CATEGORIES.find(c => c.name === category);
         await completeOnboarding({
-          fullName: user?.fullName || 'Usuario',
+          firstName: user?.firstName || user?.fullName?.split(' ')[0] || 'Administrador',
+          lastName: user?.lastName || user?.fullName?.split(' ').slice(1).join(' ') || '',
+          fullName: user?.fullName || 'Administrador',
           businessName,
           sectorTemplateId: selectedCat?.id || 99,
           businessPhone: '',

@@ -17,7 +17,8 @@ import { useAuthStore } from '../model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
 
 export const RegisterClientScreen = () => {
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +32,7 @@ export const RegisterClientScreen = () => {
   const router = useRouter();
 
   const isFormValid =
-    fullName.trim().length > 0 &&
+    firstName.trim().length > 0 &&
     email.trim().length > 0 &&
     password.length >= 6;
 
@@ -39,15 +40,21 @@ export const RegisterClientScreen = () => {
     if (!isFormValid) return;
     try {
       clearError();
+      const sanitizedPhone = phone.trim() ? phone.trim() : undefined;
+      const cleanFirstName = firstName.trim();
+      const cleanLastName = lastName.trim();
+
       await registerClient({
-        fullName,
-        email,
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        fullName: `${cleanFirstName} ${cleanLastName}`.trim(),
+        email: email.trim().toLowerCase(),
         password,
-        phone,
+        phone: sanitizedPhone,
       });
-      router.replace('/(main)/explore' as any);
-    } catch {
-      // Error handled in store
+      router.replace('/(onboarding)/consumer' as any);
+    } catch (err) {
+      console.error('Error durante el registro de cliente:', err);
     }
   };
 
@@ -75,7 +82,7 @@ export const RegisterClientScreen = () => {
                 styles.iconBtn,
                 {
                   backgroundColor: colors.background.secondary,
-                  borderColor: colors.border.main,
+                  borderColor: colors.border.light,
                 },
               ]}
               activeOpacity={0.7}
@@ -89,7 +96,7 @@ export const RegisterClientScreen = () => {
                 styles.iconBtn,
                 {
                   backgroundColor: colors.background.secondary,
-                  borderColor: colors.border.main,
+                  borderColor: colors.border.light,
                 },
               ]}
               activeOpacity={0.7}
@@ -100,11 +107,15 @@ export const RegisterClientScreen = () => {
 
           {/* Header */}
           <View style={styles.header}>
+            <View style={[styles.roleBadge, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+              <MaterialCommunityIcons name="account-outline" size={14} color="#10B981" />
+              <Text style={styles.roleBadgeText}>Cuenta de Cliente</Text>
+            </View>
             <Text style={[styles.title, { color: colors.text.primary }]}>
               Crear Cuenta
             </Text>
             <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-              Agenda citas en segundos.
+              Agenda citas en tus establecimientos favoritos en segundos.
             </Text>
           </View>
 
@@ -132,23 +143,45 @@ export const RegisterClientScreen = () => {
               </View>
             ) : null}
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>Nombre completo</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.background.tertiary,
-                    color: colors.text.primary,
-                    borderColor: colors.border.main,
-                  },
-                ]}
-                placeholder="Ej. Carlos Mendoza"
-                placeholderTextColor={colors.text.muted}
-                value={fullName}
-                onChangeText={setFullName}
-                editable={!isLoading}
-              />
+            {/* Nombre y Apellido (Campos Separados) */}
+            <View style={styles.nameRow}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: 6 }]}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Nombre</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.background.tertiary,
+                      color: colors.text.primary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                  placeholder="Ej. Carlos"
+                  placeholderTextColor={colors.text.muted}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  editable={!isLoading}
+                />
+              </View>
+
+              <View style={[styles.inputGroup, { flex: 1, marginLeft: 6 }]}>
+                <Text style={[styles.label, { color: colors.text.primary }]}>Apellido</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.background.tertiary,
+                      color: colors.text.primary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                  placeholder="Ej. Mendoza"
+                  placeholderTextColor={colors.text.muted}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -211,7 +244,7 @@ export const RegisterClientScreen = () => {
                     borderColor: colors.border.main,
                   },
                 ]}
-                placeholder="•••••••• (mínimo 6 caracteres)"
+                placeholder="Mínimo 6 caracteres"
                 placeholderTextColor={colors.text.muted}
                 secureTextEntry
                 value={password}
@@ -233,7 +266,7 @@ export const RegisterClientScreen = () => {
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.buttonText}>Crear Cuenta ➔</Text>
+                <Text style={styles.buttonText}>Crear Cuenta</Text>
               )}
             </TouchableOpacity>
 
@@ -327,6 +360,10 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   inputGroup: {
     marginBottom: 16,

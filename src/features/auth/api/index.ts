@@ -39,12 +39,15 @@ export const authApi = {
    * Syncing with .NET backend is done separately in onboarding.
    */
   register: async (request: RegisterAdminRequest) => {
+    const calculatedFullName = request.fullName || `${request.firstName} ${request.lastName}`.trim();
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
       password: request.password || '',
       options: {
         data: {
-          full_name: request.fullName,
+          first_name: request.firstName,
+          last_name: request.lastName,
+          full_name: calculatedFullName,
         },
       },
     });
@@ -55,15 +58,18 @@ export const authApi = {
   },
 
   /**
-   * Register a consumer client with Supabase Auth.
+   * Register a consumer client with Supabase Auth and synchronize with PostgreSQL clientes table.
    */
   registerClient: async (request: RegisterClientRequest) => {
+    const calculatedFullName = request.fullName || `${request.firstName} ${request.lastName}`.trim();
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
       password: request.password,
       options: {
         data: {
-          full_name: request.fullName,
+          first_name: request.firstName,
+          last_name: request.lastName,
+          full_name: calculatedFullName,
           phone: request.phone,
           role: 'CLIENTE',
         },
@@ -71,6 +77,22 @@ export const authApi = {
     });
 
     if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('No se pudo crear el usuario en Supabase.');
+
+    // Sincronizar en la tabla clientes de PostgreSQL vía .NET Backend
+    try {
+      await apiClient.post(API_ENDPOINTS.AUTH.SYNC_CLIENT, {
+        id: data.user.id,
+        firstName: request.firstName,
+        lastName: request.lastName,
+        fullName: calculatedFullName,
+        email: request.email,
+        phone: request.phone,
+      });
+    } catch (syncErr: any) {
+      console.warn('Advertencia al sincronizar cliente en PostgreSQL (continuando sesión):', syncErr.message);
+    }
+
     return data;
   },
 
@@ -79,9 +101,13 @@ export const authApi = {
    * Called at the end of onboarding.
    */
   syncProfile: async (syncPayload: SyncProfileRequest) => {
+    const calculatedFullName = syncPayload.fullName || `${syncPayload.firstName || ''} ${syncPayload.lastName || ''}`.trim();
     const response = await apiClient.post<SyncProfileResponse>(
       API_ENDPOINTS.AUTH.SYNC,
-      syncPayload
+      {
+        ...syncPayload,
+        fullName: calculatedFullName,
+      }
     );
     return response.data;
   },
