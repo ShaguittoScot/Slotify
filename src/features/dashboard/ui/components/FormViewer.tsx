@@ -157,7 +157,7 @@ export function FormViewer({ schema, onSubmit, onCancel }: FormViewerProps) {
                 }}
               >
                 <AntDesign 
-                  name={star <= rating ? "star" : "staro"} 
+                  name={(star <= rating ? "star" : "staro") as any} 
                   size={isSlideMode ? 44 : 32} 
                   color={star <= rating ? "#F59E0B" : colors.text.muted} 
                 />
