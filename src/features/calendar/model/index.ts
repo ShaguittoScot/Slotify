@@ -98,17 +98,29 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   setViewMode: (mode) => {
     set({ viewMode: mode });
-    get().loadSlots();
+    // Si no hay slots precargados en memoria, cargamos
+    if (get().slots.length === 0) {
+      get().loadSlots();
+    }
   },
 
   setSelectedDate: (date) => {
+    const prev = get().selectedDate;
+    const sameMonth = prev.getFullYear() === date.getFullYear() && prev.getMonth() === date.getMonth();
     set({ selectedDate: date });
-    get().loadSlots();
+    if (!sameMonth || get().slots.length === 0) {
+      get().loadSlots();
+    }
   },
 
   goToToday: () => {
-    set({ selectedDate: new Date() });
-    get().loadSlots();
+    const today = new Date();
+    const prev = get().selectedDate;
+    const sameMonth = prev.getFullYear() === today.getFullYear() && prev.getMonth() === today.getMonth();
+    set({ selectedDate: today });
+    if (!sameMonth || get().slots.length === 0) {
+      get().loadSlots();
+    }
   },
 
   navigateForward: () => {
@@ -117,8 +129,12 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     if (viewMode === 'day') next.setDate(next.getDate() + 1);
     else if (viewMode === 'week') next.setDate(next.getDate() + 7);
     else next.setMonth(next.getMonth() + 1);
+
+    const sameMonth = selectedDate.getFullYear() === next.getFullYear() && selectedDate.getMonth() === next.getMonth();
     set({ selectedDate: next });
-    get().loadSlots();
+    if (!sameMonth || get().slots.length === 0) {
+      get().loadSlots();
+    }
   },
 
   navigateBackward: () => {
@@ -127,17 +143,27 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     if (viewMode === 'day') prev.setDate(prev.getDate() - 1);
     else if (viewMode === 'week') prev.setDate(prev.getDate() - 7);
     else prev.setMonth(prev.getMonth() - 1);
+
+    const sameMonth = selectedDate.getFullYear() === prev.getFullYear() && selectedDate.getMonth() === prev.getMonth();
     set({ selectedDate: prev });
-    get().loadSlots();
+    if (!sameMonth || get().slots.length === 0) {
+      get().loadSlots();
+    }
   },
 
   loadSlots: async () => {
-    const { selectedDate, viewMode } = get();
-    const { startDate, endDate } = getVisibleDateRange(selectedDate, viewMode);
+    const { selectedDate } = get();
+    // Cargamos la ventana completa del mes para que cambiar entre Día, Semana y Mes sea instantáneo
+    const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1, 0, 0, 0);
+    const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
 
-    set({ isLoading: true, error: null });
+    // Solo activamos spinner bloqueante si no tenemos ningún slot cargado previamente
+    if (get().slots.length === 0) {
+      set({ isLoading: true, error: null });
+    }
+
     try {
-      const response = await fetchCalendarSlots(startDate, endDate);
+      const response = await fetchCalendarSlots(start.toISOString(), end.toISOString());
       set({ slots: response.slots, isLoading: false });
     } catch (err: any) {
       set({ error: err.message || 'Error al cargar slots del calendario', isLoading: false });

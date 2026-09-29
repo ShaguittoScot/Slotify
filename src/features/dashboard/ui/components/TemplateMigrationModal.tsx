@@ -70,7 +70,7 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
           <TouchableOpacity onPress={onClose} style={s.closeBtn}>
             <Feather name="x" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={[s.title, { color: colors.text.primary }]}>Cambiar Plantilla (US-013)</Text>
+          <Text style={[s.title, { color: colors.text.primary }]}>Cambiar Giro del Negocio</Text>
           <View style={{ width: 44 }} />
         </View>
 
