@@ -18,6 +18,7 @@ interface AuthState {
   setAppMode: (mode: AppMode) => void;
   toggleAppMode: () => void;
   setJustRegistered: (val: boolean) => void;
+  updateUser: (partial: Partial<AuthUser>) => void;
   login: (credentials: LoginCredentials) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
@@ -42,6 +43,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       appMode: state.appMode === 'BUSINESS' ? 'CONSUMER' : 'BUSINESS',
     })),
   setJustRegistered: (val) => set({ isJustRegistered: val }),
+  updateUser: (partial) =>
+    set((state) => ({
+      user: state.user ? { ...state.user, ...partial } : ({ ...partial } as AuthUser),
+    })),
 
   loginWithGoogle: async () => {
     set({ isLoading: true, error: null });

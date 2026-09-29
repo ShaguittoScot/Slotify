@@ -15,6 +15,7 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme } from '@/shared/theme';
 import { TemplateMigrationModal } from '../components/TemplateMigrationModal';
+import { useCalendarStore } from '@/features/calendar/model';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -25,18 +26,35 @@ const BUSINESS_STATS = [
   { label: 'Pendientes', value: '2', icon: 'clock', color: '#EC4899' },
 ];
 
-const UPCOMING_APPOINTMENTS = [
-  { id: '1', name: 'Carlos Mendoza', service: 'Corte de Cabello & Barba', time: '10:00 AM', status: 'confirmed' },
-  { id: '2', name: 'Laura Gómez', service: 'Tinte & Peinado', time: '11:30 AM', status: 'confirmed' },
-  { id: '3', name: 'Roberto Díaz', service: 'Tratamiento Capilar', time: '02:00 PM', status: 'pending' },
-  { id: '4', name: 'Andrea Ruiz', service: 'Manicura Spa', time: '04:15 PM', status: 'confirmed' },
-];
-
 export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
+  const { slots, loadSlots } = useCalendarStore();
   const [migrationModalVisible, setMigrationModalVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    loadSlots();
+  }, [loadSlots]);
+
+  const upcomingAppointments = React.useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const isToday = (d: Date) =>
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate();
+
+    return slots
+      .filter((s) => s.type === 'appointment' && (s.status === 'confirmed' || s.status === 'pending'))
+      .filter((s) => {
+        const d = new Date(s.startTime);
+        return isToday(d) && new Date(s.endTime) > now;
+      })
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+      .slice(0, 5); // próximas 3 a 5
+  }, [slots]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -260,63 +278,90 @@ export function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            {UPCOMING_APPOINTMENTS.map((apt, idx) => (
+            {upcomingAppointments.length === 0 ? (
               <Animated.View
-                key={apt.id}
-                entering={FadeInRight.duration(400).delay(350 + idx * 80)}
+                entering={FadeInRight.duration(400).delay(350)}
                 style={[
                   s.appointmentCard,
                   {
                     backgroundColor: colors.background.secondary,
                     borderColor: colors.border.main,
+                    paddingVertical: 24,
+                    justifyContent: 'center',
                   },
                 ]}
               >
-                <View style={s.aptLeft}>
-                  <View
+                <Feather name="coffee" size={24} color={colors.text.secondary} style={{ marginBottom: 8, alignSelf: 'center' }} />
+                <Text style={{ color: colors.text.secondary, fontSize: 14, textAlign: 'center', fontWeight: '500' }}>
+                  ¡Jornada terminada! No tienes más citas por hoy.
+                </Text>
+              </Animated.View>
+            ) : (
+              upcomingAppointments.map((apt, idx) => (
+                <Animated.View
+                  key={apt.resourceId}
+                  entering={FadeInRight.duration(400).delay(350 + idx * 80)}
+                >
+                  <TouchableOpacity
                     style={[
-                      s.aptAvatar,
+                      s.appointmentCard,
                       {
-                        backgroundColor: colors.background.tertiary,
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.main,
                       },
                     ]}
+                    activeOpacity={0.7}
+                    onPress={() => router.push('/(main)/agenda' as any)}
                   >
-                    <Text style={[s.aptAvatarText, { color: colors.text.primary }]}>
-                      {getInitials(apt.name)}
-                    </Text>
-                  </View>
-                  <View style={s.aptInfo}>
-                    <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.name}</Text>
-                    <Text style={[s.aptService, { color: colors.text.secondary }]}>
-                      {apt.service}
-                    </Text>
-                  </View>
-                </View>
+                    <View style={s.aptLeft}>
+                      <View
+                        style={[
+                          s.aptAvatar,
+                          {
+                            backgroundColor: colors.background.tertiary,
+                          },
+                        ]}
+                      >
+                        <Text style={[s.aptAvatarText, { color: colors.text.primary }]}>
+                          {getInitials(apt.clientName)}
+                        </Text>
+                      </View>
+                      <View style={s.aptInfo}>
+                        <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.clientName || 'Cliente'}</Text>
+                        <Text style={[s.aptService, { color: colors.text.secondary }]}>
+                          {apt.title}
+                        </Text>
+                      </View>
+                    </View>
 
-                <View style={s.aptRight}>
-                  <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
-                  <View
-                    style={[
-                      s.aptBadge,
-                      apt.status === 'confirmed'
-                        ? { backgroundColor: '#10B98120' }
-                        : { backgroundColor: '#F59E0B20' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        s.aptBadgeText,
-                        apt.status === 'confirmed'
-                          ? { color: '#10B981' }
-                          : { color: '#F59E0B' },
-                      ]}
-                    >
-                      {apt.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
-                    </Text>
-                  </View>
-                </View>
-              </Animated.View>
-            ))}
+                    <View style={s.aptRight}>
+                      <Text style={[s.aptTime, { color: colors.text.primary }]}>
+                        {new Date(apt.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <View
+                        style={[
+                          s.aptBadge,
+                          apt.status === 'confirmed'
+                            ? { backgroundColor: '#10B98120' }
+                            : { backgroundColor: '#F59E0B20' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            s.aptBadgeText,
+                            apt.status === 'confirmed'
+                              ? { color: '#10B981' }
+                              : { color: '#F59E0B' },
+                          ]}
+                        >
+                          {apt.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))
+            )}
           </Animated.View>
 
           <View style={{ height: 110 }} />

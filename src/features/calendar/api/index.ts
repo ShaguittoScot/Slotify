@@ -81,7 +81,6 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
       servicePrice: '$220 MXN',
       employeeName: 'Ariel (Master Barber)',
     });
-
     curr.setDate(curr.getDate() + 1);
   }
 
@@ -103,7 +102,7 @@ export async function fetchCalendarSlots(
 
     const response = await apiClient.get<CalendarResponse | ApiResponse<CalendarResponse>>(
       API_ENDPOINTS.CALENDAR.GET_SLOTS,
-      { params }
+      { params, timeout: 10000 }
     );
 
     // Si la respuesta viene envuelta en ApiResponse<T>
