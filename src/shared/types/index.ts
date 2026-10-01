@@ -35,6 +35,8 @@ export interface AuthTokens {
 /** Datos del usuario autenticado (subconjunto seguro, sin passwordHash) */
 export interface AuthUser {
   id: string;
+  firstName?: string;
+  lastName?: string;
   fullName: string;
   email: string;
   role: 'DUENO' | 'EMPLEADO' | 'CLIENTE';
@@ -52,7 +54,9 @@ export interface AuthResponse {
 
 /** Payload para registrar admin (US-000) */
 export interface RegisterAdminPayload {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  fullName?: string;
   email: string;
   password: string;
   businessName: string;

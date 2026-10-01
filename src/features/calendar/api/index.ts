@@ -8,6 +8,7 @@
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
 import type { ApiResponse, CalendarResponse, CalendarSlot } from '@/shared/types';
+import { useAuthStore } from '@/features/auth/model';
 
 /** Generador de datos simulados realistas para visualización offline / preview */
 export function generateMockCalendarSlots(startDate: Date, endDate: Date): CalendarSlot[] {
@@ -96,6 +97,11 @@ export async function fetchCalendarSlots(
   endDate: string,
   employeeId?: string
 ): Promise<CalendarResponse> {
+  const currentUser = useAuthStore.getState().user;
+  const isDemo =
+    currentUser?.email === 'demo@slotify.com' ||
+    currentUser?.email === 'admin@slotify.com';
+
   try {
     const params: Record<string, string> = { startDate, endDate };
     if (employeeId) params.employeeId = employeeId;
@@ -115,17 +121,38 @@ export async function fetchCalendarSlots(
       return response.data as CalendarResponse;
     }
 
-    throw new Error('Formato de respuesta de calendario no válido');
-  } catch (error) {
-    // Si el backend local no está corriendo en este momento, devolvemos fallback simulado
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const mockSlots = generateMockCalendarSlots(start, end);
+    if (Array.isArray(response.data)) {
+      return {
+        rangeStart: startDate,
+        rangeEnd: endDate,
+        slots: response.data,
+      };
+    }
 
     return {
       rangeStart: startDate,
       rangeEnd: endDate,
-      slots: mockSlots,
+      slots: [],
+    };
+  } catch (error) {
+    // Solo si el usuario es de la cuenta demo@slotify.com devolvemos mock fallback
+    if (isDemo) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const mockSlots = generateMockCalendarSlots(start, end);
+
+      return {
+        rangeStart: startDate,
+        rangeEnd: endDate,
+        slots: mockSlots,
+      };
+    }
+
+    // Para cualquier otra cuenta real sin backend o sin citas todavía, retornamos lista vacía
+    return {
+      rangeStart: startDate,
+      rangeEnd: endDate,
+      slots: [],
     };
   }
 }
