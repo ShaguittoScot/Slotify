@@ -25,6 +25,15 @@ import { useAppTheme } from '@/shared/theme';
 import { FormSchema, FormField } from '../screens/FormBuilderScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Mock de servicios de Barbería para visualizar en el constructor/preview.
+// En producción, esto vendrá del Backend (Business.CustomFormConfig o Business.Services).
+const MOCK_SERVICES = [
+  { id: 's1', name: 'Corte Clásico', price: 200, duration: 30 },
+  { id: 's2', name: 'Arreglo de Barba', price: 150, duration: 20 },
+  { id: 's3', name: 'Corte + Barba', price: 300, duration: 50 },
+  { id: 's4', name: 'Facial Exprés', price: 180, duration: 25 },
+];
+
 const { width, height } = Dimensions.get('window');
 
 interface FormViewerProps {
@@ -61,6 +70,72 @@ export function FormViewer({ schema, onSubmit, onCancel }: FormViewerProps) {
   // ─── Componentes de Renderizado de Campos ───
   const renderFieldInput = (field: FormField, isSlideMode: boolean) => {
     const value = answers[field.id];
+
+    if (field.type === 'service_catalog') {
+      const selectedServiceIds = (value as string[]) || [];
+      const catalog = MOCK_SERVICES;
+
+      return (
+        <View style={styles.optionsContainer}>
+          {catalog.map((srv) => {
+            const isSelected = selectedServiceIds.includes(srv.id);
+
+            return (
+              <TouchableOpacity
+                key={srv.id}
+                activeOpacity={0.7}
+                style={[
+                  styles.optionCard,
+                  { 
+                    backgroundColor: isSelected 
+                      ? (isDark ? `${schema.accentColor}30` : `${schema.accentColor}15`) 
+                      : (isDark ? '#1E1E1E' : '#FFFFFF'),
+                    borderColor: isSelected ? schema.accentColor : (isDark ? '#333' : '#E5E5E5'),
+                    justifyContent: 'space-between'
+                  },
+                  isSlideMode && styles.optionCardLarge
+                ]}
+                onPress={() => {
+                  const next = isSelected 
+                    ? selectedServiceIds.filter(id => id !== srv.id) 
+                    : [...selectedServiceIds, srv.id];
+                  handleAnswer(field.id, next);
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={[
+                    styles.checkbox, 
+                    { 
+                      borderRadius: 6,
+                      borderColor: isSelected ? schema.accentColor : colors.text.muted,
+                      backgroundColor: isSelected ? schema.accentColor : 'transparent'
+                    }
+                  ]}>
+                    {isSelected && <Feather name="check" size={14} color="#FFF" />}
+                  </View>
+                  <View>
+                    <Text style={[
+                      styles.optionText, 
+                      { color: isSelected ? schema.accentColor : colors.text.primary },
+                      isSlideMode && styles.optionTextLarge
+                    ]}>
+                      {srv.name}
+                    </Text>
+                    <Text style={{ color: colors.text.muted, fontSize: 13, marginTop: 4 }}>
+                      <Feather name="clock" size={12} /> {srv.duration} min
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 16, fontWeight: '700', color: isSelected ? schema.accentColor : colors.text.primary }}>
+                  ${srv.price.toFixed(2)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      );
+    }
 
     switch (field.type) {
       case 'short_text':
@@ -157,7 +232,7 @@ export function FormViewer({ schema, onSubmit, onCancel }: FormViewerProps) {
                 }}
               >
                 <AntDesign 
-                  name={star <= rating ? "star" : "staro"} 
+                  name={(star <= rating ? "star" : "staro") as any} 
                   size={isSlideMode ? 44 : 32} 
                   color={star <= rating ? "#F59E0B" : colors.text.muted} 
                 />
@@ -171,6 +246,44 @@ export function FormViewer({ schema, onSubmit, onCancel }: FormViewerProps) {
     }
   };
 
+
+  // ═══════════════════════════════════════════════════════════
+  // CÁLCULO DE SUMATORIAS
+  // ═══════════════════════════════════════════════════════════
+  const hasServiceCatalog = schema.fields.some(f => f.type === 'service_catalog');
+  let totalPrice = 0;
+  let totalDuration = 0;
+
+  if (hasServiceCatalog) {
+    const serviceField = schema.fields.find(f => f.type === 'service_catalog');
+    if (serviceField) {
+      const selectedIds = (answers[serviceField.id] as string[]) || [];
+      selectedIds.forEach(id => {
+        const srv = MOCK_SERVICES.find(c => c.id === id);
+        if (srv) {
+          totalPrice += srv.price;
+          totalDuration += srv.duration;
+        }
+      });
+    }
+  }
+
+  // Componente de barra inferior pegajosa
+  const SummaryBar = () => {
+    if (!hasServiceCatalog || totalPrice === 0) return null;
+    return (
+      <Animated.View entering={FadeInDown.duration(300)} style={[styles.summaryBar, { backgroundColor: isDark ? '#111' : '#FFF', borderTopColor: isDark ? '#222' : '#E5E5E5' }]}>
+        <View>
+          <Text style={{ color: colors.text.secondary, fontSize: 13, fontWeight: '500' }}>Total a pagar</Text>
+          <Text style={{ color: schema.accentColor, fontSize: 20, fontWeight: '800' }}>${totalPrice.toFixed(2)}</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={{ color: colors.text.secondary, fontSize: 13, fontWeight: '500' }}>Tiempo estimado</Text>
+          <Text style={{ color: colors.text.primary, fontSize: 16, fontWeight: '700' }}>{totalDuration} min</Text>
+        </View>
+      </Animated.View>
+    );
+  };
 
   // ═══════════════════════════════════════════════════════════
   // RENDER: ESTILO SLIDES (TYPEFORM)
@@ -235,6 +348,7 @@ export function FormViewer({ schema, onSubmit, onCancel }: FormViewerProps) {
             <Feather name="check" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
+        <SummaryBar />
       </View>
     );
   }
@@ -288,9 +402,10 @@ export function FormViewer({ schema, onSubmit, onCancel }: FormViewerProps) {
             </TouchableOpacity>
           </Animated.View>
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: 120 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+      <SummaryBar />
     </View>
   );
 }
@@ -370,5 +485,21 @@ const styles = StyleSheet.create({
   classicFieldQuestion: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
   classicInputWrapper: { },
   classicSubmitBtn: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  classicSubmitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' }
+  classicSubmitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  
+  // Resumen / Sumatoria
+  summaryBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    borderTopWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 10,
+  }
 });

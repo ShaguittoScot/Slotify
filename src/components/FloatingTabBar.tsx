@@ -30,7 +30,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   const isBusiness = appMode === 'BUSINESS';
   const currentRouteOptions = descriptors[state.routes[state.index].key]?.options;
-  const tabBarStyle = StyleSheet.flatten(currentRouteOptions?.tabBarStyle);
+  const tabBarStyle = StyleSheet.flatten(currentRouteOptions?.tabBarStyle) as any;
 
   if (tabBarStyle?.display === 'none') {
     return null;

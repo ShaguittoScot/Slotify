@@ -25,7 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormViewer } from '../components/FormViewer';
 
 // ─── Tipos del Modelo Dinámico ──────────────────────────────────────
-export type FieldType = 'short_text' | 'paragraph' | 'single_choice' | 'multiple_choice' | 'rating_stars';
+export type FieldType = 'short_text' | 'paragraph' | 'single_choice' | 'multiple_choice' | 'rating_stars' | 'service_catalog';
 export type PresentationStyle = 'classic_scroll' | 'interactive_slides';
 
 export interface FormField {
@@ -50,6 +50,7 @@ const FIELD_TYPE_META: Record<FieldType, { icon: any; label: string }> = {
   single_choice: { icon: 'check-circle', label: 'Opción Única' },
   multiple_choice: { icon: 'check-square', label: 'Opción Múltiple' },
   rating_stars: { icon: 'star', label: 'Calificación' },
+  service_catalog: { icon: 'list', label: 'Catálogo de Servicios' },
 };
 
 // ─── Componente Principal ──────────────────────────────────────────
@@ -78,8 +79,8 @@ export function FormBuilderScreen() {
     const newField: FormField = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      question: 'Nueva Pregunta',
-      required: false,
+      question: type === 'service_catalog' ? 'Selecciona los servicios que deseas:' : 'Nueva Pregunta',
+      required: type === 'service_catalog' ? true : false,
       options: type.includes('choice') ? ['Opción 1', 'Opción 2'] : undefined,
     };
     setSchema((prev) => ({ ...prev, fields: [...prev.fields, newField] }));
@@ -266,6 +267,18 @@ export function FormBuilderScreen() {
                     <Feather name="plus" size={14} color={schema.accentColor} />
                     <Text style={{ color: schema.accentColor, fontSize: 13, marginLeft: 4 }}>Añadir opción</Text>
                   </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Si es catálogo de servicios, mostrar nota */}
+              {field.type === 'service_catalog' && (
+                <View style={[styles.optionsContainer, { backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)', padding: 12, borderRadius: 12, marginTop: 10 }]}>
+                  <Text style={{ color: schema.accentColor, fontSize: 13, fontWeight: '500', marginBottom: 4 }}>
+                    <Feather name="info" size={12} /> Sincronización Automática
+                  </Text>
+                  <Text style={{ color: colors.text.secondary, fontSize: 12, lineHeight: 18 }}>
+                    Los servicios y precios configurados en la pestaña "Plantilla" de tu negocio se mostrarán aquí automáticamente para que el cliente pueda seleccionarlos.
+                  </Text>
                 </View>
               )}
 

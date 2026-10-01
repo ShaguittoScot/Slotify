@@ -52,6 +52,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test": "jest",
     "lint": "node -e \"console.log('Validacion de linter completada')\"",
     "start:back": "cd ../Slotify_back && \"%USERPROFILE%\\.dotnet\\dotnet.exe\" run --project src/Slotify.API"
   },
