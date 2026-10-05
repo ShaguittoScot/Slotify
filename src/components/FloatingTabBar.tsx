@@ -29,6 +29,12 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   const { appMode } = useAuthStore();
 
   const isBusiness = appMode === 'BUSINESS';
+  const currentRouteOptions = descriptors[state.routes[state.index].key]?.options;
+  const tabBarStyle = StyleSheet.flatten(currentRouteOptions?.tabBarStyle) as any;
+
+  if (tabBarStyle?.display === 'none') {
+    return null;
+  }
 
   // Configuración de rutas visibles según el rol del usuario
   const allowedRouteNames = isBusiness
