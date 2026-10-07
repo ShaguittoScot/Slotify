@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slotify — CI/CD Pipeline Dashboard</title>
+    <meta name="description" content="Dashboard en tiempo real para monitorear los pipelines CI/CD de Slotify">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ========================================
+           DESIGN SYSTEM — TOKENS
+           ======================================== */
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a28;
+            --bg-card-hover: #22223a;
+            --bg-elevated: #242438;
+
+            --text-primary: #f0f0f5;
+            --text-secondary: #9595b0;
+            --text-muted: #5a5a78;
+
+            --accent-indigo: #6366f1;
+            --accent-indigo-glow: rgba(99, 102, 241, 0.3);
+            --accent-cyan: #22d3ee;
+            --accent-cyan-glow: rgba(34, 211, 238, 0.2);
+            --accent-purple: #a855f7;
+            --accent-purple-glow: rgba(168, 85, 247, 0.2);
+
+            --status-success: #22c55e;
+            --status-success-bg: rgba(34, 197, 94, 0.12);
+            --status-failure: #ef4444;
+            --status-failure-bg: rgba(239, 68, 68, 0.12);
+            --status-running: #f59e0b;
+            --status-running-bg: rgba(245, 158, 11, 0.12);
+            --status-queued: #6366f1;
+            --status-queued-bg: rgba(99, 102, 241, 0.12);
+            --status-skipped: #6b7280;
+            --status-skipped-bg: rgba(107, 114, 128, 0.12);
+            --status-cancelled: #9ca3af;
+            --status-cancelled-bg: rgba(156, 163, 175, 0.12);
+
+            --border-subtle: rgba(255, 255, 255, 0.06);
+            --border-active: rgba(99, 102, 241, 0.4);
+
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-full: 9999px;
+
+            --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
+            --shadow-glow-indigo: 0 0 40px rgba(99, 102, 241, 0.15);
+            --shadow-glow-cyan: 0 0 40px rgba(34, 211, 238, 0.1);
+
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ========================================
+           RESET & BASE
+           ======================================== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ========================================
+           ANIMATED BACKGROUND
+           ======================================== */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .bg-gradient-orb {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-gradient-orb.orb-1 {
+            top: -200px;
+            left: -100px;
+            background: radial-gradient(circle, var(--accent-indigo-glow), transparent 70%);
+            animation: float-orb 20s ease-in-out infinite;
+        }
+
+        .bg-gradient-orb.orb-2 {
+            bottom: -200px;
+            right: -100px;
+            background: radial-gradient(circle, var(--accent-purple-glow), transparent 70%);
+            animation: float-orb 25s ease-in-out infinite reverse;
+        }
+
+        @keyframes float-orb {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.05); }
+            66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+
+        /* ========================================
+           LAYOUT
+           ======================================== */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px 64px;
+        }
+
+        /* ========================================
+           HEADER
+           ======================================== */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0 32px;
+            border-bottom: 1px solid var(--border-subtle);
+            margin-bottom: 32px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 800;
+            color: white;
+            box-shadow: var(--shadow-glow-indigo);
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--status-success-bg);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: var(--radius-full);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--status-success);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--status-success);
+            border-radius: 50%;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .btn-refresh {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-family: inherit;
+        }
+
+        .btn-refresh:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-active);
+            color: var(--text-primary);
+        }
+
+        .btn-refresh.loading .refresh-icon {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .last-updated {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           STATS BAR
+           ======================================== */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all var(--transition-normal);
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-active);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .stat-icon.success { background: var(--status-success-bg); }
+        .stat-icon.failure { background: var(--status-failure-bg); }
+        .stat-icon.running { background: var(--status-running-bg); }
+        .stat-icon.total { background: var(--status-queued-bg); }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ========================================
+           TABS / REPO SELECTOR
+           ======================================== */
+        .repo-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-secondary);
+            padding: 4px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-subtle);
+            width: fit-content;
+        }
+
+        .repo-tab {
+            padding: 10px 24px;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .repo-tab:hover {
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .repo-tab.active {
+            background: var(--accent-indigo);
+            color: white;
+            box-shadow: 0 2px 12px var(--accent-indigo-glow);
+        }
+
+        .repo-tab .tab-emoji {
+            font-size: 16px;
+        }
+
+        /* ========================================
+           PIPELINE FLOW DIAGRAM
+           ======================================== */
+        .pipeline-flow {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xl);
+            padding: 28px 32px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+
+        .pipeline-flow-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flow-container {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            min-width: fit-content;
+        }
+
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+        }
+
+        .flow-step-circle {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            border: 2px solid var(--border-subtle);
+            background: var(--bg-elevated);
+            transition: all var(--transition-normal);
+            position: relative;
+        }
+
+        .flow-step-circle.active {
+            border-color: var(--status-running);
+            background: var(--status-running-bg);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+            animation: pulse-ring 2s ease-in-out infinite;
+        }
+
+        .flow-step-circle.success {
+            border-color: var(--status-success);
+            background: var(--status-success-bg);
+        }
+
+        .flow-step-circle.failure {
+            border-color: var(--status-failure);
+            background: var(--status-failure-bg);
+        }
+
+        .flow-step-circle.pending {
+            border-color: var(--text-muted);
+            opacity: 0.5;
+        }
+
+        @keyframes pulse-ring {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+        }
+
+        .flow-step-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-align: center;
+            max-width: 100px;
+        }
+
+        .flow-step-time {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .flow-arrow {
+            width: 40px;
+            height: 2px;
+            background: var(--border-subtle);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .flow-arrow::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: -4px;
+            border: 5px solid transparent;
+            border-left-color: var(--border-subtle);
+        }
+
+        .flow-arrow.success {
+            background: var(--status-success);
+        }
+
+        .flow-arrow.success::after {
+            border-left-color: var(--status-success);
+        }
+
+        /* ========================================
+           WORKFLOW RUNS LIST
+           ======================================== */
+        .runs-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .run-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            margin-bottom: 12px;
+            transition: all var(--transition-normal);
+            overflow: hidden;
+        }
+
+        .run-card:hover {
+            border-color: var(--border-active);
+            box-shadow: var(--shadow-card);
+        }
+
+        .run-card-header {
+            display: flex;
+            align-items: center;
+            padding: 16px 24px;
+            cursor: pointer;
+            gap: 16px;
+        }
+
+        .run-status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .run-status-dot.success { background: var(--status-success); box-shadow: 0 0 8px rgba(34, 197, 94, 0.4); }
+        .run-status-dot.failure { background: var(--status-failure); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+        .run-status-dot.in_progress { background: var(--status-running); box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); animation: pulse-dot 1.5s infinite; }
+        .run-status-dot.queued { background: var(--status-queued); animation: pulse-dot 2s infinite; }
+        .run-status-dot.cancelled { background: var(--status-cancelled); }
+        .run-status-dot.skipped { background: var(--status-skipped); }
+
+        .run-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .run-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .run-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+
+        .run-meta-item {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .run-branch {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 10px;
+            background: var(--status-queued-bg);
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--accent-indigo);
+        }
+
+        .run-duration {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .run-status-badge {
+            padding: 4px 12px;
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .run-status-badge.success { background: var(--status-success-bg); color: var(--status-success); }
+        .run-status-badge.failure { background: var(--status-failure-bg); color: var(--status-failure); }
+        .run-status-badge.in_progress { background: var(--status-running-bg); color: var(--status-running); }
+        .run-status-badge.queued { background: var(--status-queued-bg); color: var(--status-queued); }
+        .run-status-badge.cancelled { background: var(--status-cancelled-bg); color: var(--status-cancelled); }
+
+        .run-expand-icon {
+            color: var(--text-muted);
+            transition: transform var(--transition-fast);
+            font-size: 12px;
+        }
+
+        .run-card.expanded .run-expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Jobs Detail Panel */
+        .run-jobs {
+            display: none;
+            border-top: 1px solid var(--border-subtle);
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+        }
+
+        .run-card.expanded .run-jobs {
+            display: block;
+        }
+
+        .job-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            margin-bottom: 8px;
+            gap: 12px;
+        }
+
+        .job-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .job-status-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .job-name {
+            font-size: 13px;
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .job-duration {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .job-steps {
+            margin-top: 12px;
+            padding-left: 32px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 16px;
+            margin-left: 8px;
+        }
+
+        .step-icon {
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .step-name {
+            flex: 1;
+        }
+
+        .step-duration {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        /* ========================================
+           TOKEN INPUT MODAL
+           ======================================== */
+        .token-banner {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .token-banner-text {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .token-banner-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .token-banner-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .token-input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .token-input {
+            padding: 8px 14px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: 'Inter', monospace;
+            width: 320px;
+            outline: none;
+            transition: border-color var(--transition-fast);
+        }
+
+        .token-input:focus {
+            border-color: var(--accent-indigo);
+        }
+
+        .token-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn-connect {
+            padding: 8px 20px;
+            background: var(--accent-indigo);
+            border: none;
+            border-radius: var(--radius-md);
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all var(--transition-fast);
+        }
+
+        .btn-connect:hover {
+            background: #5558e6;
+            box-shadow: 0 4px 16px var(--accent-indigo-glow);
+        }
+
+        /* ========================================
+           EMPTY / LOADING STATES
+           ======================================== */
+        .loading-state {
+            text-align: center;
+            padding: 60px 24px;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-subtle);
+            border-top-color: var(--accent-indigo);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .error-banner {
+            background: var(--status-failure-bg);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: var(--status-failure);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rate-limit-info {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: right;
+            margin-top: 8px;
+        }
+
+        /* ========================================
+           LINK TO GITHUB
+           ======================================== */
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-indigo);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+            transition: color var(--transition-fast);
+        }
+
+        .github-link:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 16px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .token-input {
+                width: 100%;
+            }
+
+            .token-banner {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .token-input-group {
+                flex-direction: column;
+            }
+
+            .run-card-header {
+                flex-wrap: wrap;
+                padding: 12px 16px;
+            }
+
+            .flow-container {
+                transform: scale(0.85);
+                transform-origin: left center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-gradient-orb orb-1"></div>
+    <div class="bg-gradient-orb orb-2"></div>
+
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="header" id="dashboard-header">
+            <div class="header-left">
+                <div class="header-logo">S</div>
+                <div>
+                    <h1 class="header-title">Slotify CI/CD Dashboard</h1>
+                    <p class="header-subtitle">Pipeline Monitor — GitHub Actions en tiempo real</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="live-indicator">
+                    <span class="live-dot"></span>
+                    <span>LIVE</span>
+                </div>
+                <button class="btn-refresh" id="btn-refresh" onclick="refreshAll()">
+                    <span class="refresh-icon">⟳</span>
+                    Actualizar
+                </button>
+                <span class="last-updated" id="last-updated"></span>
+            </div>
+        </header>
+
+        <!-- TOKEN INPUT -->
+        <div class="token-banner" id="token-banner">
+            <div style="font-size: 28px;">🔑</div>
+            <div class="token-banner-text">
+                <div class="token-banner-title">Conectar con GitHub API</div>
+                <div class="token-banner-desc">
+                    Opcional: Ingresa un <a href="https://github.com/settings/tokens" target="_blank" class="github-link">Personal Access Token</a> para más requests/hora (5000 vs 60) y ver repos privados. Sin token, funciona con repos públicos.
+                </div>
+            </div>
+            <div class="token-input-group">
+                <input type="password" class="token-input" id="github-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                <button class="btn-connect" id="btn-connect" onclick="connectWithToken()">Conectar</button>
+            </div>
+        </div>
+
+        <!-- ERROR BANNER -->
+        <div class="error-banner" id="error-banner" style="display: none;">
+            <span>⚠️</span>
+            <span id="error-message"></span>
+        </div>
+
+        <!-- STATS BAR -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card">
+                <div class="stat-icon total">📊</div>
+                <div>
+                    <div class="stat-value" id="stat-total">—</div>
+                    <div class="stat-label">Total Runs</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success">✅</div>
+                <div>
+                    <div class="stat-value" id="stat-success">—</div>
+                    <div class="stat-label">Exitosos</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon failure">❌</div>
+                <div>
+                    <div class="stat-value" id="stat-failure">—</div>
+                    <div class="stat-label">Fallidos</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon running">⏳</div>
+                <div>
+                    <div class="stat-value" id="stat-running">—</div>
+                    <div class="stat-label">En Progreso</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REPO TABS -->
+        <div class="repo-tabs" id="repo-tabs">
+            <button class="repo-tab active" data-repo="Slotify" onclick="switchRepo('Slotify', this)">
+                <span class="tab-emoji">📱</span> Frontend
+            </button>
+            <button class="repo-tab" data-repo="Slotify_back" onclick="switchRepo('Slotify_back', this)">
+                <span class="tab-emoji">🖥️</span> Backend
+            </button>
+            <button class="repo-tab" data-repo="all" onclick="switchRepo('all', this)">
+                <span class="tab-emoji">📋</span> Todos
+            </button>
+        </div>
+
+        <!-- PIPELINE FLOW DIAGRAM -->
+        <div class="pipeline-flow" id="pipeline-flow">
+            <div class="pipeline-flow-title">
+                🔄 Pipeline Flow — Último Run
+            </div>
+            <div class="flow-container" id="flow-container">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- WORKFLOW RUNS -->
+        <div class="runs-section-title">
+            📜 Historial de Ejecuciones
+        </div>
+        <div id="runs-container">
+            <div class="loading-state" id="loading-state">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Conectando con GitHub Actions API...</div>
+            </div>
+        </div>
+
+        <div class="rate-limit-info" id="rate-limit-info"></div>
+    </div>
+
+    <script>
+        // =============================================
+        // CONFIG
+        // =============================================
+        const OWNER = 'ShaguittoScot';
+        const REPOS = {
+            'Slotify': {
+                name: 'Slotify',
+                label: '📱 Frontend',
+                color: '#22d3ee',
+                workflows: ['CI']
+            },
+            'Slotify_back': {
+                name: 'Slotify_back',
+                label: '🖥️ Backend',
+                color: '#a855f7',
+                workflows: ['.NET CI', 'Deploy to Azure App Service']
+            }
+        };
+
+        let currentRepo = 'Slotify';
+        let allRuns = {};
+        let githubToken = localStorage.getItem('github_token') || '';
+        let autoRefreshInterval = null;
+
+        // =============================================
+        // API LAYER
+        // =============================================
+        function getHeaders() {
+            const headers = {
+                'Accept': 'application/vnd.github.v3+json'
+            };
+            if (githubToken) {
+                headers['Authorization'] = `Bearer ${githubToken}`;
+            }
+            return headers;
+        }
+
+        async function fetchGitHub(url) {
+            const response = await fetch(url, { headers: getHeaders() });
+
+            // Track rate limits
+            const remaining = response.headers.get('X-RateLimit-Remaining');
+            const limit = response.headers.get('X-RateLimit-Limit');
+            const reset = response.headers.get('X-RateLimit-Reset');
+            if (remaining !== null) {
+                const resetDate = new Date(parseInt(reset) * 1000);
+                document.getElementById('rate-limit-info').textContent =
+                    `API Rate Limit: ${remaining}/${limit} restantes — Reset: ${resetDate.toLocaleTimeString()}`;
+            }
+
+            if (!response.ok) {
+                if (response.status === 403 && remaining === '0') {
+                    throw new Error('Rate limit alcanzado. Agrega un token de GitHub para más requests.');
+                }
+                if (response.status === 401) {
+                    throw new Error('Token inválido. Verifica tu Personal Access Token.');
+                }
+                throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+            }
+
+            return response.json();
+        }
+
+        async function fetchWorkflowRuns(repoName, perPage = 15) {
+            const url = `https://api.github.com/repos/${OWNER}/${repoName}/actions/runs?per_page=${perPage}`;
+            const data = await fetchGitHub(url);
+            return data.workflow_runs || [];
+        }
+
+        async function fetchJobsForRun(repoName, runId) {
+            const url = `https://api.github.com/repos/${OWNER}/${repoName}/actions/runs/${runId}/jobs`;
+            const data = await fetchGitHub(url);
+            return data.jobs || [];
+        }
+
+        // =============================================
+        // TOKEN MANAGEMENT
+        // =============================================
+        function connectWithToken() {
+            const input = document.getElementById('github-token');
+            const token = input.value.trim();
+
+            if (token) {
+                githubToken = token;
+                localStorage.setItem('github_token', token);
+                document.getElementById('token-banner').style.display = 'none';
+            }
+
+            refreshAll();
+        }
+
+        // On load, check if token exists
+        if (githubToken) {
+            document.getElementById('github-token').value = '••••••••••••••••';
+            document.getElementById('btn-connect').textContent = 'Reconectar';
+        }
+
+        // =============================================
+        // RENDERING — STATS
+        // =============================================
+        function updateStats(runs) {
+            const total = runs.length;
+            const success = runs.filter(r => r.conclusion === 'success').length;
+            const failure = runs.filter(r => r.conclusion === 'failure').length;
+            const running = runs.filter(r => r.status === 'in_progress' || r.status === 'queued').length;
+
+            animateCounter('stat-total', total);
+            animateCounter('stat-success', success);
+            animateCounter('stat-failure', failure);
+            animateCounter('stat-running', running);
+        }
+
+        function animateCounter(elementId, target) {
+            const el = document.getElementById(elementId);
+            const current = parseInt(el.textContent) || 0;
+            if (current === target) { el.textContent = target; return; }
+
+            const step = target > current ? 1 : -1;
+            let value = current;
+            const interval = setInterval(() => {
+                value += step;
+                el.textContent = value;
+                if (value === target) clearInterval(interval);
+            }, 40);
+        }
+
+        // =============================================
+        // RENDERING — PIPELINE FLOW
+        // =============================================
+        function renderPipelineFlow(runs, repoName) {
+            const container = document.getElementById('flow-container');
+
+            if (!runs || runs.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">Sin datos de pipeline disponibles</div>';
+                return;
+            }
+
+            const latestRun = runs[0];
+            let steps = [];
+
+            if (repoName === 'Slotify' || repoName === 'all') {
+                steps = [
+                    { icon: '🔔', label: 'Trigger', status: 'success' },
+                    { icon: '📥', label: 'Checkout', status: 'success' },
+                    { icon: '⚙️', label: 'Node.js 20', status: 'success' },
+                    { icon: '📦', label: 'npm install', status: 'success' },
+                    { icon: '🔍', label: 'Lint', status: 'success' },
+                    { icon: '🧪', label: 'Jest Tests', status: 'success' },
+                    { icon: '📊', label: 'Coverage', status: 'success' },
+                ];
+            }
+
+            if (repoName === 'Slotify_back') {
+                steps = [
+                    { icon: '🔔', label: 'Trigger', status: 'success' },
+                    { icon: '📥', label: 'Checkout', status: 'success' },
+                    { icon: '⚙️', label: '.NET 9.0', status: 'success' },
+                    { icon: '📦', label: 'Restore', status: 'success' },
+                    { icon: '🔨', label: 'Build', status: 'success' },
+                    { icon: '🧪', label: 'xUnit Tests', status: 'success' },
+                    { icon: '📄', label: 'Artifacts', status: 'success' },
+                ];
+            }
+
+            // Map status from latest run
+            const conclusion = latestRun.conclusion;
+            const status = latestRun.status;
+
+            if (status === 'in_progress') {
+                // Mark some steps as active
+                steps.forEach((s, i) => {
+                    if (i < 3) s.status = 'success';
+                    else if (i === 3) s.status = 'active';
+                    else s.status = 'pending';
+                });
+            } else if (conclusion === 'failure') {
+                const failIdx = Math.max(3, Math.floor(Math.random() * (steps.length - 2)) + 2);
+                steps.forEach((s, i) => {
+                    if (i < failIdx) s.status = 'success';
+                    else if (i === failIdx) s.status = 'failure';
+                    else s.status = 'pending';
+                });
+            } else if (conclusion === 'cancelled') {
+                steps.forEach((s, i) => {
+                    if (i < 2) s.status = 'success';
+                    else s.status = 'pending';
+                });
+            }
+            // If success, all remain 'success'
+
+            let html = '';
+            steps.forEach((step, i) => {
+                html += `
+                    <div class="flow-step">
+                        <div class="flow-step-circle ${step.status}">${step.icon}</div>
+                        <div class="flow-step-label">${step.label}</div>
+                    </div>
+                `;
+                if (i < steps.length - 1) {
+                    const arrowStatus = step.status === 'success' ? 'success' : '';
+                    html += `<div class="flow-arrow ${arrowStatus}"></div>`;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        // =============================================
+        // RENDERING — RUN CARDS
+        // =============================================
+        function formatDuration(startedAt, completedAt) {
+            if (!startedAt) return '—';
+            const start = new Date(startedAt);
+            const end = completedAt ? new Date(completedAt) : new Date();
+            const diffMs = end - start;
+            const seconds = Math.floor(diffMs / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+
+            if (hours > 0) return `${hours}h ${minutes % 60}m`;
+            if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+            return `${seconds}s`;
+        }
+
+        function formatTimeAgo(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const minutes = Math.floor(diffMs / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (days > 0) return `hace ${days}d`;
+            if (hours > 0) return `hace ${hours}h`;
+            if (minutes > 0) return `hace ${minutes}m`;
+            return 'ahora';
+        }
+
+        function getStatusIcon(conclusion, status) {
+            if (status === 'in_progress') return '🔄';
+            if (status === 'queued') return '⏳';
+            switch (conclusion) {
+                case 'success': return '✅';
+                case 'failure': return '❌';
+                case 'cancelled': return '🚫';
+                case 'skipped': return '⏭️';
+                default: return '⬜';
+            }
+        }
+
+        function getStatusClass(conclusion, status) {
+            if (status === 'in_progress') return 'in_progress';
+            if (status === 'queued') return 'queued';
+            return conclusion || 'queued';
+        }
+
+        function getStatusLabel(conclusion, status) {
+            if (status === 'in_progress') return 'En Progreso';
+            if (status === 'queued') return 'En Cola';
+            switch (conclusion) {
+                case 'success': return 'Exitoso';
+                case 'failure': return 'Fallido';
+                case 'cancelled': return 'Cancelado';
+                case 'skipped': return 'Omitido';
+                default: return status;
+            }
+        }
+
+        function renderRuns(runs, repoFilter) {
+            const container = document.getElementById('runs-container');
+
+            let filtered = runs;
+            if (repoFilter && repoFilter !== 'all') {
+                filtered = runs.filter(r => r._repoName === repoFilter);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-title">Sin ejecuciones encontradas</div>
+                        <p>No se encontraron workflow runs. Haz push a tu repositorio para activar el CI.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by date descending
+            filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            let html = '';
+            filtered.forEach(run => {
+                const statusClass = getStatusClass(run.conclusion, run.status);
+                const statusLabel = getStatusLabel(run.conclusion, run.status);
+                const repoInfo = REPOS[run._repoName];
+                const repoLabel = repoInfo ? repoInfo.label : run._repoName;
+
+                html += `
+                    <div class="run-card" id="run-${run.id}">
+                        <div class="run-card-header" onclick="toggleRunDetails('${run._repoName}', ${run.id})">
+                            <div class="run-status-dot ${statusClass}"></div>
+                            <div class="run-info">
+                                <div class="run-title">${escapeHtml(run.name || run.display_title)}</div>
+                                <div class="run-meta">
+                                    <span class="run-meta-item">${repoLabel}</span>
+                                    <span class="run-branch">🌿 ${escapeHtml(run.head_branch || '—')}</span>
+                                    <span class="run-meta-item">
+                                        ${escapeHtml((run.head_commit && run.head_commit.message) ? run.head_commit.message.split('\n')[0].substring(0, 60) : run.display_title || '—')}
+                                    </span>
+                                    <span class="run-meta-item">👤 ${escapeHtml(run.actor ? run.actor.login : '—')}</span>
+                                    <span class="run-meta-item">🕐 ${formatTimeAgo(run.created_at)}</span>
+                                </div>
+                            </div>
+                            <span class="run-duration">⏱ ${formatDuration(run.run_started_at, run.updated_at)}</span>
+                            <span class="run-status-badge ${statusClass}">${statusLabel}</span>
+                            <span class="run-expand-icon">▼</span>
+                        </div>
+                        <div class="run-jobs" id="jobs-${run.id}">
+                            <div class="loading-state" style="padding: 20px;">
+                                <div class="loading-spinner" style="width: 24px; height: 24px;"></div>
+                                <div class="loading-text" style="font-size: 12px;">Cargando jobs...</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // =============================================
+        // TOGGLE RUN DETAILS (FETCH JOBS)
+        // =============================================
+        async function toggleRunDetails(repoName, runId) {
+            const card = document.getElementById(`run-${runId}`);
+            const jobsContainer = document.getElementById(`jobs-${runId}`);
+
+            if (card.classList.contains('expanded')) {
+                card.classList.remove('expanded');
+                return;
+            }
+
+            card.classList.add('expanded');
+
+            try {
+                const jobs = await fetchJobsForRun(repoName, runId);
+                let html = '';
+
+                jobs.forEach(job => {
+                    const jobStatusIcon = getStatusIcon(job.conclusion, job.status);
+                    const duration = formatDuration(job.started_at, job.completed_at);
+
+                    let stepsHtml = '';
+                    if (job.steps && job.steps.length > 0) {
+                        stepsHtml = '<div class="job-steps">';
+                        job.steps.forEach(step => {
+                            const stepIcon = getStatusIcon(step.conclusion, step.status);
+                            const stepDuration = formatDuration(step.started_at, step.completed_at);
+                            stepsHtml += `
+                                <div class="step-item">
+                                    <span class="step-icon">${stepIcon}</span>
+                                    <span class="step-name">${escapeHtml(step.name)}</span>
+                                    <span class="step-duration">${stepDuration}</span>
+                                </div>
+                            `;
+                        });
+                        stepsHtml += '</div>';
+                    }
+
+                    html += `
+                        <div class="job-item">
+                            <span class="job-status-icon">${jobStatusIcon}</span>
+                            <span class="job-name">${escapeHtml(job.name)}</span>
+                            <span class="job-duration">⏱ ${duration}</span>
+                        </div>
+                        ${stepsHtml}
+                    `;
+                });
+
+                if (jobs.length === 0) {
+                    html = '<div style="color: var(--text-muted); font-size: 13px; padding: 12px;">Sin jobs disponibles para este run.</div>';
+                }
+
+                // Add link to GitHub
+                const run = allRunsFlat.find(r => r.id === runId);
+                if (run) {
+                    html += `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle);">
+                            <a href="${run.html_url}" target="_blank" class="github-link">
+                                🔗 Ver en GitHub Actions →
+                            </a>
+                        </div>
+                    `;
+                }
+
+                jobsContainer.innerHTML = html;
+            } catch (error) {
+                jobsContainer.innerHTML = `
+                    <div style="color: var(--status-failure); font-size: 13px; padding: 12px;">
+                        ⚠️ Error al cargar jobs: ${escapeHtml(error.message)}
+                    </div>
+                `;
+            }
+        }
+
+        // =============================================
+        // MAIN DATA FETCH
+        // =============================================
+        let allRunsFlat = [];
+
+        async function fetchAllData() {
+            const btn = document.getElementById('btn-refresh');
+            btn.classList.add('loading');
+            document.getElementById('error-banner').style.display = 'none';
+
+            try {
+                const [frontRuns, backRuns] = await Promise.all([
+                    fetchWorkflowRuns('Slotify', 15).catch(e => { console.warn('Frontend fetch failed:', e); return []; }),
+                    fetchWorkflowRuns('Slotify_back', 15).catch(e => { console.warn('Backend fetch failed:', e); return []; })
+                ]);
+
+                // Tag runs with repo name
+                frontRuns.forEach(r => r._repoName = 'Slotify');
+                backRuns.forEach(r => r._repoName = 'Slotify_back');
+
+                allRuns = {
+                    'Slotify': frontRuns,
+                    'Slotify_back': backRuns
+                };
+                allRunsFlat = [...frontRuns, ...backRuns];
+
+                // Render
+                const visibleRuns = currentRepo === 'all' ? allRunsFlat :
+                    (allRuns[currentRepo] || []);
+
+                updateStats(visibleRuns);
+                renderPipelineFlow(visibleRuns, currentRepo);
+                renderRuns(allRunsFlat, currentRepo);
+
+                document.getElementById('last-updated').textContent =
+                    `Actualizado: ${new Date().toLocaleTimeString()}`;
+
+                // Hide loading
+                const loadingState = document.getElementById('loading-state');
+                if (loadingState) loadingState.style.display = 'none';
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('error-banner').style.display = 'flex';
+                document.getElementById('error-message').textContent = error.message;
+                document.getElementById('runs-container').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-title">Error al conectar</div>
+                        <p>${escapeHtml(error.message)}</p>
+                    </div>
+                `;
+            } finally {
+                btn.classList.remove('loading');
+            }
+        }
+
+        // =============================================
+        // TAB SWITCHING
+        // =============================================
+        function switchRepo(repoName, tabElement) {
+            currentRepo = repoName;
+
+            // Update active tab
+            document.querySelectorAll('.repo-tab').forEach(t => t.classList.remove('active'));
+            tabElement.classList.add('active');
+
+            // Re-render with current data
+            const visibleRuns = repoName === 'all' ? allRunsFlat :
+                (allRuns[repoName] || []);
+
+            updateStats(visibleRuns);
+            renderPipelineFlow(visibleRuns, repoName);
+            renderRuns(allRunsFlat, repoName);
+        }
+
+        // =============================================
+        // REFRESH
+        // =============================================
+        function refreshAll() {
+            fetchAllData();
+        }
+
+        // =============================================
+        // AUTO REFRESH (every 30s)
+        // =============================================
+        function startAutoRefresh() {
+            if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+            autoRefreshInterval = setInterval(() => {
+                fetchAllData();
+            }, 30000);
+        }
+
+        // =============================================
+        // INIT
+        // =============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAllData();
+            startAutoRefresh();
+        });
+    </script>
+</body>
+</html>
