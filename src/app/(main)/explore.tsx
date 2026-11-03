@@ -311,7 +311,7 @@ export default function ExploreScreen() {
       let backendId = `apt-${Date.now()}`;
       try {
         const payload = {
-          businessId: selectedBusiness.id.startsWith('biz-') ? '00000000-0000-0000-0000-000000000000' : selectedBusiness.id,
+
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           clientName,

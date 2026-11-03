@@ -1,7 +1,9 @@
 import { supabase } from '@/shared/lib/supabase';
 import { apiClient } from '@/shared/lib/api';
-import { API_ENDPOINTS } from '@/shared/lib/constants';
+import { API_ENDPOINTS, STORAGE_KEYS } from '@/shared/lib/constants';
+import { storage } from '@/shared/lib/storage';
 import type {
+  ExchangeTokenResponse,
   LoginCredentials,
   RegisterAdminRequest,
   RegisterClientRequest,
@@ -21,6 +23,27 @@ export const authApi = {
 
     if (error) throw new Error(error.message);
     return data;
+  },
+
+  /**
+   * Intercambia la identidad autenticada de Supabase por el JWT propio de Slotify (.NET JwtService)
+   * que contiene el claim `businessId` requerido por los endpoints protegidos (US-022).
+   */
+  exchangeBackendToken: async (userId: string, email: string) => {
+    const response = await apiClient.post<ExchangeTokenResponse>(
+      API_ENDPOINTS.AUTH.LOGIN,
+      { userId, email },
+    );
+
+    const tokenData = response.data?.data;
+    if (tokenData?.accessToken) {
+      await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, tokenData.accessToken);
+      if (tokenData.refreshToken) {
+        await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, tokenData.refreshToken);
+      }
+    }
+
+    return tokenData ?? null;
   },
 
   /**
@@ -97,7 +120,7 @@ export const authApi = {
   },
 
   /**
-   * Sync profile with .NET backend to create Business + User row.
+   * Sync profile with .NET backend to create Business + User row and store the issued JwtService token.
    * Called at the end of onboarding.
    */
   syncProfile: async (syncPayload: SyncProfileRequest) => {
@@ -107,15 +130,26 @@ export const authApi = {
       {
         ...syncPayload,
         fullName: calculatedFullName,
-      }
+      },
     );
+
+    const syncedData = response.data?.data;
+    if (syncedData?.accessToken) {
+      await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, syncedData.accessToken);
+      if (syncedData.refreshToken) {
+        await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, syncedData.refreshToken);
+      }
+    }
+
     return response.data;
   },
 
   /**
-   * Sign out from Supabase Auth.
+   * Sign out from Supabase Auth and clear Slotify JWT tokens.
    */
   logout: async () => {
+    await storage.secureRemove(STORAGE_KEYS.ACCESS_TOKEN);
+    await storage.secureRemove(STORAGE_KEYS.REFRESH_TOKEN);
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
   },
