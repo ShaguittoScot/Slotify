@@ -19,6 +19,7 @@ import Animated, {
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { apiClient } from '@/shared/lib/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FormViewer } from '../components/FormViewer';
 import { FormBrandIdentityCard } from '../components/FormBrandIdentityCard';
