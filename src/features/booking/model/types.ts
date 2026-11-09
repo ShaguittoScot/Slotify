@@ -4,6 +4,10 @@ export interface BookingFormConfig {
   requiresGuestCount: boolean;
   requiresTable: boolean;
   requiresPatientDetails: boolean;
+  logoUrl?: string | null;
+  accentColor?: string;
+  secondaryColor?: string;
+  businessName?: string;
 }
 
 export interface BookingFormData {
