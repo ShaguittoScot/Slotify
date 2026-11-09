@@ -1,25 +1,27 @@
-import { useEffect } from 'react';
-import { Slot, useRouter, useSegments, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { View, ActivityIndicator, StatusBar } from 'react-native';
-import { useFonts } from 'expo-font';
-import {
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-} from '@expo-google-fonts/poppins';
+import '@/global.css';
+
 import {
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import {
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts } from 'expo-font';
+import { DarkTheme, DefaultTheme, Slot, ThemeProvider, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
+import { ActivityIndicator, StatusBar, View } from 'react-native';
 
-import { useAuthStore } from '@/features/auth/model';
-import { useAppTheme } from '@/shared/theme';
-import { STORAGE_KEYS } from '@/shared/lib/constants';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { useAuthStore } from '@/features/auth/model';
+import { STORAGE_KEYS } from '@/shared/lib/constants';
+import { useAppTheme } from '@/shared/theme';
 
 SplashScreen.preventAutoHideAsync();
 

@@ -174,6 +174,10 @@ export function DashboardScreen() {
     return 'Aún no tienes citas registradas. Comparte tu link para que tus clientes comiencen a agendar.';
   }, [appointments, isDemo]);
 
+
+
+
+
   const getInitials = (name?: string) => {
     if (!name) return 'US';
     const parts = name.trim().split(' ');

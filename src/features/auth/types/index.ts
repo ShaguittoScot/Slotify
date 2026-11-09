@@ -50,4 +50,6 @@ export interface SyncProfileResponse {
   data?: AuthUser;
   message?: string;
   sectorTemplateId?: number;
+  errors?: string[];
+
 }

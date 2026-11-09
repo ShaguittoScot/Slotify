@@ -1,133 +1,136 @@
+
 /**
  * Slotify Storage Helpers
- * Typed wrappers around AsyncStorage
+ * AsyncStorage for general data, SecureStore for sensitive data
+ * and memory as a last-resort fallback.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Memoria en caché de respaldo para entornos donde AsyncStorage nativo no esté enlazado
 const memoryStore = new Map<string, string>();
 
-// Sanitizador de claves para SecureStore (solo permite caracteres alfanuméricos, '.', '-', '_')
-const sanitizeKey = (key: string) => key.replace(/[^a-zA-Z0-9._-]/g, '_');
+const sanitizeKey = (key: string) =>
+  key.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+const parseValue = <T>(raw: string): T => {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return raw as unknown as T;
+  }
+};
 
 export const storage = {
-  // ── Standard Storage con Fallback Seguro ─────────────────────────────
   get: async <T = string>(key: string): Promise<T | null> => {
     try {
-      let raw: string | null = null;
-      try {
-        raw = await AsyncStorage.getItem(key);
-      } catch {
-        // Si el módulo nativo de AsyncStorage es nulo en Expo Go, recurrimos a SecureStore
-        try {
-          raw = await storage.secureGet(sanitizeKey(key));
-        } catch {
-          raw = null;
-        }
-      }
+      const raw = await AsyncStorage.getItem(key);
 
-      if (raw === null) {
-        raw = memoryStore.get(key) ?? null;
-      }
-
-      if (raw === null) return null;
-      try {
-        return JSON.parse(raw) as T;
-      } catch {
-        return raw as unknown as T;
+      if (raw !== null) {
+        return parseValue<T>(raw);
       }
     } catch {
-      return (memoryStore.get(key) as unknown as T) ?? null;
+      // AsyncStorage unavailable: try SecureStore.
     }
+
+    try {
+      const secureValue = await storage.secureGet(sanitizeKey(key));
+
+      if (secureValue !== null) {
+        return parseValue<T>(secureValue);
+      }
+    } catch {
+      // SecureStore unavailable: try memory.
+    }
+
+    const memoryValue = memoryStore.get(key);
+
+    return memoryValue !== undefined
+      ? parseValue<T>(memoryValue)
+      : null;
   },
 
   set: async <T>(key: string, value: T): Promise<void> => {
-    const stringified = typeof value === 'string' ? value : JSON.stringify(value);
-    memoryStore.set(key, stringified);
+    const stringified =
+      typeof value === 'string' ? value : JSON.stringify(value);
+
+    if (stringified === undefined) {
+      throw new Error(`[Storage] Value for "${key}" cannot be serialized.`);
+    }
 
     try {
       await AsyncStorage.setItem(key, stringified);
+      memoryStore.set(key, stringified);
+      return;
     } catch {
-      // Si el módulo nativo de AsyncStorage es nulo, guardamos en SecureStore
-      try {
-        await storage.secureSet(sanitizeKey(key), stringified);
-      } catch {
-        // Mantenido en memoria de respaldo
-      }
+      // Try persistent secure storage.
+    }
+
+    try {
+      await storage.secureSet(sanitizeKey(key), stringified);
+      memoryStore.set(key, stringified);
+      return;
+    } catch {
+      // Last resort: current-process memory only.
+      memoryStore.set(key, stringified);
     }
   },
 
   remove: async (key: string): Promise<void> => {
     memoryStore.delete(key);
-    try {
-      await AsyncStorage.removeItem(key);
-    } catch {
-      try {
-        await storage.secureRemove(sanitizeKey(key));
-      } catch {
-        // Mantenido en memoria
-      }
+
+    const results = await Promise.allSettled([
+      AsyncStorage.removeItem(key),
+      storage.secureRemove(sanitizeKey(key)),
+    ]);
+
+    if (results.every((result) => result.status === 'rejected')) {
+      throw new Error(`[Storage] Could not remove "${key}" from persistent storage.`);
     }
   },
 
   clear: async (): Promise<void> => {
     memoryStore.clear();
-    try {
-      await AsyncStorage.clear();
-    } catch {
-      // Memoria limpiada
-    }
+    await AsyncStorage.clear();
   },
 
-  // ── Secure Storage (Expo SecureStore) ────────────────────────────────
   secureGet: async (key: string): Promise<string | null> => {
-    try {
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined') {
-          return window.localStorage.getItem(key);
-        }
-        return null;
-      }
-      return await SecureStore.getItemAsync(key, { 
-        keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK 
-      });
-    } catch (error) {
-      console.warn(`[Storage] Secure storage locked/unavailable for [${key}]`);
-      return null;
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') return null;
+      return window.localStorage.getItem(key);
     }
+
+    return SecureStore.getItemAsync(key, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+    });
   },
 
   secureSet: async (key: string, value: string): Promise<void> => {
-    try {
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(key, value);
-        }
-        return;
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') {
+        throw new Error('[Storage] Browser storage is unavailable.');
       }
-      await SecureStore.setItemAsync(key, value, { 
-        keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK 
-      });
-    } catch (error) {
-      console.warn(`[Storage] Error saving to secure storage [${key}]`);
+
+      window.localStorage.setItem(key, value);
+      return;
     }
+
+    await SecureStore.setItemAsync(key, value, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+    });
   },
 
   secureRemove: async (key: string): Promise<void> => {
-    try {
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(key);
-        }
-        return;
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') {
+        throw new Error('[Storage] Browser storage is unavailable.');
       }
-      await SecureStore.deleteItemAsync(key);
-    } catch (error) {
-      console.error(`Error removing from secure storage [${key}]:`, error);
-    }
-  }
-};
 
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    await SecureStore.deleteItemAsync(key);
+  },
+};
