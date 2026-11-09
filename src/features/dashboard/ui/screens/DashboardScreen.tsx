@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useCalendarStore } from '@/features/calendar/model';
@@ -29,7 +29,7 @@ const DEMO_UPCOMING_APPOINTMENTS = [
 export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
-  const { user } = useAuthStore();
+  const { user, toggleAppMode } = useAuthStore();
   const { slots, loadSlots } = useCalendarStore();
   const [migrationModalVisible, setMigrationModalVisible] = useState(false);
 
@@ -174,10 +174,6 @@ export function DashboardScreen() {
     return 'Aún no tienes citas registradas. Comparte tu link para que tus clientes comiencen a agendar.';
   }, [appointments, isDemo]);
 
-
-
-
-
   const getInitials = (name?: string) => {
     if (!name) return 'US';
     const parts = name.trim().split(' ');
@@ -214,7 +210,7 @@ export function DashboardScreen() {
               </View>
               <View>
                 <Text style={[s.greetingSmall, { color: colors.text.secondary }]}>
-                  Panel de Negocio
+                  Panel de Negocio (Admin)
                 </Text>
                 <Text style={[s.greetingName, { color: colors.text.primary }]}>
                   {user?.fullName || 'Mi Negocio'}
@@ -222,19 +218,43 @@ export function DashboardScreen() {
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[
-                s.bellBtn,
-                {
-                  backgroundColor: colors.background.secondary,
-                  borderColor: colors.border.main,
-                },
-              ]}
-              onPress={() => router.push('/(main)/settings' as any)}
-              activeOpacity={0.7}
-            >
-              <Feather name="settings" size={18} color={colors.text.primary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Botón de Salto Rápido de Interfaz (Pruebas) */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  borderRadius: 16,
+                  backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.10)',
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(99, 102, 241, 0.35)' : 'rgba(99, 102, 241, 0.22)',
+                }}
+                onPress={toggleAppMode}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="swap-horizontal" size={16} color="#818CF8" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#818CF8' }}>
+                  Ver Cliente
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  s.bellBtn,
+                  {
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
+                  },
+                ]}
+                onPress={() => router.push('/(main)/settings' as any)}
+                activeOpacity={0.7}
+              >
+                <Feather name="settings" size={18} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* ─── HERO CARD ─── */}
