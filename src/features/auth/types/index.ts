@@ -30,6 +30,22 @@ export interface AuthResponse {
   session: any;
 }
 
+export interface BackendAuthUserDto extends AuthUser {
+  accessToken?: string;
+  refreshToken?: string;
+}
+
+export interface ExchangeTokenResponse {
+  success: boolean;
+  data?: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
+    user: AuthUser;
+  };
+  message?: string;
+}
+
 /**
  * Payload sent to the .NET backend after Supabase signup
  * to sync the user profile and create a business.
@@ -47,7 +63,7 @@ export interface SyncProfileRequest {
 
 export interface SyncProfileResponse {
   success: boolean;
-  data?: AuthUser;
+  data?: BackendAuthUserDto;
   message?: string;
   sectorTemplateId?: number;
 }

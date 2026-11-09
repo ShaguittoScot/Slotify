@@ -16,9 +16,10 @@ import Animated, {
   Layout,
   FadeOutUp,
 } from 'react-native-reanimated';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { apiClient } from '@/shared/lib/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -117,21 +118,15 @@ export function FormBuilderScreen() {
         return;
       }
 
-      // Conexión real al backend
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/businesses/${businessId}/booking-config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formConfig: schema })
+      // Conexión real autenticada vía apiClient (adjunta Bearer token y gestiona 401/403 - US-022)
+      await apiClient.put(`/businesses/${businessId}/booking-config`, {
+        formConfig: schema,
       });
 
-      if (res.ok) {
-        Alert.alert('¡Éxito!', 'El esquema se ha guardado permanentemente en la base de datos.');
-      } else {
-        const data = await res.json();
-        Alert.alert('Error', data.error || 'No se pudo guardar la configuración.');
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Problema de conexión con el servidor.');
+      Alert.alert('¡Éxito!', 'El esquema se ha guardado permanentemente en la base de datos.');
+    } catch (e: any) {
+      const apiError = e?.response?.data?.error;
+      Alert.alert('Error', apiError || 'No se pudo guardar la configuración.');
     } finally {
       setIsSaving(false);
     }
@@ -225,7 +220,7 @@ export function FormBuilderScreen() {
         <Animated.View entering={FadeInDown.duration(400).delay(300)}>
           <Text style={[styles.sectionLabel, { color: colors.text.primary, marginTop: 10 }]}>Preguntas del Formulario</Text>
           
-          {schema.fields.map((field, index) => (
+          {schema.fields.map((field) => (
             <Animated.View
               key={field.id}
               layout={Layout.springify()}

@@ -550,7 +550,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Términos y Privacidad',
-                  'Slotify cumple con estándares de cifrado de grado bancario para la protección de tus datos comerciales y clientes.'
+                  'Tus datos y credenciales se resguardan mediante almacenamiento local seguro (KeyStore/Keychain) y conexiones cifradas de extremo a extremo.'
                 )
               }
               activeOpacity={0.7}
