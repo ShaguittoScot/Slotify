@@ -1,14 +1,24 @@
 /**
- * US-003: Calendar — API Layer
+ * US-003 / US-022: Calendar — API Layer
  *
- * Funciones para comunicarse con el endpoint /api/calendar de Slotify_back.
- * Soporta consulta en tiempo real y fallback de slots simulados para desarrollo.
+ * Funciones para comunicarse con el endpoint protegido /api/calendar de Slotify_back.
+ * El BusinessId nunca se envía por query ni body; el backend lo resuelve del token JWT (ICurrentUserService).
  */
 
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
 import type { ApiResponse, CalendarResponse, CalendarSlot } from '@/shared/types';
 import { useAuthStore } from '@/features/auth/model';
+
+export interface CreateCalendarAppointmentPayload {
+  employeeId?: string;
+  startTime: string;
+  endTime: string;
+  clientName: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  agreedTotal?: number;
+}
 
 /** Generador de datos simulados realistas para visualización offline / preview */
 export function generateMockCalendarSlots(startDate: Date, endDate: Date): CalendarSlot[] {
@@ -90,25 +100,38 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
 
 /**
  * Obtiene los slots del calendario para un rango de fechas desde Slotify_back.
- * Endpoint: GET /api/calendar/slots?startDate=...&endDate=...
+ * Endpoint protegido: GET /api/calendar/slots?startDate=...&endDate=...
+ * El businessId se resuelve automáticamente en el backend a partir del JWT (US-022).
  */
 export async function fetchCalendarSlots(
   startDate: string,
   endDate: string,
-  employeeId?: string
+  employeeId?: string,
 ): Promise<CalendarResponse> {
   const currentUser = useAuthStore.getState().user;
   const isDemo =
     currentUser?.email === 'demo@slotify.com' ||
     currentUser?.email === 'admin@slotify.com';
 
+  if (isDemo) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return {
+      rangeStart: startDate,
+      rangeEnd: endDate,
+      slots: generateMockCalendarSlots(start, end),
+    };
+  }
+
   try {
     const params: Record<string, string> = { startDate, endDate };
-    if (employeeId) params.employeeId = employeeId;
+    if (employeeId) {
+      params.employeeId = employeeId;
+    }
 
     const response = await apiClient.get<CalendarResponse | ApiResponse<CalendarResponse>>(
       API_ENDPOINTS.CALENDAR.GET_SLOTS,
-      { params, timeout: 10000 }
+      { params, timeout: 10000 },
     );
 
     // Si la respuesta viene envuelta en ApiResponse<T>
@@ -134,25 +157,24 @@ export async function fetchCalendarSlots(
       rangeEnd: endDate,
       slots: [],
     };
-  } catch (error) {
-    // Solo si el usuario es de la cuenta demo@slotify.com devolvemos mock fallback
-    if (isDemo) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const mockSlots = generateMockCalendarSlots(start, end);
-
-      return {
-        rangeStart: startDate,
-        rangeEnd: endDate,
-        slots: mockSlots,
-      };
-    }
-
-    // Para cualquier otra cuenta real sin backend o sin citas todavía, retornamos lista vacía
+  } catch {
     return {
       rangeStart: startDate,
       rangeEnd: endDate,
       slots: [],
     };
   }
+}
+
+/**
+ * Agenda una nueva cita en el negocio autenticado sin enviar businessId en el body (US-022).
+ */
+export async function createCalendarAppointment(
+  payload: CreateCalendarAppointmentPayload,
+): Promise<string> {
+  const response = await apiClient.post<{ id?: string; data?: string }>(
+    '/calendar/appointments',
+    payload,
+  );
+  return response.data?.id ?? response.data?.data ?? '';
 }

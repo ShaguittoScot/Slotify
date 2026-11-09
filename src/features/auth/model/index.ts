@@ -51,6 +51,26 @@ const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
   };
 };
 
+const syncBackendJwtIfBusinessUser = async (authUser: AuthUser): Promise<AuthUser> => {
+  if (authUser.role === 'CLIENTE' || !authUser.id || !authUser.email) {
+    return authUser;
+  }
+
+  try {
+    const tokenData = await authApi.exchangeBackendToken(authUser.id, authUser.email);
+    if (tokenData?.user?.businessId) {
+      return {
+        ...authUser,
+        businessId: tokenData.user.businessId,
+      };
+    }
+  } catch (err: any) {
+    console.warn('No se pudo obtener el JWT del backend (continuando sesión local):', err?.message);
+  }
+
+  return authUser;
+};
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -101,7 +121,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const data = await authApi.login(credentials);
 
       if (data.user) {
-        const authUser = buildAuthUser(data.user);
+        const baseUser = buildAuthUser(data.user);
+        const authUser = await syncBackendJwtIfBusinessUser(baseUser);
         set({
           user: authUser,
           isAuthenticated: true,
@@ -186,15 +207,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         sectorTemplateId: data.sectorTemplateId,
       };
 
+      let syncedBusinessId = user.businessId;
       try {
-        await authApi.syncProfile(payload);
+        const syncResponse = await authApi.syncProfile(payload);
+        if (syncResponse?.data?.businessId) {
+          syncedBusinessId = syncResponse.data.businessId;
+        }
       } catch (syncErr: any) {
         console.warn('Backend sync warning (continuing locally):', syncErr.message);
       }
 
-      // Update business state so it marks them as complete
       set({
-        user: { ...user, businessId: user.businessId || 'synced-backend' },
+        user: { ...user, businessId: syncedBusinessId || 'synced-backend' },
         isJustRegistered: false,
         isLoading: false,
       });
@@ -219,7 +243,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const session = await authApi.getSession();
 
       if (session?.user) {
-        const authUser = buildAuthUser(session.user);
+        const baseUser = buildAuthUser(session.user);
+        const authUser = await syncBackendJwtIfBusinessUser(baseUser);
         set({
           user: authUser,
           isAuthenticated: true,
@@ -238,11 +263,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 // Listen for Supabase auth state changes
-supabase.auth.onAuthStateChange((event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') {
     useAuthStore.setState({ user: null, isAuthenticated: false });
   } else if (event === 'SIGNED_IN' && session?.user) {
-    const authUser = buildAuthUser(session.user);
+    const baseUser = buildAuthUser(session.user);
+    const authUser = await syncBackendJwtIfBusinessUser(baseUser);
     useAuthStore.setState({
       user: authUser,
       isAuthenticated: true,
