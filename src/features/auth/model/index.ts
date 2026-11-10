@@ -1,6 +1,6 @@
+import { create } from 'zustand';
 import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
-import { create } from 'zustand';
 import { authApi } from '../api';
 import type { LoginCredentials, RegisterAdminRequest, RegisterClientRequest, SyncProfileRequest } from '../types';
 
@@ -49,6 +49,26 @@ const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
     role,
     businessId,
   };
+};
+
+const syncBackendJwtIfBusinessUser = async (authUser: AuthUser): Promise<AuthUser> => {
+  if (authUser.role === 'CLIENTE' || !authUser.id || !authUser.email) {
+    return authUser;
+  }
+
+  try {
+    const tokenData = await authApi.exchangeBackendToken(authUser.id, authUser.email);
+    if (tokenData?.user?.businessId) {
+      return {
+        ...authUser,
+        businessId: tokenData.user.businessId,
+      };
+    }
+  } catch (err: any) {
+    console.warn('No se pudo obtener el JWT del backend (continuando sesión local):', err?.message);
+  }
+
+  return authUser;
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -101,7 +121,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const data = await authApi.login(credentials);
 
       if (data.user) {
-        const authUser = buildAuthUser(data.user);
+        const baseUser = buildAuthUser(data.user);
+        const authUser = await syncBackendJwtIfBusinessUser(baseUser);
         set({
           user: authUser,
           isAuthenticated: true,
@@ -169,78 +190,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-
   completeOnboarding: async (data) => {
     set({ isLoading: true, error: null });
-
     try {
       const { user } = get();
-
-      if (!user) {
-        throw new Error('No hay usuario autenticado');
-      }
+      if (!user) throw new Error('No hay usuario autenticado');
 
       const payload: SyncProfileRequest = {
         id: user.id,
         email: user.email,
-        firstName:
-          data.firstName ||
-          user.firstName ||
-          user.fullName.split(' ')[0] ||
-          'Usuario',
-        lastName:
-          data.lastName ||
-          user.lastName ||
-          user.fullName.split(' ').slice(1).join(' '),
+        firstName: data.firstName || user.firstName || user.fullName.split(' ')[0] || 'Usuario',
+        lastName: data.lastName || user.lastName || user.fullName.split(' ').slice(1).join(' '),
         fullName: data.fullName || user.fullName,
         businessName: data.businessName,
         businessPhone: data.businessPhone,
         sectorTemplateId: data.sectorTemplateId,
       };
 
-      // Sincronizar usuario y negocio con el backend.
-      const response = await authApi.syncProfile(payload);
-
-      // Comprobar que el backend confirmó la operación.
-      if (!response.success || !response.data?.businessId) {
-        throw new Error(
-          response.message ||
-          response.errors?.join(', ') ||
-          'No se pudo crear el negocio en el backend.'
-        );
+      let syncedBusinessId = user.businessId;
+      try {
+        const syncResponse = await authApi.syncProfile(payload);
+        if (syncResponse?.data?.businessId) {
+          syncedBusinessId = syncResponse.data.businessId;
+        }
+      } catch (syncErr: any) {
+        console.warn('Backend sync warning (continuing locally):', syncErr.message);
       }
 
-      // Recuperar el usuario y el BusinessId reales.
-      const syncedUser = response.data;
-
       set({
-        user: {
-          ...user,
-          ...syncedUser,
-          businessId: syncedUser.businessId,
-        },
-        isAuthenticated: true,
+        user: { ...user, businessId: syncedBusinessId || 'synced-backend' },
         isJustRegistered: false,
         isLoading: false,
-        error: null,
       });
-
     } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.errors?.join(', ') ||
-        error.message ||
-        'Error al guardar la configuración';
-
-      set({
-        error: errorMessage,
-        isLoading: false,
-      });
-
-      throw new Error(errorMessage);
+      set({ error: error.message || 'Error al guardar la configuración', isLoading: false });
+      throw error;
     }
   },
-
 
   logout: async () => {
     set({ isLoading: true });
@@ -257,7 +243,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const session = await authApi.getSession();
 
       if (session?.user) {
-        const authUser = buildAuthUser(session.user);
+        const baseUser = buildAuthUser(session.user);
+        const authUser = await syncBackendJwtIfBusinessUser(baseUser);
         set({
           user: authUser,
           isAuthenticated: true,
@@ -276,11 +263,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 // Listen for Supabase auth state changes
-supabase.auth.onAuthStateChange((event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') {
     useAuthStore.setState({ user: null, isAuthenticated: false });
   } else if (event === 'SIGNED_IN' && session?.user) {
-    const authUser = buildAuthUser(session.user);
+    const baseUser = buildAuthUser(session.user);
+    const authUser = await syncBackendJwtIfBusinessUser(baseUser);
     useAuthStore.setState({
       user: authUser,
       isAuthenticated: true,

@@ -3,6 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useAppTheme } from '@/shared/theme';
 import { TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { AdminOnlyGuard } from '@/components/AdminOnlyGuard';
 
 export default function FormBuilderRoute() {
   const { colors } = useAppTheme();
@@ -23,7 +24,12 @@ export default function FormBuilderRoute() {
           ),
         }}
       />
-      <FormBuilderScreen />
+      <AdminOnlyGuard
+        featureName="el Constructor de Formularios e Identidad de Marca"
+        description="Esta herramienta permite a los administradores personalizar los campos del formulario público de reservas, colores corporativos y logotipo del negocio."
+      >
+        <FormBuilderScreen />
+      </AdminOnlyGuard>
     </>
   );
 }

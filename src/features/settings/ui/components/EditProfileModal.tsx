@@ -22,7 +22,8 @@ interface Props {
 
 export function EditProfileModal({ visible, onClose }: Props) {
   const { colors, isDark } = useAppTheme();
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, appMode } = useAuthStore();
+  const isBusiness = appMode === 'BUSINESS';
 
   const [fullName, setFullName] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -38,7 +39,7 @@ export function EditProfileModal({ visible, onClose }: Props) {
     if (!fullName.trim()) return;
     updateUser({
       fullName: fullName.trim(),
-      businessName: businessName.trim() || undefined,
+      ...(isBusiness ? { businessName: businessName.trim() || undefined } : {}),
     });
     onClose();
   };
@@ -66,10 +67,12 @@ export function EditProfileModal({ visible, onClose }: Props) {
               <View style={styles.modalHeader}>
                 <View>
                   <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-                    Editar Perfil
+                    {isBusiness ? 'Editar Perfil de Administrador' : 'Editar Datos Personales'}
                   </Text>
                   <Text style={[styles.modalSubtitle, { color: colors.text.muted }]}>
-                    Actualiza tu nombre y negocio activo
+                    {isBusiness
+                      ? 'Actualiza tu nombre y negocio activo'
+                      : 'Actualiza tu información para citas y reservas'}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -101,29 +104,31 @@ export function EditProfileModal({ visible, onClose }: Props) {
                 </View>
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>
-                  Nombre del Negocio
-                </Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    {
-                      backgroundColor: isDark ? '#262628' : '#F4F4F6',
-                      borderColor: isDark ? '#38383A' : '#E5E5EA',
-                    },
-                  ]}
-                >
-                  <Feather name="briefcase" size={16} color={colors.text.muted} style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text.primary }]}
-                    value={businessName}
-                    onChangeText={setBusinessName}
-                    placeholder="Ej. Barbería Don Ricardo"
-                    placeholderTextColor={colors.text.muted}
-                  />
+              {isBusiness && (
+                <View style={styles.formGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>
+                    Nombre del Negocio
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      {
+                        backgroundColor: isDark ? '#262628' : '#F4F4F6',
+                        borderColor: isDark ? '#38383A' : '#E5E5EA',
+                      },
+                    ]}
+                  >
+                    <Feather name="briefcase" size={16} color={colors.text.muted} style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, { color: colors.text.primary }]}
+                      value={businessName}
+                      onChangeText={setBusinessName}
+                      placeholder="Ej. Barbería Don Ricardo"
+                      placeholderTextColor={colors.text.muted}
+                    />
+                  </View>
                 </View>
-              </View>
+              )}
 
               <View style={styles.formGroup}>
                 <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>

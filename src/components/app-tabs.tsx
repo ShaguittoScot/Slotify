@@ -40,24 +40,23 @@ export default function AppTabs() {
           title: 'Ajustes',
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          href: null,
-        }}
-      />
+      {/*
+        Pantallas sin botón en la barra.
+        NOTA (expo-router 58+): NO usar `href: null`. Ahora se traduce a `hidden: true`
+        y el router redirige automáticamente a la pestaña inicial al intentar abrirlas.
+        La visibilidad de botones la controla FloatingTabBar mediante `allowedRouteNames`.
+      */}
+      <Tabs.Screen name="profile" />
       <Tabs.Screen
         name="form-builder"
         options={{
-          href: null,
-          tabBarStyle: { display: 'none' }
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tabs.Screen
         name="form-preview"
         options={{
-          href: null,
-          tabBarStyle: { display: 'none' }
+          tabBarStyle: { display: 'none' },
         }}
       />
     </Tabs>

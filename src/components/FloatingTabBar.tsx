@@ -22,7 +22,8 @@ export type FloatingTabBarProps = NonNullable<TabsProps['tabBar']> extends (
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   state,
   descriptors,
-  navigation,
+  emitter,
+  navigateToTab,
 }) => {
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
@@ -119,19 +120,19 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           const { label, icon } = getTabConfig(route.name);
 
           const onPress = () => {
-            const event = navigation.emit({
+            const event = emitter.emit({
               type: 'tabPress',
               target: route.key,
               canPreventDefault: true,
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+              navigateToTab(route.key);
             }
           };
 
           const onLongPress = () => {
-            navigation.emit({
+            emitter.emit({
               type: 'tabLongPress',
               target: route.key,
             });

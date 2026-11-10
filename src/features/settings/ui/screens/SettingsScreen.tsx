@@ -22,6 +22,8 @@ export function SettingsScreen() {
   const { colors, isDark, themeMode } = useAppTheme();
   const { user, logout, appMode, toggleAppMode } = useAuthStore();
 
+  const isBusiness = appMode === 'BUSINESS';
+
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -53,10 +55,13 @@ export function SettingsScreen() {
     return 'Modo Oscuro (Neutral Black)';
   };
 
-  const displayName =
-    user?.fullName && user.fullName !== 'Pendiente'
+  const displayName = isBusiness
+    ? user?.fullName && user.fullName !== 'Pendiente'
       ? user.fullName
-      : user?.businessName || 'Ricardo Alcantar';
+      : user?.businessName || 'Administrador Slotify'
+    : user?.fullName && user.fullName !== 'Pendiente'
+    ? user.fullName
+    : 'Cliente Slotify';
 
   const getInitials = (name: string) => {
     const parts = name.trim().split(' ');
@@ -72,7 +77,7 @@ export function SettingsScreen() {
       style={[styles.safeArea, { backgroundColor: colors.background.secondary }]}
     >
       <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-        {/* Cabecera Estilizada */}
+        {/* Cabecera Adaptable al Rol */}
         <View
           style={[
             styles.header,
@@ -88,10 +93,12 @@ export function SettingsScreen() {
         >
           <View>
             <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-              Ajustes
+              {isBusiness ? 'Ajustes de Negocio' : 'Mi Perfil'}
             </Text>
             <Text style={[styles.headerSubtitle, { color: colors.text.muted }]}>
-              Configuración general de tu cuenta y negocio
+              {isBusiness
+                ? 'Administración operativa y servicios de tu establecimiento'
+                : 'Tus preferencias, datos personales y reservas'}
             </Text>
           </View>
           <View
@@ -104,7 +111,11 @@ export function SettingsScreen() {
               },
             ]}
           >
-            <Feather name="settings" size={20} color={colors.text.primary} />
+            <Feather
+              name={isBusiness ? 'settings' : 'user'}
+              size={20}
+              color={colors.text.primary}
+            />
           </View>
         </View>
 
@@ -113,7 +124,7 @@ export function SettingsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Tarjeta de Perfil y Negocio Activo */}
+          {/* Tarjeta de Perfil */}
           <View
             style={[
               styles.profileCard,
@@ -127,7 +138,12 @@ export function SettingsScreen() {
               },
             ]}
           >
-            <View style={styles.avatarCircle}>
+            <View
+              style={[
+                styles.avatarCircle,
+                { backgroundColor: isBusiness ? '#6366F1' : '#10B981' },
+              ]}
+            >
               <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
             </View>
 
@@ -139,7 +155,7 @@ export function SettingsScreen() {
               </View>
 
               <Text style={[styles.profileEmail, { color: colors.text.muted }]} numberOfLines={1}>
-                {user?.email || 'richialcantar68428@gmail.com'}
+                {user?.email || (isBusiness ? 'admin@slotify.com' : 'cliente@slotify.com')}
               </Text>
 
               <View style={styles.badgesRow}>
@@ -147,10 +163,9 @@ export function SettingsScreen() {
                   style={[
                     styles.roleBadge,
                     {
-                      backgroundColor:
-                        appMode === 'BUSINESS'
-                          ? 'rgba(99, 102, 241, 0.16)'
-                          : 'rgba(16, 185, 129, 0.16)',
+                      backgroundColor: isBusiness
+                        ? 'rgba(99, 102, 241, 0.16)'
+                        : 'rgba(16, 185, 129, 0.16)',
                     },
                   ]}
                 >
@@ -158,15 +173,15 @@ export function SettingsScreen() {
                     style={[
                       styles.roleBadgeText,
                       {
-                        color: appMode === 'BUSINESS' ? '#818CF8' : '#34D399',
+                        color: isBusiness ? '#818CF8' : '#34D399',
                       },
                     ]}
                   >
-                    {appMode === 'BUSINESS' ? 'PROPIETARIO / ADMIN' : 'CLIENTE / EXPLORADOR'}
+                    {isBusiness ? 'ADMINISTRADOR / PROPIETARIO' : 'CLIENTE'}
                   </Text>
                 </View>
 
-                {user?.businessName ? (
+                {isBusiness && user?.businessName ? (
                   <View style={styles.businessBadge}>
                     <Text style={[styles.businessBadgeText, { color: colors.text.muted }]} numberOfLines={1}>
                       {user.businessName}
@@ -190,17 +205,17 @@ export function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Tarjeta de Cambio Rápido de Modo (B2B / B2C) */}
+          {/* Tarjeta de Cambio de Modo (Mantenida prominentemente para pruebas de desarrollo) */}
           <TouchableOpacity
             style={[
               styles.modeSwitcherCard,
               {
-                backgroundColor: isDark
-                  ? 'rgba(99, 102, 241, 0.12)'
-                  : 'rgba(99, 102, 241, 0.08)',
-                borderColor: isDark
-                  ? 'rgba(99, 102, 241, 0.28)'
-                  : 'rgba(99, 102, 241, 0.20)',
+                backgroundColor: isBusiness
+                  ? isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)'
+                  : isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+                borderColor: isBusiness
+                  ? isDark ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.20)'
+                  : isDark ? 'rgba(16, 185, 129, 0.28)' : 'rgba(16, 185, 129, 0.20)',
               },
             ]}
             onPress={toggleAppMode}
@@ -210,190 +225,338 @@ export function SettingsScreen() {
               <View
                 style={[
                   styles.modeIconCircle,
-                  { backgroundColor: colors.action.primary },
+                  {
+                    backgroundColor: isBusiness ? colors.action.primary : '#10B981',
+                  },
                 ]}
               >
                 <MaterialCommunityIcons
                   name={
-                    appMode === 'BUSINESS'
+                    isBusiness
                       ? 'storefront-outline'
-                      : 'ticket-confirmation-outline'
+                      : 'account-outline'
                   }
                   size={20}
-                  color={colors.action.primaryText}
+                  color="#FFFFFF"
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.modeSwitcherTitle, { color: colors.text.primary }]}>
-                  {appMode === 'BUSINESS' ? 'Modo Proveedor Activo' : 'Modo Cliente Activo'}
-                </Text>
+                <View style={styles.modePillRow}>
+                  <Text style={[styles.modeSwitcherTitle, { color: colors.text.primary }]}>
+                    {isBusiness ? 'Modo Administrador Activo' : 'Modo Cliente Activo'}
+                  </Text>
+                  <View style={[styles.testBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
+                    <Text style={[styles.testBadgeText, { color: colors.text.muted }]}>PRUEBA</Text>
+                  </View>
+                </View>
                 <Text style={[styles.modeSwitcherSubtitle, { color: colors.text.secondary }]}>
-                  {appMode === 'BUSINESS'
-                    ? 'Toca para cambiar a explorar y agendar citas'
-                    : 'Toca para cambiar a administrar tu negocio'}
+                  {isBusiness
+                    ? 'Toca para saltar a la interfaz de Cliente (Explorar y Reservar)'
+                    : 'Toca para saltar a la interfaz de Administrador (Gestionar Negocio)'}
                 </Text>
               </View>
             </View>
-            <View style={[styles.modeSwitchAction, { backgroundColor: colors.action.primary }]}>
-              <Text style={[styles.modeSwitchActionText, { color: colors.action.primaryText }]}>
-                Cambiar
+            <View
+              style={[
+                styles.modeSwitchAction,
+                { backgroundColor: isBusiness ? colors.action.primary : '#10B981' },
+              ]}
+            >
+              <Text style={[styles.modeSwitchActionText, { color: '#FFFFFF' }]}>
+                {isBusiness ? 'Saltar a Cliente' : 'Saltar a Admin'}
               </Text>
             </View>
           </TouchableOpacity>
 
-          {/* Sección: GESTIÓN DE NEGOCIO */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
-              GESTIÓN DE NEGOCIO
-            </Text>
+          {/* ════════════════════════════════════════════════════════════════
+              SECCIÓN ESPECÍFICA: ADMINISTRADOR vs CLIENTE
+          ════════════════════════════════════════════════════════════════ */}
+          {isBusiness ? (
+            /* SECCIÓN ADMIN: GESTIÓN DE NEGOCIO */
+            <View style={styles.section}>
+              <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
+                GESTIÓN DE NEGOCIO & SERVICIOS
+              </Text>
 
-            {/* Giro Comercial y Plantillas */}
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() => setShowMigrationModal(true)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.12)' }]}>
-                <MaterialCommunityIcons
-                  name="shape-outline"
-                  size={18}
-                  color="#818CF8"
-                />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Giro Comercial y Módulos
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Cambiar sector comercial y capacidades del negocio
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-
-            {/* Catálogo y Plantilla de Barbería / Servicios */}
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() =>
-                router.push({
-                  pathname: '/(onboarding)/templates' as any,
-                  params: {
-                    sectorId: '5',
-                    sectorKey: 'barberia',
-                    isMigration: 'true',
+              {/* Giro Comercial y Plantillas */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
                   },
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(224, 122, 95, 0.15)' }]}>
-                <MaterialCommunityIcons
-                  name="content-cut"
-                  size={18}
-                  color="#E07A5F"
-                />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Servicios y Catálogo Base
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Ajustar precios, duraciones, adicionales y sillones
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
+                ]}
+                onPress={() => setShowMigrationModal(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.12)' }]}>
+                  <MaterialCommunityIcons
+                    name="shape-outline"
+                    size={18}
+                    color="#818CF8"
+                  />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Giro Comercial y Módulos
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Cambiar sector comercial y capacidades del negocio
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
 
-            {/* Constructor de Formulario de Reservas */}
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() => router.push('/(main)/form-builder' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
-                <MaterialCommunityIcons
-                  name="form-select"
-                  size={18}
-                  color="#10B981"
-                />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Formulario de Reservación
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Configurar campos dinámicos, comensales y preguntas
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
+              {/* Catálogo y Plantilla de Barbería / Servicios */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(onboarding)/templates' as any,
+                    params: {
+                      sectorId: '5',
+                      sectorKey: 'barberia',
+                      isMigration: 'true',
+                    },
+                  })
+                }
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(224, 122, 95, 0.15)' }]}>
+                  <MaterialCommunityIcons
+                    name="content-cut"
+                    size={18}
+                    color="#E07A5F"
+                  />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Servicios y Catálogo Base
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Ajustar precios, duraciones, adicionales y sillones
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
 
-            {/* Información del Negocio y Enlace de Reserva */}
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() => setShowBusinessInfoModal(true)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}>
-                <MaterialCommunityIcons
-                  name="store-outline"
-                  size={18}
-                  color="#EC4899"
-                />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Información del Negocio
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Horarios, sucursal y enlace de reserva compartible
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-          </View>
+              {/* Constructor de Formulario de Reservas & Identidad de Marca */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => router.push('/(main)/form-builder' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+                  <MaterialCommunityIcons
+                    name="palette-swatch-outline"
+                    size={18}
+                    color="#10B981"
+                  />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Formulario & Marca Corporativa
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Personalizar logotipo, colores y campos de reservación
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
 
-          {/* Sección: APARIENCIA & SISTEMA */}
+              {/* Información del Negocio y Enlace de Reserva */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => setShowBusinessInfoModal(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}>
+                  <MaterialCommunityIcons
+                    name="store-outline"
+                    size={18}
+                    color="#EC4899"
+                  />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Información del Negocio
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Horarios, sucursal y enlace de reserva compartible
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+
+              {/* Directorio de Clientes */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => router.push('/(main)/clients' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(59, 130, 246, 0.14)' }]}>
+                  <MaterialCommunityIcons
+                    name="account-group-outline"
+                    size={18}
+                    color="#3B82F6"
+                  />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Directorio de Clientes
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Consulta la cartera de clientes, historial y notas
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* SECCIÓN CLIENTE: ACTIVIDAD & RESERVAS */
+            <View style={styles.section}>
+              <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
+                MI ACTIVIDAD & RESERVAS
+              </Text>
+
+              {/* Mis Citas Agendadas */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => router.push('/(main)' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+                  <Feather name="calendar" size={18} color="#10B981" />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Mis Citas Programadas
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Revisa horarios, direcciones y estado de tus citas
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+
+              {/* Explorar Establecimientos */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => router.push('/(main)/explore' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.14)' }]}>
+                  <Feather name="compass" size={18} color="#818CF8" />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Explorar Servicios y Establecimientos
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Descubre barberías, spas, consultorios y reserva citas
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+
+              {/* Mis Datos de Contacto */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => setShowProfileModal(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}>
+                  <Feather name="user-check" size={18} color="#F59E0B" />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Mis Datos Personales
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Nombre y datos usados al agendar tus citas
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Sección: APARIENCIA & SISTEMA (Compartida) */}
           <View style={styles.section}>
             <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
               APARIENCIA & SISTEMA
@@ -453,13 +616,15 @@ export function SettingsScreen() {
                   Notificaciones de Citas
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Recordatorios de agenda, avisos y cancelaciones
+                  {isBusiness
+                    ? 'Recordatorios de agenda, nuevas reservas y cancelaciones'
+                    : 'Recordatorios de tus citas y confirmaciones de horario'}
                 </Text>
               </View>
               <FluidToggleSwitch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
-                activeColor="#818CF8"
+                activeColor={isBusiness ? '#818CF8' : '#10B981'}
               />
             </View>
 
@@ -495,7 +660,7 @@ export function SettingsScreen() {
             </View>
           </View>
 
-          {/* Sección: SOPORTE & CUENTA */}
+          {/* Sección: SOPORTE & SEGURIDAD (Compartida) */}
           <View style={styles.section}>
             <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
               SOPORTE & SEGURIDAD
@@ -516,7 +681,9 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Centro de Ayuda',
-                  'Para dudas o soporte técnico escribe a soporte@slotify.app o contacta a tu asesor de implementación.'
+                  isBusiness
+                    ? 'Para dudas o soporte técnico escribe a soporte@slotify.app o contacta a tu asesor de implementación.'
+                    : 'Para dudas sobre reservas escribe a soporte@slotify.app.'
                 )
               }
               activeOpacity={0.7}
@@ -550,7 +717,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Términos y Privacidad',
-                  'Slotify cumple con estándares de cifrado de grado bancario para la protección de tus datos comerciales y clientes.'
+                  'Tus datos y credenciales se resguardan mediante almacenamiento local seguro (KeyStore/Keychain) y conexiones cifradas de extremo a extremo.'
                 )
               }
               activeOpacity={0.7}
@@ -570,7 +737,7 @@ export function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Botón Destructivo: Cerrar Sesión con margen holgado para la barra flotante */}
+          {/* Botón Destructivo: Cerrar Sesión con margen holgado */}
           <View style={styles.logoutSection}>
             <TouchableOpacity
               style={[
@@ -592,7 +759,9 @@ export function SettingsScreen() {
             </TouchableOpacity>
 
             <Text style={[styles.appVersionText, { color: colors.text.muted }]}>
-              Slotify v1.0.0 (Build 402) • Enterprise Suite
+              {isBusiness
+                ? 'Slotify v1.0.0 (Build 402) • Business Owner Edition'
+                : 'Slotify v1.0.0 (Build 402) • Consumer Client Edition'}
             </Text>
           </View>
         </ScrollView>
@@ -603,20 +772,24 @@ export function SettingsScreen() {
           onClose={() => setShowThemeModal(false)}
         />
 
-        <TemplateMigrationModal
-          visible={showMigrationModal}
-          onClose={() => setShowMigrationModal(false)}
-        />
+        {isBusiness && (
+          <>
+            <TemplateMigrationModal
+              visible={showMigrationModal}
+              onClose={() => setShowMigrationModal(false)}
+            />
+
+            <BusinessInfoModal
+              visible={showBusinessInfoModal}
+              onClose={() => setShowBusinessInfoModal(false)}
+              onOpenMigration={() => setShowMigrationModal(true)}
+            />
+          </>
+        )}
 
         <EditProfileModal
           visible={showProfileModal}
           onClose={() => setShowProfileModal(false)}
-        />
-
-        <BusinessInfoModal
-          visible={showBusinessInfoModal}
-          onClose={() => setShowBusinessInfoModal(false)}
-          onOpenMigration={() => setShowMigrationModal(true)}
         />
       </View>
     </SafeAreaView>
@@ -647,6 +820,7 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     marginTop: 2,
+    maxWidth: 270,
   },
   headerBadgeIcon: {
     width: 42,
@@ -661,7 +835,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 160, // Margen holgado para que la barra flotante NUNCA tape el botón
+    paddingBottom: 160,
   },
   profileCard: {
     flexDirection: 'row',
@@ -669,13 +843,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 22,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   avatarCircle: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -760,10 +933,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  modePillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
   modeSwitcherTitle: {
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 2,
+  },
+  testBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  testBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   modeSwitcherSubtitle: {
     fontSize: 12,

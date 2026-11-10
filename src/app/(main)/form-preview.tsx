@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
+  Image,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -17,6 +18,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { loadFormSchemaLocally } from '@/features/dashboard/model/formBranding';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -100,7 +102,30 @@ export default function FormPreviewScreen() {
     config?: string;
     size?: string;
     businessName?: string;
+    logoUrl?: string;
+    accentColor?: string;
+    secondaryColor?: string;
   }>();
+
+  const [savedBranding, setSavedBranding] = useState<{
+    logoUrl?: string | null;
+    accentColor?: string;
+    secondaryColor?: string;
+    businessName?: string;
+  }>({});
+
+  useEffect(() => {
+    loadFormSchemaLocally().then((saved) => {
+      if (saved) {
+        setSavedBranding({
+          logoUrl: saved.logoUrl,
+          accentColor: saved.accentColor,
+          secondaryColor: saved.secondaryColor,
+          businessName: saved.businessName,
+        });
+      }
+    });
+  }, []);
 
   const config = useMemo(() => {
     try {
@@ -111,7 +136,12 @@ export default function FormPreviewScreen() {
   }, [params.config]);
 
   const size = (params.size || 'small') as 'small' | 'large';
-  const businessName = params.businessName || 'Mi Restaurante';
+  const businessName =
+    params.businessName || savedBranding.businessName || 'Mi Restaurante';
+  const brandLogoUrl = params.logoUrl || savedBranding.logoUrl || null;
+  const primaryColor = params.accentColor || savedBranding.accentColor || '#6366F1';
+  const secondaryColor =
+    params.secondaryColor || savedBranding.secondaryColor || '#8B5CF6';
 
   const activeFields = FORM_FIELDS.filter((f) => config[f.key]);
 
@@ -123,9 +153,11 @@ export default function FormPreviewScreen() {
         }}
       />
       <View style={[styles.screen, { backgroundColor: isDark ? '#0A0A0A' : '#F5F3EF' }]}>  
-        {/* ─── Header del Restaurante ─── */}
+        {/* ─── Header del Establecimiento con Identidad de Marca ─── */}
         <LinearGradient
-          colors={isDark ? ['#1A1A1A', '#121212'] : ['#1C1917', '#292524']}
+          colors={[primaryColor, secondaryColor]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.restaurantHeader}
         >
           <SafeAreaView edges={['top']}>
@@ -143,8 +175,16 @@ export default function FormPreviewScreen() {
             </View>
 
             <View style={styles.restaurantInfo}>
-              <View style={styles.restaurantLogo}>
-                <Text style={{ fontSize: 28 }}>🍽️</Text>
+              <View style={[styles.restaurantLogo, { overflow: 'hidden' }]}>
+                {brandLogoUrl ? (
+                  <Image
+                    source={{ uri: brandLogoUrl }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 28 }}>🍽️</Text>
+                )}
               </View>
               <Text style={styles.restaurantName}>{businessName}</Text>
               <Text style={styles.restaurantTagline}>
@@ -372,14 +412,14 @@ export default function FormPreviewScreen() {
           <Animated.View entering={FadeInUp.duration(500).delay(700)}>
             <TouchableOpacity style={styles.reserveBtn} activeOpacity={0.85}>
               <LinearGradient
-                colors={['#6366F1', '#8B5CF6']}
+                colors={[primaryColor, secondaryColor]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.reserveBtnGradient}
               >
                 <Text style={styles.reserveBtnText}>Confirmar Reservación</Text>
                 <View style={styles.reserveBtnArrow}>
-                  <Feather name="arrow-right" size={16} color="#6366F1" />
+                  <Feather name="arrow-right" size={16} color={primaryColor} />
                 </View>
               </LinearGradient>
             </TouchableOpacity>
