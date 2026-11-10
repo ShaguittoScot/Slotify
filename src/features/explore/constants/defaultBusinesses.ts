@@ -96,3 +96,4 @@ export const DEFAULT_BUSINESS_CATALOG: BusinessDto[] = [
     ],
   },
 ];
+
