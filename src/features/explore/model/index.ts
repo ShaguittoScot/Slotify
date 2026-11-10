@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { exploreApi } from '../api';
+import { loadFormSchemaLocally } from '@/features/dashboard/model/formBranding';
 import type { BusinessDto, Category } from '../types';
 
 export const isValidHexColor = (color?: string | null): boolean => {
@@ -47,8 +48,29 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
         set({ isLoading: true, errorMessage: null });
       }
 
-      const data = await exploreApi.getBusinesses();
-      set({ businesses: data, errorMessage: null });
+      const [data, localBranding] = await Promise.all([
+        exploreApi.getBusinesses(),
+        loadFormSchemaLocally(),
+      ]);
+
+      const enriched = data.map((biz) => {
+        if (!localBranding) return biz;
+        const matchesName =
+          localBranding.businessName &&
+          biz.name.trim().toLowerCase() === localBranding.businessName.trim().toLowerCase();
+        return {
+          ...biz,
+          logoUrl: biz.logoUrl || (matchesName ? localBranding.logoUrl ?? undefined : undefined),
+          brandColor:
+            isValidHexColor(biz.brandColor) && biz.brandColor !== '#000000'
+              ? biz.brandColor
+              : matchesName && isValidHexColor(localBranding.accentColor)
+              ? localBranding.accentColor
+              : biz.brandColor,
+        };
+      });
+
+      set({ businesses: enriched, errorMessage: null });
     } catch (err: any) {
       const message =
         err?.response?.data?.message ||
