@@ -56,7 +56,7 @@ export default function AppTabs() {
       <Tabs.Screen
         name="form-preview"
         options={{
-          tabBarStyle: { display: 'none' },
+          title: 'Formulario',
         }}
       />
     </Tabs>

@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
 
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function BusinessInfoModal({ visible, onClose, onOpenMigration }: Props) {
+  const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
@@ -100,16 +102,40 @@ export function BusinessInfoModal({ visible, onClose, onOpenMigration }: Props) 
                   <Text style={[styles.linkUrlText, { color: colors.text.primary }]} numberOfLines={1}>
                     {bookingUrl}
                   </Text>
-                  <TouchableOpacity
-                    style={[styles.shareBtn, { backgroundColor: colors.action.primary }]}
-                    onPress={handleShare}
-                    activeOpacity={0.8}
-                  >
-                    <Feather name="share-2" size={14} color={colors.action.primaryText} />
-                    <Text style={[styles.shareBtnText, { color: colors.action.primaryText }]}>
-                      Compartir Enlace
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <TouchableOpacity
+                      style={[styles.shareBtn, { flex: 1, backgroundColor: colors.action.primary }]}
+                      onPress={handleShare}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="share-2" size={14} color={colors.action.primaryText} />
+                      <Text style={[styles.shareBtnText, { color: colors.action.primaryText }]}>
+                        Compartir
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.shareBtn,
+                        {
+                          flex: 1,
+                          backgroundColor: isDark ? '#2A2A2E' : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: colors.action.primary,
+                        },
+                      ]}
+                      onPress={() => {
+                        onClose();
+                        router.push(`/book/${slug || 'mi-negocio'}` as any);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="external-link" size={14} color={colors.action.primary} />
+                      <Text style={[styles.shareBtnText, { color: colors.action.primary }]}>
+                        Abrir Formulario
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Detalle operativo */}

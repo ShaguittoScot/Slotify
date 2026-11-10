@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,34 +19,126 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather, AntDesign } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
-import { FormSchema, FormField } from '../screens/FormBuilderScreen';
+import { FormSchema, FormField, FormServiceItem } from '../screens/FormBuilderScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Mock de servicios de Barbería para visualizar en el constructor/preview.
-// En producción, esto vendrá del Backend (Business.CustomFormConfig o Business.Services).
-const MOCK_SERVICES = [
+// Catálogo base por defecto cuando el negocio no especifica servicios propios
+const MOCK_SERVICES: FormServiceItem[] = [
   { id: 's1', name: 'Corte Clásico', price: 200, duration: 30 },
   { id: 's2', name: 'Arreglo de Barba', price: 150, duration: 20 },
   { id: 's3', name: 'Corte + Barba', price: 300, duration: 50 },
   { id: 's4', name: 'Facial Exprés', price: 180, duration: 25 },
 ];
 
-interface FormViewerProps {
-  schema: FormSchema;
-  onSubmit: (answers: Record<string, any>) => void;
-  onCancel?: () => void;
+const AVAILABLE_TIME_SLOTS = [
+  '09:00 AM',
+  '10:00 AM',
+  '11:30 AM',
+  '01:00 PM',
+  '03:30 PM',
+  '05:00 PM',
+  '06:30 PM',
+];
+
+export interface DateTimeSelection {
+  dateLabel: string;
+  isoDate: string;
+  time: string;
 }
 
-export function FormViewer({ schema, onSubmit }: FormViewerProps) {
+export interface BookingSubmissionSummary {
+  serviceNames: string[];
+  totalPrice: number;
+  totalDuration: number;
+  dateLabel: string;
+  isoDate: string;
+  timeLabel: string;
+  clientName: string;
+  clientPhone: string;
+  notes: string;
+}
+
+interface FormViewerProps {
+  schema: FormSchema;
+  onSubmit: (answers: Record<string, any>, summary: BookingSubmissionSummary) => void;
+  onCancel?: () => void;
+  initialAnswers?: Record<string, any>;
+  submitButtonLabel?: string;
+}
+
+function buildUpcomingDays(): { key: string; dayName: string; dayNumber: string; monthShort: string; fullLabel: string; isoDate: string }[] {
+  const days = [];
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dayName = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : dayNames[d.getDay()];
+    const dayNumber = String(d.getDate());
+    const monthShort = monthNames[d.getMonth()];
+    const fullLabel =
+      i === 0
+        ? `Hoy (${dayNumber} ${monthShort})`
+        : i === 1
+        ? `Mañana (${dayNumber} ${monthShort})`
+        : `${dayNames[d.getDay()]} ${dayNumber} ${monthShort}`;
+
+    days.push({
+      key: d.toISOString().split('T')[0],
+      dayName,
+      dayNumber,
+      monthShort,
+      fullLabel,
+      isoDate: d.toISOString(),
+    });
+  }
+  return days;
+}
+
+export function FormViewer({
+  schema,
+  onSubmit,
+  initialAnswers,
+  submitButtonLabel,
+}: FormViewerProps) {
   const { colors, isDark } = useAppTheme();
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const upcomingDays = useMemo(() => buildUpcomingDays(), []);
+
+  const [answers, setAnswers] = useState<Record<string, any>>(() => ({
+    ...(initialAnswers || {}),
+  }));
+  const [validationErrorFieldId, setValidationErrorFieldId] = useState<string | null>(null);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
   // Para el modo 'interactive_slides'
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
+  // Sincronizar respuestas iniciales y valores por defecto para fecha/hora
+  useEffect(() => {
+    setAnswers((prev) => {
+      const next = { ...(initialAnswers || {}), ...prev };
+      schema.fields.forEach((f) => {
+        if (f.type === 'date_time' && !next[f.id] && upcomingDays.length > 0) {
+          next[f.id] = {
+            dateLabel: upcomingDays[0].fullLabel,
+            isoDate: upcomingDays[0].isoDate,
+            time: AVAILABLE_TIME_SLOTS[1],
+          } as DateTimeSelection;
+        }
+      });
+      return next;
+    });
+    setCurrentSlideIndex(0);
+    setValidationErrorFieldId(null);
+    setValidationMessage(null);
+  }, [schema.businessName, schema.fields.length]);
+
   const primaryColor = schema.accentColor || '#6366F1';
   const secondaryColor = schema.secondaryColor || primaryColor;
   const businessName = schema.businessName || 'Establecimiento Verificado';
+  const serviceCatalog =
+    schema.services && schema.services.length > 0 ? schema.services : MOCK_SERVICES;
 
   const getInitials = (name: string) => {
     const clean = (name || 'SN').trim();
@@ -57,23 +149,144 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
     return clean.slice(0, 2).toUpperCase();
   };
 
+  const isFieldAnswered = (field: FormField, val: any): boolean => {
+    if (val === undefined || val === null) return false;
+    if (field.type === 'service_catalog' || field.type === 'multiple_choice') {
+      return Array.isArray(val) && val.length > 0;
+    }
+    if (field.type === 'date_time') {
+      const dt = val as DateTimeSelection;
+      return Boolean(dt && dt.dateLabel && dt.time);
+    }
+    if (field.type === 'rating_stars') {
+      return typeof val === 'number' && val > 0;
+    }
+    if (typeof val === 'string') {
+      return val.trim().length > 0;
+    }
+    return true;
+  };
+
   const handleAnswer = (fieldId: string, value: any) => {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+    if (validationErrorFieldId === fieldId) {
+      setValidationErrorFieldId(null);
+      setValidationMessage(null);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // CÁLCULO DE SUMATORIAS Y RESUMEN DE CITA
+  // ═══════════════════════════════════════════════════════════
+  const hasServiceCatalog = schema.fields.some((f) => f.type === 'service_catalog');
+  let totalPrice = 0;
+  let totalDuration = 0;
+  const selectedServiceNames: string[] = [];
+
+  if (hasServiceCatalog) {
+    const serviceField = schema.fields.find((f) => f.type === 'service_catalog');
+    if (serviceField) {
+      const selectedIds = (answers[serviceField.id] as string[]) || [];
+      selectedIds.forEach((id) => {
+        const srv = serviceCatalog.find((c) => c.id === id);
+        if (srv) {
+          totalPrice += srv.price;
+          totalDuration += srv.duration;
+          selectedServiceNames.push(srv.name);
+        }
+      });
+    }
+  }
+
+  const buildSummary = (): BookingSubmissionSummary => {
+    let dateLabel = upcomingDays[0]?.fullLabel || 'Hoy';
+    let isoDate = upcomingDays[0]?.isoDate || new Date().toISOString();
+    let timeLabel = '10:00 AM';
+    let clientName = '';
+    let clientPhone = '';
+    let notes = '';
+
+    schema.fields.forEach((field) => {
+      const val = answers[field.id];
+      if (!val) return;
+
+      if (field.type === 'date_time' && val.dateLabel && val.time) {
+        dateLabel = val.dateLabel;
+        isoDate = val.isoDate || isoDate;
+        timeLabel = val.time;
+      } else if (
+        field.type === 'phone' ||
+        field.question.toLowerCase().includes('teléfono') ||
+        field.question.toLowerCase().includes('telefono') ||
+        field.question.toLowerCase().includes('whatsapp') ||
+        field.question.toLowerCase().includes('celular')
+      ) {
+        if (typeof val === 'string') clientPhone = val.trim();
+      } else if (
+        field.type === 'short_text' &&
+        (field.question.toLowerCase().includes('nombre') || !clientName)
+      ) {
+        if (typeof val === 'string') clientName = val.trim();
+      } else if (field.type === 'paragraph') {
+        if (typeof val === 'string') notes = val.trim();
+      }
+    });
+
+    return {
+      serviceNames:
+        selectedServiceNames.length > 0
+          ? selectedServiceNames
+          : ['Cita General Reservada'],
+      totalPrice,
+      totalDuration: totalDuration || 30,
+      dateLabel,
+      isoDate,
+      timeLabel,
+      clientName: clientName || 'Cliente Slotify',
+      clientPhone: clientPhone || 'Sin especificar',
+      notes,
+    };
+  };
+
+  const validateAndSubmitAll = () => {
+    for (const field of schema.fields) {
+      if (field.required && !isFieldAnswered(field, answers[field.id])) {
+        setValidationErrorFieldId(field.id);
+        setValidationMessage(`Por favor responde: "${field.question}"`);
+        return;
+      }
+    }
+    setValidationErrorFieldId(null);
+    setValidationMessage(null);
+    onSubmit(answers, buildSummary());
   };
 
   const handleNextSlide = () => {
+    const currentField = schema.fields[currentSlideIndex];
+    if (currentField?.required && !isFieldAnswered(currentField, answers[currentField.id])) {
+      setValidationErrorFieldId(currentField.id);
+      setValidationMessage('Completa este paso obligatorio para continuar.');
+      return;
+    }
+
     if (currentSlideIndex < schema.fields.length - 1) {
       setCurrentSlideIndex((prev) => prev + 1);
     } else {
-      onSubmit(answers);
+      validateAndSubmitAll();
     }
   };
 
   const handlePrevSlide = () => {
     if (currentSlideIndex > 0) {
+      setValidationErrorFieldId(null);
+      setValidationMessage(null);
       setCurrentSlideIndex((prev) => prev - 1);
     }
   };
+
+  const answeredCount = schema.fields.filter((f) =>
+    isFieldAnswered(f, answers[f.id])
+  ).length;
 
   // ─── Cabecera de Identidad de Marca Reutilizable ───
   const renderBrandIdentityBanner = (compact = false) => (
@@ -127,6 +340,14 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
             {businessName}
           </Text>
         </View>
+
+        {/* Indicador de progreso de llenado */}
+        <View style={styles.completionPill}>
+          <Feather name="check-square" size={12} color="#FFFFFF" />
+          <Text style={styles.completionPillText}>
+            {answeredCount}/{schema.fields.length}
+          </Text>
+        </View>
       </View>
 
       {!compact && (
@@ -143,32 +364,34 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
   // ─── Componentes de Renderizado de Campos ───
   const renderFieldInput = (field: FormField, isSlideMode: boolean) => {
     const value = answers[field.id];
+    const hasError = validationErrorFieldId === field.id;
 
     if (field.type === 'service_catalog') {
       const selectedServiceIds = (value as string[]) || [];
-      const catalog = MOCK_SERVICES;
 
       return (
         <View style={styles.optionsContainer}>
-          {catalog.map((srv) => {
+          {serviceCatalog.map((srv) => {
             const isSelected = selectedServiceIds.includes(srv.id);
 
             return (
               <TouchableOpacity
                 key={srv.id}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
                 style={[
                   styles.optionCard,
                   {
                     backgroundColor: isSelected
                       ? isDark
                         ? `${primaryColor}30`
-                        : `${primaryColor}15`
+                        : `${primaryColor}14`
                       : isDark
                       ? '#1E1E1E'
                       : '#FFFFFF',
                     borderColor: isSelected
                       ? primaryColor
+                      : hasError
+                      ? colors.status.error
                       : isDark
                       ? '#333'
                       : '#E5E5E5',
@@ -183,7 +406,7 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
                   handleAnswer(field.id, next);
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 }}>
                   <View
                     style={[
                       styles.checkbox,
@@ -196,7 +419,7 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
                   >
                     {isSelected && <Feather name="check" size={14} color="#FFF" />}
                   </View>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text
                       style={[
                         styles.optionText,
@@ -237,7 +460,7 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
                       color: isSelected ? '#FFFFFF' : colors.text.primary,
                     }}
                   >
-                    ${srv.price.toFixed(2)}
+                    ${Number(srv.price).toFixed(2)}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -247,28 +470,238 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
       );
     }
 
+    if (field.type === 'date_time') {
+      const currentSelection: DateTimeSelection = (value as DateTimeSelection) || {
+        dateLabel: upcomingDays[0]?.fullLabel || 'Hoy',
+        isoDate: upcomingDays[0]?.isoDate || new Date().toISOString(),
+        time: AVAILABLE_TIME_SLOTS[1],
+      };
+
+      return (
+        <View style={{ gap: 16 }}>
+          {/* Selector de Día */}
+          <View>
+            <View style={styles.subLabelRow}>
+              <Feather name="calendar" size={14} color={primaryColor} />
+              <Text style={[styles.subLabelText, { color: colors.text.secondary }]}>
+                Selecciona el día
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.daysScrollRow}
+            >
+              {upcomingDays.map((day) => {
+                const isSelectedDay = currentSelection.dateLabel === day.fullLabel;
+                return (
+                  <TouchableOpacity
+                    key={day.key}
+                    activeOpacity={0.78}
+                    onPress={() =>
+                      handleAnswer(field.id, {
+                        ...currentSelection,
+                        dateLabel: day.fullLabel,
+                        isoDate: day.isoDate,
+                      })
+                    }
+                    style={[
+                      styles.dayPillCard,
+                      {
+                        backgroundColor: isSelectedDay
+                          ? primaryColor
+                          : isDark
+                          ? '#1E1E1E'
+                          : '#F8FAFC',
+                        borderColor: isSelectedDay
+                          ? primaryColor
+                          : isDark
+                          ? '#333'
+                          : '#E2E8F0',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dayPillName,
+                        {
+                          color: isSelectedDay
+                            ? 'rgba(255,255,255,0.88)'
+                            : colors.text.muted,
+                        },
+                      ]}
+                    >
+                      {day.dayName}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dayPillNumber,
+                        { color: isSelectedDay ? '#FFFFFF' : colors.text.primary },
+                      ]}
+                    >
+                      {day.dayNumber}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dayPillMonth,
+                        {
+                          color: isSelectedDay
+                            ? 'rgba(255,255,255,0.85)'
+                            : colors.text.muted,
+                        },
+                      ]}
+                    >
+                      {day.monthShort}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Selector de Horario */}
+          <View>
+            <View style={styles.subLabelRow}>
+              <Feather name="clock" size={14} color={secondaryColor} />
+              <Text style={[styles.subLabelText, { color: colors.text.secondary }]}>
+                Horarios disponibles
+              </Text>
+            </View>
+            <View style={styles.timeGrid}>
+              {AVAILABLE_TIME_SLOTS.map((slotTime) => {
+                const isSelectedTime = currentSelection.time === slotTime;
+                return (
+                  <TouchableOpacity
+                    key={slotTime}
+                    activeOpacity={0.78}
+                    onPress={() =>
+                      handleAnswer(field.id, {
+                        ...currentSelection,
+                        time: slotTime,
+                      })
+                    }
+                    style={[
+                      styles.timeSlotChip,
+                      {
+                        backgroundColor: isSelectedTime
+                          ? `${secondaryColor}22`
+                          : isDark
+                          ? '#1E1E1E'
+                          : '#F8FAFC',
+                        borderColor: isSelectedTime
+                          ? secondaryColor
+                          : isDark
+                          ? '#333'
+                          : '#E2E8F0',
+                      },
+                    ]}
+                  >
+                    <Feather
+                      name="clock"
+                      size={12}
+                      color={isSelectedTime ? secondaryColor : colors.text.muted}
+                    />
+                    <Text
+                      style={[
+                        styles.timeSlotText,
+                        {
+                          color: isSelectedTime
+                            ? secondaryColor
+                            : colors.text.primary,
+                          fontWeight: isSelectedTime ? '700' : '500',
+                        },
+                      ]}
+                    >
+                      {slotTime}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     switch (field.type) {
       case 'short_text':
-      case 'paragraph':
+      case 'phone':
+      case 'email':
+      case 'paragraph': {
+        const isPhone =
+          field.type === 'phone' ||
+          field.question.toLowerCase().includes('teléfono') ||
+          field.question.toLowerCase().includes('telefono') ||
+          field.question.toLowerCase().includes('whatsapp');
+        const isEmail =
+          field.type === 'email' ||
+          field.question.toLowerCase().includes('correo') ||
+          field.question.toLowerCase().includes('email');
+
+        const defaultPlaceholder =
+          field.placeholder ||
+          (isPhone
+            ? 'Ej. +52 55 1234 5678'
+            : isEmail
+            ? 'Ej. cliente@correo.com'
+            : field.type === 'paragraph'
+            ? 'Escribe tus comentarios o notas aquí...'
+            : 'Escribe tu respuesta aquí...');
+
         return (
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-                borderColor: value ? primaryColor : isDark ? '#333' : '#E5E5E5',
-                color: colors.text.primary,
-                minHeight: field.type === 'paragraph' ? 100 : 50,
-              },
-              isSlideMode && styles.textInputLarge,
-            ]}
-            placeholder="Escribe tu respuesta aquí..."
-            placeholderTextColor={colors.text.muted}
-            multiline={field.type === 'paragraph'}
-            value={value || ''}
-            onChangeText={(text) => handleAnswer(field.id, text)}
-          />
+          <View style={styles.inputWithIconWrapper}>
+            {field.type !== 'paragraph' && (
+              <View style={styles.inputLeadingIcon}>
+                <Feather
+                  name={
+                    isPhone
+                      ? 'phone'
+                      : isEmail
+                      ? 'mail'
+                      : field.question.toLowerCase().includes('nombre')
+                      ? 'user'
+                      : 'edit-3'
+                  }
+                  size={16}
+                  color={value ? primaryColor : colors.text.muted}
+                />
+              </View>
+            )}
+            <TextInput
+              style={[
+                styles.textInput,
+                field.type !== 'paragraph' && !isSlideMode && { paddingLeft: 42 },
+                {
+                  backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+                  borderColor: hasError
+                    ? colors.status.error
+                    : value
+                    ? primaryColor
+                    : isDark
+                    ? '#333'
+                    : '#E5E5E5',
+                  color: colors.text.primary,
+                  minHeight: field.type === 'paragraph' ? 96 : 52,
+                },
+                isSlideMode && styles.textInputLarge,
+              ]}
+              placeholder={defaultPlaceholder}
+              placeholderTextColor={colors.text.muted}
+              multiline={field.type === 'paragraph'}
+              keyboardType={
+                isPhone
+                  ? 'phone-pad'
+                  : isEmail
+                  ? 'email-address'
+                  : 'default'
+              }
+              autoCapitalize={isEmail ? 'none' : 'sentences'}
+              value={value || ''}
+              onChangeText={(text) => handleAnswer(field.id, text)}
+            />
+          </View>
         );
+      }
 
       case 'single_choice':
       case 'multiple_choice': {
@@ -296,6 +729,8 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
                         : '#FFFFFF',
                       borderColor: isSelected
                         ? primaryColor
+                        : hasError
+                        ? colors.status.error
                         : isDark
                         ? '#333'
                         : '#E5E5E5',
@@ -371,32 +806,10 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
     }
   };
 
-  // ═══════════════════════════════════════════════════════════
-  // CÁLCULO DE SUMATORIAS
-  // ═══════════════════════════════════════════════════════════
-  const hasServiceCatalog = schema.fields.some(
-    (f) => f.type === 'service_catalog'
-  );
-  let totalPrice = 0;
-  let totalDuration = 0;
-
-  if (hasServiceCatalog) {
-    const serviceField = schema.fields.find((f) => f.type === 'service_catalog');
-    if (serviceField) {
-      const selectedIds = (answers[serviceField.id] as string[]) || [];
-      selectedIds.forEach((id) => {
-        const srv = MOCK_SERVICES.find((c) => c.id === id);
-        if (srv) {
-          totalPrice += srv.price;
-          totalDuration += srv.duration;
-        }
-      });
-    }
-  }
-
-  // Componente de barra inferior pegajosa
+  // Componente de barra inferior pegajosa con resumen en vivo
   const SummaryBar = () => {
     if (!hasServiceCatalog || totalPrice === 0) return null;
+    const summary = buildSummary();
     return (
       <Animated.View
         entering={FadeInDown.duration(300)}
@@ -408,15 +821,17 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
           },
         ]}
       >
-        <View>
+        <View style={{ flex: 1 }}>
           <Text
             style={{
               color: colors.text.secondary,
-              fontSize: 13,
-              fontWeight: '500',
+              fontSize: 12,
+              fontWeight: '600',
             }}
+            numberOfLines={1}
           >
-            Total a pagar
+            {selectedServiceNames.length}{' '}
+            {selectedServiceNames.length === 1 ? 'servicio' : 'servicios'} • {summary.dateLabel}
           </Text>
           <Text
             style={{
@@ -432,20 +847,20 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
           <Text
             style={{
               color: colors.text.secondary,
-              fontSize: 13,
-              fontWeight: '500',
+              fontSize: 12,
+              fontWeight: '600',
             }}
           >
-            Tiempo estimado
+            {summary.timeLabel}
           </Text>
           <Text
             style={{
               color: secondaryColor,
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: '700',
             }}
           >
-            {totalDuration} min
+            <Feather name="clock" size={13} /> {totalDuration} min
           </Text>
         </View>
       </Animated.View>
@@ -531,6 +946,13 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
                   )}
                 </Text>
 
+                {validationMessage && validationErrorFieldId === currentField.id && (
+                  <View style={styles.validationBanner}>
+                    <Feather name="alert-circle" size={15} color="#EF4444" />
+                    <Text style={styles.validationBannerText}>{validationMessage}</Text>
+                  </View>
+                )}
+
                 <View style={styles.slideInputWrapper}>
                   {renderFieldInput(currentField, true)}
                 </View>
@@ -554,7 +976,7 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
             onPress={handlePrevSlide}
             disabled={currentSlideIndex === 0}
           >
-            <Feather name="chevron-up" size={28} color={colors.text.primary} />
+            <Feather name="chevron-left" size={26} color={colors.text.primary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -570,10 +992,18 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
             >
               <Text style={styles.slideMainBtnText}>
                 {currentSlideIndex === schema.fields.length - 1
-                  ? 'Confirmar Reserva'
+                  ? submitButtonLabel || 'Confirmar Reserva'
                   : 'Siguiente'}
               </Text>
-              <Feather name="check" size={20} color="#FFF" />
+              <Feather
+                name={
+                  currentSlideIndex === schema.fields.length - 1
+                    ? 'check'
+                    : 'arrow-right'
+                }
+                size={18}
+                color="#FFF"
+              />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -599,49 +1029,78 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
         <ScrollView
           contentContainerStyle={styles.classicScrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Cabecera del Formulario con Identidad de Marca (Logotipo y Colores Corporativos) */}
           <Animated.View entering={FadeInDown.duration(400)}>
             {renderBrandIdentityBanner(false)}
           </Animated.View>
 
+          {validationMessage && (
+            <Animated.View entering={FadeIn.duration(250)} style={styles.validationBanner}>
+              <Feather name="alert-circle" size={16} color="#EF4444" />
+              <Text style={styles.validationBannerText}>{validationMessage}</Text>
+            </Animated.View>
+          )}
+
           {/* Lista de Campos */}
-          {schema.fields.map((field, idx) => (
-            <Animated.View
-              key={field.id}
-              entering={FadeInDown.duration(400).delay(150 + idx * 100)}
-              style={[
-                styles.classicFieldCard,
-                {
-                  backgroundColor: colors.background.primary,
-                  borderLeftColor: idx % 2 === 0 ? primaryColor : secondaryColor,
-                  borderLeftWidth: 4,
-                },
-              ]}
-            >
-              <Text
+          {schema.fields.map((field, idx) => {
+            const isComplete = isFieldAnswered(field, answers[field.id]);
+            const hasFieldError = validationErrorFieldId === field.id;
+
+            return (
+              <Animated.View
+                key={field.id}
+                entering={FadeInDown.duration(400).delay(100 + idx * 70)}
                 style={[
-                  styles.classicFieldQuestion,
-                  { color: colors.text.primary },
+                  styles.classicFieldCard,
+                  {
+                    backgroundColor: colors.background.primary,
+                    borderLeftColor: hasFieldError
+                      ? '#EF4444'
+                      : idx % 2 === 0
+                      ? primaryColor
+                      : secondaryColor,
+                    borderLeftWidth: 4,
+                  },
                 ]}
               >
-                {field.question}
-                {field.required && (
-                  <Text style={{ color: colors.status.error }}> *</Text>
-                )}
-              </Text>
+                <View style={styles.classicQuestionHeader}>
+                  <Text
+                    style={[
+                      styles.classicFieldQuestion,
+                      { color: colors.text.primary, flex: 1, marginBottom: 0 },
+                    ]}
+                  >
+                    {field.question}
+                    {field.required && (
+                      <Text style={{ color: colors.status.error }}> *</Text>
+                    )}
+                  </Text>
+                  {isComplete && (
+                    <View
+                      style={[
+                        styles.completedFieldBadge,
+                        { backgroundColor: `${primaryColor}18` },
+                      ]}
+                    >
+                      <Feather name="check" size={12} color={primaryColor} />
+                    </View>
+                  )}
+                </View>
 
-              <View style={styles.classicInputWrapper}>
-                {renderFieldInput(field, false)}
-              </View>
-            </Animated.View>
-          ))}
+                <View style={styles.classicInputWrapper}>
+                  {renderFieldInput(field, false)}
+                </View>
+              </Animated.View>
+            );
+          })}
 
           {/* Botón de Enviar con Degradado Corporativo */}
-          <Animated.View entering={FadeIn.delay(500)}>
+          <Animated.View entering={FadeIn.delay(350)}>
             <TouchableOpacity
               style={styles.classicSubmitBtnWrapper}
-              onPress={() => onSubmit(answers)}
+              onPress={validateAndSubmitAll}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -650,15 +1109,16 @@ export function FormViewer({ schema, onSubmit }: FormViewerProps) {
                 end={{ x: 1, y: 0 }}
                 style={styles.classicSubmitBtn}
               >
+                <Feather name="check-circle" size={18} color="#FFFFFF" />
                 <Text style={styles.classicSubmitBtnText}>
-                  Confirmar Reservación
+                  {submitButtonLabel || 'Confirmar Reservación'}
                 </Text>
                 <Feather name="arrow-right" size={18} color="#FFFFFF" />
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
 
-          <View style={{ height: 120 }} />
+          <View style={{ height: 130 }} />
         </ScrollView>
       </KeyboardAvoidingView>
       <SummaryBar />
@@ -737,6 +1197,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.4,
   },
+  completionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.24)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  completionPillText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   brandFormMeta: {
     marginTop: 16,
     paddingTop: 14,
@@ -744,7 +1218,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.22)',
   },
   brandFormTitle: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 6,
@@ -759,7 +1233,36 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
+  // Validación
+  validationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  validationBannerText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+
   // Elementos Comunes
+  inputWithIconWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  inputLeadingIcon: {
+    position: 'absolute',
+    left: 14,
+    zIndex: 2,
+  },
   textInput: {
     borderWidth: 1.5,
     borderRadius: 12,
@@ -799,12 +1302,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionText: { fontSize: 16, fontWeight: '500' },
+  optionText: { fontSize: 15.5, fontWeight: '600' },
   optionTextLarge: { fontSize: 18, fontWeight: '600' },
   pricePill: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
+  },
+
+  // Selector de Fecha y Hora
+  subLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  subLabelText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  daysScrollRow: {
+    gap: 10,
+    paddingVertical: 2,
+  },
+  dayPillCard: {
+    width: 72,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPillName: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  dayPillNumber: {
+    fontSize: 19,
+    fontWeight: '800',
+    marginVertical: 2,
+  },
+  dayPillMonth: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeSlotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  timeSlotText: {
+    fontSize: 13,
   },
 
   starsContainer: { flexDirection: 'row', gap: 12, alignItems: 'center' },
@@ -823,16 +1381,16 @@ const styles = StyleSheet.create({
   },
   slideQuestionNumber: { fontSize: 14, fontWeight: '700' },
   slideQuestionText: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
-    lineHeight: 36,
-    marginBottom: 32,
+    lineHeight: 34,
+    marginBottom: 24,
   },
   slideInputWrapper: { minHeight: 120 },
   slideNavigation: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 16,
     paddingBottom: 32,
@@ -863,7 +1421,7 @@ const styles = StyleSheet.create({
   // ESTILO: Classic Scroll
   classicScrollContent: { padding: 16, gap: 16 },
   classicFieldCard: {
-    padding: 22,
+    padding: 20,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -871,12 +1429,26 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  classicQuestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 14,
+  },
+  completedFieldBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   classicFieldQuestion: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
   classicInputWrapper: {},
   classicSubmitBtnWrapper: {
     borderRadius: 14,
     overflow: 'hidden',
-    marginTop: 12,
+    marginTop: 8,
   },
   classicSubmitBtn: {
     height: 54,
@@ -894,8 +1466,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    paddingVertical: 14,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 14,
     borderTopWidth: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },

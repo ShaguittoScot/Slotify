@@ -40,7 +40,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   // Configuración de rutas visibles según el rol del usuario
   const allowedRouteNames = isBusiness
     ? ['index', 'agenda', 'clients', 'settings']
-    : ['explore', 'index', 'settings'];
+    : ['explore', 'form-preview', 'index', 'settings'];
 
   const visibleRoutes = state.routes.filter((route: any) =>
     allowedRouteNames.includes(route.name)
@@ -72,6 +72,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         return {
           label: 'Explorar',
           icon: (color: string) => <Feather name="compass" size={18} color={color} />,
+        };
+      case 'form-preview':
+        return {
+          label: 'Formulario',
+          icon: (color: string) => <Feather name="file-text" size={18} color={color} />,
         };
       case 'settings':
         return {

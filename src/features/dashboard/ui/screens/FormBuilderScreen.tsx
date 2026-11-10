@@ -35,8 +35,18 @@ export type FieldType =
   | 'single_choice'
   | 'multiple_choice'
   | 'rating_stars'
-  | 'service_catalog';
+  | 'service_catalog'
+  | 'date_time'
+  | 'phone'
+  | 'email';
 export type PresentationStyle = 'classic_scroll' | 'interactive_slides';
+
+export interface FormServiceItem {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+}
 
 export interface FormField {
   id: string;
@@ -44,6 +54,7 @@ export interface FormField {
   question: string;
   required: boolean;
   options?: string[];
+  placeholder?: string;
 }
 
 export interface FormSchema {
@@ -54,16 +65,20 @@ export interface FormSchema {
   secondaryColor?: string;
   logoUrl?: string | null;
   businessName?: string;
+  services?: FormServiceItem[];
   fields: FormField[];
 }
 
 const FIELD_TYPE_META: Record<FieldType, { icon: any; label: string }> = {
+  service_catalog: { icon: 'list', label: 'Catálogo de Servicios' },
+  date_time: { icon: 'calendar', label: 'Fecha y Hora' },
   short_text: { icon: 'type', label: 'Texto corto' },
-  paragraph: { icon: 'align-left', label: 'Párrafo' },
+  phone: { icon: 'phone', label: 'Teléfono / WhatsApp' },
+  email: { icon: 'mail', label: 'Correo Electrónico' },
   single_choice: { icon: 'check-circle', label: 'Opción Única' },
   multiple_choice: { icon: 'check-square', label: 'Opción Múltiple' },
+  paragraph: { icon: 'align-left', label: 'Párrafo / Notas' },
   rating_stars: { icon: 'star', label: 'Calificación' },
-  service_catalog: { icon: 'list', label: 'Catálogo de Servicios' },
 };
 
 // ─── Componente Principal ──────────────────────────────────────────
@@ -83,13 +98,45 @@ export function FormBuilderScreen() {
     logoUrl: null,
     businessName: defaultBusinessName,
     fields: [
-      { id: 'f1', type: 'short_text', question: 'Nombre completo', required: true },
+      {
+        id: 'f_services',
+        type: 'service_catalog',
+        question: 'Selecciona los servicios que deseas agendar:',
+        required: true,
+      },
+      {
+        id: 'f_datetime',
+        type: 'date_time',
+        question: 'Elige el día y horario de tu cita:',
+        required: true,
+      },
+      {
+        id: 'f1',
+        type: 'short_text',
+        question: 'Nombre completo',
+        required: true,
+        placeholder: 'Ej. Juan Pérez',
+      },
+      {
+        id: 'f_phone',
+        type: 'phone',
+        question: 'Teléfono o WhatsApp de contacto',
+        required: true,
+        placeholder: 'Ej. +52 55 1234 5678',
+      },
       {
         id: 'f2',
         type: 'single_choice',
-        question: 'Zona o modalidad preferida',
+        question: 'Zona o especialista de preferencia',
         required: false,
-        options: ['Terraza', 'Salón Principal', 'Jardín'],
+        options: ['Cualquier disponible', 'Especialista Principal', 'Zona Preferente'],
+      },
+      {
+        id: 'f_notes',
+        type: 'paragraph',
+        question: 'Notas o peticiones especiales (opcional)',
+        required: false,
+        placeholder: 'Indica cualquier detalle adicional para tu visita...',
       },
     ],
   });
@@ -118,14 +165,21 @@ export function FormBuilderScreen() {
 
   // Funciones de utilidad
   const addField = (type: FieldType) => {
+    const defaultQuestions: Partial<Record<FieldType, string>> = {
+      service_catalog: 'Selecciona los servicios que deseas:',
+      date_time: 'Elige la fecha y hora de tu cita:',
+      phone: 'Teléfono o WhatsApp de contacto',
+      email: 'Correo electrónico para confirmación',
+      paragraph: 'Comentarios o peticiones adicionales',
+    };
     const newField: FormField = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      question:
-        type === 'service_catalog'
-          ? 'Selecciona los servicios que deseas:'
-          : 'Nueva Pregunta',
-      required: type === 'service_catalog' ? true : false,
+      question: defaultQuestions[type] || 'Nueva Pregunta',
+      required:
+        type === 'service_catalog' ||
+        type === 'date_time' ||
+        type === 'phone',
       options: type.includes('choice') ? ['Opción 1', 'Opción 2'] : undefined,
     };
     setSchema((prev) => ({ ...prev, fields: [...prev.fields, newField] }));

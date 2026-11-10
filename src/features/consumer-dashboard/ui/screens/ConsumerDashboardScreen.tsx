@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,30 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useCalendarStore } from '@/features/calendar/model';
 import { useAppTheme } from '@/shared/theme';
+import {
+  loadConsumerAppointmentsLocally,
+  ConsumerBookedAppointment,
+} from '@/features/dashboard/model/formBranding';
 
 const DEMO_CONSUMER_APPOINTMENTS = [
-  { id: 'c1', business: 'Barbería Capital', service: 'Corte Degradado', date: 'Hoy', time: '04:00 PM', status: 'confirmed', address: 'Av. Reforma 222' },
-  { id: 'c2', business: 'Clínica Dental Sonrisas', service: 'Limpieza Dental', date: 'Mañana', time: '11:00 AM', status: 'pending', address: 'Calle 10 #45' },
+  {
+    id: 'c1',
+    business: 'Barbería Capital',
+    service: 'Corte Degradado',
+    date: 'Hoy',
+    time: '04:00 PM',
+    status: 'confirmed',
+    address: 'Av. Reforma 222',
+  },
+  {
+    id: 'c2',
+    business: 'Clínica Dental Sonrisas',
+    service: 'Limpieza Dental',
+    date: 'Mañana',
+    time: '11:00 AM',
+    status: 'pending',
+    address: 'Calle 10 #45',
+  },
 ];
 
 export function ConsumerDashboardScreen() {
@@ -24,45 +44,77 @@ export function ConsumerDashboardScreen() {
   const { colors, isDark } = useAppTheme();
   const { user, toggleAppMode } = useAuthStore();
   const { slots, loadSlots } = useCalendarStore();
+  const [localBookings, setLocalBookings] = useState<ConsumerBookedAppointment[]>([]);
+
+  const hydrateConsumerBookings = useCallback(async () => {
+    const saved = await loadConsumerAppointmentsLocally();
+    setLocalBookings(saved);
+  }, []);
 
   useEffect(() => {
     loadSlots();
-  }, []);
+    hydrateConsumerBookings();
+  }, [loadSlots, hydrateConsumerBookings]);
 
   const isDemo =
     user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
 
   const appointmentsList = useMemo(() => {
-    const validSlots = slots.filter((s) => s.type === 'appointment' && s.status !== 'cancelled');
+    const mappedLocal = localBookings.map((b) => ({
+      id: b.id,
+      business: b.businessName,
+      service: b.serviceNames.join(' + '),
+      date: b.dateLabel,
+      time: b.timeLabel,
+      status: b.status || 'confirmed',
+      address: b.clientName
+        ? `Reservado para ${b.clientName} • $${Number(b.totalPrice || 0).toFixed(2)}`
+        : 'Confirmación digital Slotify',
+    }));
 
-    if (validSlots.length > 0) {
-      return validSlots.map((apt) => {
-        const d = new Date(apt.startTime);
-        const isToday =
-          d.getDate() === new Date().getDate() &&
-          d.getMonth() === new Date().getMonth() &&
-          d.getFullYear() === new Date().getFullYear();
+    const localIds = new Set(mappedLocal.map((m) => m.id));
+    const validSlots = slots.filter(
+      (s) =>
+        s.type === 'appointment' &&
+        s.status !== 'cancelled' &&
+        !localIds.has(s.resourceId)
+    );
 
-        const dateStr = isToday
-          ? 'Hoy'
-          : d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
+    const mappedSlots = validSlots.map((apt) => {
+      const d = new Date(apt.startTime);
+      const isToday =
+        d.getDate() === new Date().getDate() &&
+        d.getMonth() === new Date().getMonth() &&
+        d.getFullYear() === new Date().getFullYear();
 
-        const timeStr = d.toLocaleTimeString('es-MX', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        });
+      const dateStr = isToday
+        ? 'Hoy'
+        : d.toLocaleDateString('es-MX', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          });
 
-        return {
-          id: apt.resourceId,
-          business: apt.employeeName || 'Slotify Business',
-          service: apt.title || 'Cita programada',
-          date: dateStr,
-          time: timeStr,
-          status: apt.status || 'confirmed',
-          address: 'Ubicación registrada',
-        };
+      const timeStr = d.toLocaleTimeString('es-MX', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
       });
+
+      return {
+        id: apt.resourceId,
+        business: apt.employeeName || 'Slotify Business',
+        service: apt.title || 'Cita programada',
+        date: dateStr,
+        time: timeStr,
+        status: apt.status || 'confirmed',
+        address: 'Ubicación registrada',
+      };
+    });
+
+    const combined = [...mappedLocal, ...mappedSlots];
+    if (combined.length > 0) {
+      return combined;
     }
 
     if (isDemo) {
@@ -70,7 +122,7 @@ export function ConsumerDashboardScreen() {
     }
 
     return [];
-  }, [slots, isDemo]);
+  }, [localBookings, slots, isDemo]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -115,15 +167,25 @@ export function ConsumerDashboardScreen() {
                   paddingHorizontal: 10,
                   paddingVertical: 7,
                   borderRadius: 16,
-                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : 'rgba(16, 185, 129, 0.10)',
+                  backgroundColor: isDark
+                    ? 'rgba(16, 185, 129, 0.18)'
+                    : 'rgba(16, 185, 129, 0.10)',
                   borderWidth: 1,
-                  borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.22)',
+                  borderColor: isDark
+                    ? 'rgba(16, 185, 129, 0.35)'
+                    : 'rgba(16, 185, 129, 0.22)',
                 }}
                 onPress={toggleAppMode}
                 activeOpacity={0.7}
               >
-                <MaterialCommunityIcons name="swap-horizontal" size={16} color="#10B981" />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>
+                <MaterialCommunityIcons
+                  name="swap-horizontal"
+                  size={16}
+                  color="#10B981"
+                />
+                <Text
+                  style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}
+                >
                   Modo Admin
                 </Text>
               </TouchableOpacity>
@@ -157,26 +219,42 @@ export function ConsumerDashboardScreen() {
             >
               <View style={s.heroContent}>
                 <View style={s.heroBadge}>
-                  <Text style={s.heroBadgeText}>Explorar Servicios</Text>
+                  <Text style={s.heroBadgeText}>Explorar y Agendar</Text>
                 </View>
                 <Text style={s.heroTitle}>¿Buscas agendar una cita?</Text>
                 <Text style={s.heroSub}>
-                  Encuentra barberías, consultorios, spas y más negocios cerca de ti.
+                  Encuentra barberías, consultorios, spas y llena tu formulario de reserva en segundos.
                 </Text>
-                <TouchableOpacity
-                  style={[s.heroBtn, { backgroundColor: colors.action.primary }]}
-                  onPress={() => router.push('/(main)/explore' as any)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.heroBtnText, { color: colors.action.primaryText }]}>
-                    Explorar y Reservar
-                  </Text>
-                  <Feather
-                    name="compass"
-                    size={15}
-                    color={colors.action.primaryText}
-                  />
-                </TouchableOpacity>
+                <View style={s.heroButtonsRow}>
+                  <TouchableOpacity
+                    style={[s.heroBtn, { backgroundColor: colors.action.primary }]}
+                    onPress={() => router.push('/(main)/form-preview' as any)}
+                    activeOpacity={0.85}
+                  >
+                    <Feather
+                      name="file-text"
+                      size={15}
+                      color={colors.action.primaryText}
+                    />
+                    <Text
+                      style={[
+                        s.heroBtnText,
+                        { color: colors.action.primaryText },
+                      ]}
+                    >
+                      Llenar Formulario
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={s.heroSecondaryBtn}
+                    onPress={() => router.push('/(main)/explore' as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="compass" size={15} color="#FFFFFF" />
+                    <Text style={s.heroSecondaryBtnText}>Explorar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </Animated.View>
@@ -187,8 +265,12 @@ export function ConsumerDashboardScreen() {
               <Text style={[s.sectionTitle, { color: colors.text.primary }]}>
                 Mis Citas Programadas
               </Text>
-              <TouchableOpacity onPress={() => router.push('/(main)/explore' as any)}>
-                <Text style={[s.seeAll, { color: colors.action.primary }]}>+ Agendar otra</Text>
+              <TouchableOpacity
+                onPress={() => router.push('/(main)/form-preview' as any)}
+              >
+                <Text style={[s.seeAll, { color: colors.action.primary }]}>
+                  + Nueva reserva
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -196,7 +278,7 @@ export function ConsumerDashboardScreen() {
               appointmentsList.map((apt, idx) => (
                 <Animated.View
                   key={apt.id}
-                  entering={FadeInRight.duration(400).delay(250 + idx * 80)}
+                  entering={FadeInRight.duration(400).delay(200 + idx * 70)}
                   style={[
                     s.appointmentCard,
                     {
@@ -214,22 +296,43 @@ export function ConsumerDashboardScreen() {
                         },
                       ]}
                     >
-                      <Feather name="calendar" size={18} color={colors.action.primary} />
+                      <Feather
+                        name="calendar"
+                        size={18}
+                        color={colors.action.primary}
+                      />
                     </View>
                     <View style={s.aptInfo}>
-                      <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.business}</Text>
-                      <Text style={[s.aptService, { color: colors.text.secondary }]}>
+                      <Text
+                        style={[s.aptName, { color: colors.text.primary }]}
+                      >
+                        {apt.business}
+                      </Text>
+                      <Text
+                        style={[s.aptService, { color: colors.text.secondary }]}
+                      >
                         {apt.service}
                       </Text>
-                      <Text style={[s.aptSubText, { color: colors.text.muted }]}>
+                      <Text
+                        style={[s.aptSubText, { color: colors.text.muted }]}
+                      >
                         {apt.address}
                       </Text>
                     </View>
                   </View>
 
                   <View style={s.aptRight}>
-                    <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
-                    <Text style={[s.aptDateBadge, { color: colors.text.secondary }]}>{apt.date}</Text>
+                    <Text style={[s.aptTime, { color: colors.text.primary }]}>
+                      {apt.time}
+                    </Text>
+                    <Text
+                      style={[
+                        s.aptDateBadge,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      {apt.date}
+                    </Text>
                     <View
                       style={[
                         s.aptBadge,
@@ -246,7 +349,9 @@ export function ConsumerDashboardScreen() {
                             : { color: '#F59E0B' },
                         ]}
                       >
-                        {apt.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
+                        {apt.status === 'confirmed'
+                          ? 'Confirmada'
+                          : 'Pendiente'}
                       </Text>
                     </View>
                   </View>
@@ -266,25 +371,48 @@ export function ConsumerDashboardScreen() {
                 <View
                   style={[
                     s.emptyIconCircle,
-                    { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F3F4F6' },
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(255,255,255,0.06)'
+                        : '#F3F4F6',
+                    },
                   ]}
                 >
                   <Feather name="calendar" size={26} color={colors.text.muted} />
                 </View>
-                <Text style={[s.emptyStateTitle, { color: colors.text.primary }]}>
+                <Text
+                  style={[s.emptyStateTitle, { color: colors.text.primary }]}
+                >
                   Aún no tienes citas programadas
                 </Text>
-                <Text style={[s.emptyStateSubtitle, { color: colors.text.secondary }]}>
-                  Encuentra negocios, servicios y reserva tu próxima cita fácilmente en segundos.
+                <Text
+                  style={[
+                    s.emptyStateSubtitle,
+                    { color: colors.text.secondary },
+                  ]}
+                >
+                  Abre el formulario de reservación, llena tus datos y agenda tu próxima cita en segundos.
                 </Text>
                 <TouchableOpacity
-                  style={[s.emptyActionBtn, { backgroundColor: colors.action.primary }]}
-                  onPress={() => router.push('/(main)/explore' as any)}
+                  style={[
+                    s.emptyActionBtn,
+                    { backgroundColor: colors.action.primary },
+                  ]}
+                  onPress={() => router.push('/(main)/form-preview' as any)}
                   activeOpacity={0.8}
                 >
-                  <Feather name="compass" size={15} color={colors.action.primaryText} />
-                  <Text style={[s.emptyActionBtnText, { color: colors.action.primaryText }]}>
-                    Explorar Servicios
+                  <Feather
+                    name="file-text"
+                    size={15}
+                    color={colors.action.primaryText}
+                  />
+                  <Text
+                    style={[
+                      s.emptyActionBtnText,
+                      { color: colors.action.primaryText },
+                    ]}
+                  >
+                    Abrir Formulario de Reserva
                   </Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -303,28 +431,117 @@ const s = StyleSheet.create({
   safeArea: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 12 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarText: { fontSize: 15, fontWeight: '700' },
   greetingSmall: { fontSize: 13, fontWeight: '500' },
   greetingName: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  bellBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  bellBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
   heroWrapper: { marginBottom: 20 },
   heroCard: { borderRadius: 24, padding: 22, borderWidth: 1 },
   heroContent: { zIndex: 1 },
-  heroBadge: { backgroundColor: 'rgba(255,255,255,0.15)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 10 },
+  heroBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
   heroBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  heroTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.4, marginBottom: 6 },
-  heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 20, marginBottom: 16 },
-  heroBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  heroSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  heroButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  heroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
   heroBtnText: { fontSize: 14, fontWeight: '700' },
-  sectionTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  heroSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  heroSecondaryBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   seeAll: { fontSize: 13, fontWeight: '600' },
-  appointmentCard: { borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1 },
+  appointmentCard: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
   aptLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  aptAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  aptAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   aptInfo: { flex: 1 },
   aptName: { fontSize: 15, fontWeight: '700' },
   aptService: { fontSize: 13, marginTop: 2 },
@@ -334,10 +551,41 @@ const s = StyleSheet.create({
   aptDateBadge: { fontSize: 11, fontWeight: '500' },
   aptBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   aptBadgeText: { fontSize: 11, fontWeight: '700' },
-  emptyStateCard: { borderRadius: 20, padding: 24, alignItems: 'center', borderWidth: 1, marginTop: 4 },
-  emptyIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyStateTitle: { fontSize: 16, fontWeight: '700', marginBottom: 6, textAlign: 'center' },
-  emptyStateSubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 18, paddingHorizontal: 16 },
-  emptyActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 },
+  emptyStateCard: {
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  emptyIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptyStateSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+    paddingHorizontal: 16,
+  },
+  emptyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
   emptyActionBtnText: { fontSize: 14, fontWeight: '700' },
 });

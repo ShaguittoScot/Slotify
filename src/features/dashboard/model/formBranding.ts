@@ -126,3 +126,38 @@ export async function loadFormSchemaLocally(): Promise<FormSchema | null> {
   return await storage.get<FormSchema>(FORM_SCHEMA_STORAGE_KEY);
 }
 
+export const CONSUMER_APPOINTMENTS_STORAGE_KEY = 'slotify_consumer_appointments_v1';
+
+export interface ConsumerBookedAppointment {
+  id: string;
+  businessSlug: string;
+  businessName: string;
+  accentColor: string;
+  clientName: string;
+  clientPhone: string;
+  serviceNames: string[];
+  totalPrice: number;
+  totalDuration: number;
+  dateLabel: string;
+  isoDate: string;
+  timeLabel: string;
+  notes?: string;
+  status: 'confirmed' | 'pending';
+  createdAt: string;
+}
+
+export async function loadConsumerAppointmentsLocally(): Promise<ConsumerBookedAppointment[]> {
+  const list = await storage.get<ConsumerBookedAppointment[]>(CONSUMER_APPOINTMENTS_STORAGE_KEY);
+  return Array.isArray(list) ? list : [];
+}
+
+export async function saveConsumerAppointmentLocally(
+  appointment: ConsumerBookedAppointment
+): Promise<ConsumerBookedAppointment[]> {
+  const current = await loadConsumerAppointmentsLocally();
+  const updated = [appointment, ...current];
+  await storage.set(CONSUMER_APPOINTMENTS_STORAGE_KEY, updated);
+  return updated;
+}
+
+

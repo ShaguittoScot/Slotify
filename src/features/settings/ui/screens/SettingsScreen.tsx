@@ -524,6 +524,36 @@ export function SettingsScreen() {
                 <Feather name="chevron-right" size={18} color={colors.text.muted} />
               </TouchableOpacity>
 
+              {/* Formulario de Reservación Rápida */}
+              <TouchableOpacity
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(26, 26, 26, 0.75)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+                onPress={() => router.push('/(main)/form-preview' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(236, 72, 153, 0.14)' }]}>
+                  <Feather name="file-text" size={18} color="#EC4899" />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                    Formulario de Reservación
+                  </Text>
+                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
+                    Abre el formulario para llenar tus datos y agendar tu cita
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+
               {/* Mis Datos de Contacto */}
               <TouchableOpacity
                 style={[
