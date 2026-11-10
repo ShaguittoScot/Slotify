@@ -1,6 +1,6 @@
-import { create } from 'zustand';
 import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
+import { create } from 'zustand';
 import { authApi } from '../api';
 import type { LoginCredentials, RegisterAdminRequest, RegisterClientRequest, SyncProfileRequest } from '../types';
 
@@ -190,17 +190,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+
   completeOnboarding: async (data) => {
     set({ isLoading: true, error: null });
+
     try {
       const { user } = get();
-      if (!user) throw new Error('No hay usuario autenticado');
+
+      if (!user) {
+        throw new Error('No hay usuario autenticado');
+      }
 
       const payload: SyncProfileRequest = {
         id: user.id,
         email: user.email,
-        firstName: data.firstName || user.firstName || user.fullName.split(' ')[0] || 'Usuario',
-        lastName: data.lastName || user.lastName || user.fullName.split(' ').slice(1).join(' '),
+        firstName:
+          data.firstName ||
+          user.firstName ||
+          user.fullName.split(' ')[0] ||
+          'Usuario',
+        lastName:
+          data.lastName ||
+          user.lastName ||
+          user.fullName.split(' ').slice(1).join(' '),
         fullName: data.fullName || user.fullName,
         businessName: data.businessName,
         businessPhone: data.businessPhone,
@@ -221,12 +233,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: { ...user, businessId: syncedBusinessId || 'synced-backend' },
         isJustRegistered: false,
         isLoading: false,
+        error: null,
       });
+
     } catch (error: any) {
-      set({ error: error.message || 'Error al guardar la configuración', isLoading: false });
-      throw error;
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.errors?.join(', ') ||
+        error.message ||
+        'Error al guardar la configuración';
+
+      set({
+        error: errorMessage,
+        isLoading: false,
+      });
+
+      throw new Error(errorMessage);
     }
   },
+
 
   logout: async () => {
     set({ isLoading: true });
