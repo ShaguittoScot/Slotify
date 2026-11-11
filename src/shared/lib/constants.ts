@@ -31,11 +31,24 @@ export const API_ENDPOINTS = {
   /** US-003: Calendario — obtener slots por rango de fechas */
   CALENDAR: {
     GET_SLOTS: '/calendar/slots',
+    EMPLOYEES: '/calendar/employees',
+    CREATE_APPOINTMENT: '/calendar/appointments',
+    UPDATE_APPOINTMENT: (id: string) => `/calendar/appointments/${id}`,
   },
   /** US-008: Bloqueo Manual de Horarios */
   SCHEDULE_BLOCKS: {
     CREATE: '/schedule-blocks',
-    DELETE: (id: number) => `/schedule-blocks/${id}`,
+    DELETE: (id: string) => `/schedule-blocks/${id}`,
+  },
+  /** US-026: Construcción de módulo de clientes */
+  CLIENTS: {
+    NOTE: '/clients/note',
+    GET_ALL: '/clients',
+    OPTIONS: '/clients/options',
+    UPSERT: '/clients',
+    UPDATE: (id: string) => `/clients/${id}`,
+    ARCHIVE: '/clients/archive',
+    RESTORE: (id: string) => `/clients/${id}/restore`,
   },
 } as const;
 
@@ -49,4 +62,7 @@ export const QUERY_KEYS = {
   /** US-008: Cache de bloqueos de agenda */
   SCHEDULE_BLOCKS: (startDate: string, endDate: string) =>
     ['scheduleBlocks', startDate, endDate] as const,
+  /** US-026: Cache de cartera de clientes */
+  BUSINESS_CLIENTS: (search?: string) => ['clients', search ?? 'all'] as const,
 } as const;
+export const CLIENT_PHONE_MAX_LENGTH = 20;

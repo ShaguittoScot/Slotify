@@ -3,12 +3,11 @@
  *
  * Funciones para comunicarse con el endpoint /api/schedule-blocks.
  *
- * TODO: Implementar las llamadas al backend.
  */
 
 import { apiClient } from '@/shared/lib';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
-import type { ApiResponse, CreateScheduleBlockPayload, ScheduleBlock } from '@/shared/types';
+import type { ApiResponse } from '@/shared/types';
 
 /**
  * Crea un nuevo bloqueo manual en la agenda.
@@ -16,15 +15,13 @@ import type { ApiResponse, CreateScheduleBlockPayload, ScheduleBlock } from '@/s
  * Requiere autenticación JWT.
  */
 export async function createScheduleBlock(
-  payload: CreateScheduleBlockPayload,
-): Promise<number> {
-  // TODO: Implementar llamada real
-  // const response = await apiClient.post<ApiResponse<number>>(
-  //   API_ENDPOINTS.SCHEDULE_BLOCKS.CREATE,
-  //   payload
-  // );
-  // return response.data.data; // retorna el ID del bloqueo creado
-  throw new Error('US-008: createScheduleBlock no implementado');
+  payload: { startDateTime: string; endDateTime: string; reason: string },
+): Promise<string> {
+  const { data } = await apiClient.post<ApiResponse<number | string>>(API_ENDPOINTS.SCHEDULE_BLOCKS.CREATE, payload);
+  if (data.success !== true || !data.data) {
+    throw new Error('El servidor no confirmó el bloqueo.');
+  }
+  return String(data.data);
 }
 
 /**
@@ -32,8 +29,9 @@ export async function createScheduleBlock(
  * Endpoint: DELETE /api/schedule-blocks/{id}
  * Requiere autenticación JWT.
  */
-export async function deleteScheduleBlock(blockId: number): Promise<void> {
-  // TODO: Implementar llamada real
-  // await apiClient.delete(API_ENDPOINTS.SCHEDULE_BLOCKS.DELETE(blockId));
-  throw new Error('US-008: deleteScheduleBlock no implementado');
+export async function deleteScheduleBlock(blockId: string): Promise<void> {
+  const { data } = await apiClient.delete<{ success: boolean }>(API_ENDPOINTS.SCHEDULE_BLOCKS.DELETE(blockId));
+  if (data?.success !== true) {
+    throw new Error('El servidor no confirmó el desbloqueo.');
+  }
 }

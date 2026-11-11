@@ -1,3 +1,4 @@
+import { toBusinessClock } from '../model/businessTime';
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { CalendarSlot } from '@/shared/types';
@@ -7,6 +8,7 @@ import { useAppTheme } from '@/shared/theme';
 
 interface WeekViewProps {
   selectedDate: Date;
+  timeZone: string;
   slots: CalendarSlot[];
   onSelectDate: (date: Date) => void;
   onSelectSlot?: (slot: CalendarSlot) => void;
@@ -16,6 +18,7 @@ const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export const WeekView: React.FC<WeekViewProps> = ({
   selectedDate,
+  timeZone,
   slots,
   onSelectDate,
   onSelectSlot,
@@ -25,26 +28,26 @@ export const WeekView: React.FC<WeekViewProps> = ({
   // Genera los 7 días de la semana actual (Lunes a Domingo)
   const weekDays = useMemo(() => {
     const d = new Date(selectedDate);
-    const dayOfWeek = d.getDay();
-    const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
+    const dayOfWeek = d.getUTCDay();
+    const diff = d.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const monday = new Date(d.setUTCDate(diff));
 
     return Array.from({ length: 7 }, (_, i) => {
       const day = new Date(monday);
-      day.setDate(monday.getDate() + i);
+      day.setUTCDate(monday.getUTCDate() + i);
       return day;
     });
   }, [selectedDate]);
 
   // Compara si dos fechas corresponden al mismo día local (inmune a offsets UTC)
   const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
+    d1.getUTCFullYear() === d2.getUTCFullYear() &&
+    d1.getUTCMonth() === d2.getUTCMonth() &&
+    d1.getUTCDate() === d2.getUTCDate();
 
   // Slots del día seleccionado
   const activeDaySlots = slots.filter((s) => {
-    const slotDate = new Date(s.startTime);
+    const slotDate = toBusinessClock(s.startTime, timeZone);
     return isSameDay(slotDate, selectedDate);
   });
 
@@ -67,8 +70,8 @@ export const WeekView: React.FC<WeekViewProps> = ({
         <View style={styles.daysRow}>
           {weekDays.map((day, idx) => {
             const isSelected = isSameDay(day, selectedDate);
-            const isToday = isSameDay(day, new Date());
-            const hasSlots = slots.some((s) => isSameDay(new Date(s.startTime), day));
+            const isToday = isSameDay(day, toBusinessClock(Date.now(), timeZone));
+            const hasSlots = slots.some((s) => isSameDay(toBusinessClock(s.startTime, timeZone), day));
 
             return (
               <TouchableOpacity
@@ -111,7 +114,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                     isSelected && styles.dayNumberTextSelected,
                   ]}
                 >
-                  {day.getDate()}
+                  {day.getUTCDate()}
                 </Text>
 
                 {/* Punto indicador de citas */}
@@ -158,7 +161,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
 
         {activeDaySlots.length > 0 ? (
           activeDaySlots.map((slot) => (
-            <CalendarSlotCard key={slot.resourceId} slot={slot} onPress={onSelectSlot} />
+            <CalendarSlotCard key={slot.resourceId} slot={slot} timeZone={timeZone} onPress={onSelectSlot} />
           ))
         ) : (
           <View

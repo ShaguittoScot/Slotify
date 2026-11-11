@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,170 +9,101 @@ import {
   Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
-import { useCalendarStore } from '@/features/calendar/model';
+import {
+  getCalendarAmount,
+  resolveSessionScopeKey,
+} from '@/features/calendar/model';
+import { fetchCalendarSlots } from '@/features/calendar/api';
+import { resolveBusinessTimeZone } from '@/features/calendar/model/businessTime';
+import type { CalendarResponse, CalendarSlot } from '@/shared/types';
+import { dashboardCalendarRange, selectDashboardAppointments } from '../../model/appointments';
+import {
+  useClientsStore,
+  buildUnifiedBusinessClients,
+} from '@/features/clients/model';
 import { useAppTheme } from '@/shared/theme';
 import { TemplateMigrationModal } from '../components/TemplateMigrationModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const DEMO_UPCOMING_APPOINTMENTS = [
-  { id: '1', name: 'Carlos Mendoza', service: 'Corte de Cabello & Barba', time: '10:00 AM', status: 'confirmed' },
-  { id: '2', name: 'Laura Gómez', service: 'Tinte & Peinado', time: '11:30 AM', status: 'confirmed' },
-  { id: '3', name: 'Roberto Díaz', service: 'Tratamiento Capilar', time: '02:00 PM', status: 'pending' },
-  { id: '4', name: 'Andrea Ruiz', service: 'Manicura Spa', time: '04:15 PM', status: 'confirmed' },
-];
+const EMPTY_SLOTS: CalendarSlot[] = [];
 
 export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
-  const { user, toggleAppMode } = useAuthStore();
-  const { slots, loadSlots } = useCalendarStore();
+  const { user } = useAuthStore();
+  const { apiClients, manualClients, clientNotes, loadClients, currentScopeKey } =
+    useClientsStore();
   const [migrationModalVisible, setMigrationModalVisible] = useState(false);
+  const [calendar, setCalendar] = useState<{
+    scopeKey: string;
+    data?: CalendarResponse;
+    failed?: boolean;
+  }>();
+  const [now, setNow] = useState(Date.now);
+  const scopeKey = resolveSessionScopeKey(user);
 
-  useEffect(() => {
-    loadSlots();
-  }, []);
-
-  const isDemo =
-    user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
-
-  const appointments = useMemo(() => {
-    return slots.filter((s) => s.type === 'appointment');
-  }, [slots]);
-
-  // Lista de citas para mostrar en "Próximas Citas"
-  const upcomingAppointmentsList = useMemo(() => {
-    if (appointments.length > 0) {
-      const validAppointments = appointments
-        .filter((s) => s.status !== 'cancelled')
-        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
-      return validAppointments.slice(0, 5).map((apt) => {
-        const startDate = new Date(apt.startTime);
-        const timeStr = startDate.toLocaleTimeString('es-MX', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        });
-
-        return {
-          id: apt.resourceId,
-          name: apt.clientName || 'Cliente',
-          service: apt.title || 'Servicio agendado',
-          time: timeStr,
-          status: apt.status || 'confirmed',
-        };
-      });
-    }
-
-    if (isDemo) {
-      return DEMO_UPCOMING_APPOINTMENTS;
-    }
-
-    return [];
-  }, [appointments, isDemo]);
-
-  // Cálculo dinámico de métricas del negocio
-  const stats = useMemo(() => {
-    if (appointments.length > 0) {
-      const isSameDay = (d1: Date, d2: Date) =>
-        d1.getFullYear() === d2.getFullYear() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getDate() === d2.getDate();
-
-      const today = new Date();
-      const todayAppointments = appointments.filter(
-        (s) => isSameDay(new Date(s.startTime), today) && s.status !== 'cancelled'
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const refresh = () => {
+      const currentTime = Date.now();
+      setNow(currentTime);
+      const { startDate, endDate } = dashboardCalendarRange(currentTime);
+      fetchCalendarSlots(startDate, endDate).then(
+        (data) => { if (active) setCalendar({ scopeKey, data }); },
+        () => { if (active) setCalendar({ scopeKey, failed: true }); },
       );
+    };
+    refresh();
+    void loadClients(scopeKey);
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [loadClients, scopeKey]));
 
-      const uniqueClients = new Set(
-        appointments.map((s) => s.clientName || s.clientPhone).filter(Boolean)
-      ).size;
-
-      const todayRevenue = todayAppointments
-        .filter((s) => s.status === 'completed' || s.status === 'confirmed')
-        .reduce((sum, s) => {
-          if (!s.servicePrice) return sum;
-          const num = parseFloat(s.servicePrice.replace(/[^0-9.]/g, ''));
-          return sum + (isNaN(num) ? 0 : num);
-        }, 0);
-
-      const pendingCount = appointments.filter((s) => s.status === 'pending').length;
-
-      return [
-        {
-          label: 'Citas Hoy',
-          value: String(todayAppointments.length),
-          icon: 'calendar',
-          color: '#6366F1',
-        },
-        {
-          label: 'Clientes',
-          value: String(uniqueClients),
-          icon: 'users',
-          color: '#10B981',
-        },
-        {
-          label: 'Ingresos Hoy',
-          value: todayRevenue > 0 ? `$${todayRevenue.toLocaleString('es-MX')}` : '$0',
-          icon: 'dollar-sign',
-          color: '#F59E0B',
-        },
-        {
-          label: 'Pendientes',
-          value: String(pendingCount),
-          icon: 'clock',
-          color: '#EC4899',
-        },
-      ];
-    }
-
-    if (isDemo) {
-      return [
-        { label: 'Citas Hoy', value: '3', icon: 'calendar', color: '#6366F1' },
-        { label: 'Clientes', value: '12', icon: 'users', color: '#10B981' },
-        { label: 'Ingresos Hoy', value: '$1,450', icon: 'dollar-sign', color: '#F59E0B' },
-        { label: 'Pendientes', value: '2', icon: 'clock', color: '#EC4899' },
-      ];
-    }
-
-    return [
-      { label: 'Citas Hoy', value: '0', icon: 'calendar', color: '#6366F1' },
-      { label: 'Clientes', value: '0', icon: 'users', color: '#10B981' },
-      { label: 'Ingresos Hoy', value: '$0', icon: 'dollar-sign', color: '#F59E0B' },
-      { label: 'Pendientes', value: '0', icon: 'clock', color: '#EC4899' },
-    ];
-  }, [appointments, isDemo]);
-
-  const heroSubtitle = useMemo(() => {
-    if (appointments.length > 0) {
-      const isSameDay = (d1: Date, d2: Date) =>
-        d1.getFullYear() === d2.getFullYear() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getDate() === d2.getDate();
-      const todayCount = appointments.filter(
-        (s) => isSameDay(new Date(s.startTime), new Date()) && s.status !== 'cancelled'
-      ).length;
-      const pendingCount = appointments.filter((s) => s.status === 'pending').length;
-
-      if (todayCount === 0) {
-        return 'No tienes citas programadas para hoy. ¡Comparte tu enlace o crea una cita!';
-      }
-      return `Tienes ${todayCount} ${todayCount === 1 ? 'cita programada' : 'citas programadas'} para hoy${
-        pendingCount > 0 ? ` y ${pendingCount} pendiente(s)` : ''
-      }.`;
-    }
-
-    if (isDemo) {
-      return 'Tienes 3 citas programadas para hoy y 2 pendientes de confirmar.';
-    }
-
-    return 'Aún no tienes citas registradas. Comparte tu link para que tus clientes comiencen a agendar.';
-  }, [appointments, isDemo]);
+  const currentCalendar = calendar?.scopeKey === scopeKey ? calendar : undefined;
+  const calendarReady = currentCalendar?.data !== undefined;
+  const calendarFailed = currentCalendar?.failed === true;
+  const slots = currentCalendar?.data?.slots ?? EMPTY_SLOTS;
+  const timeZone = resolveBusinessTimeZone(currentCalendar?.data?.timeZone);
+  const { todayAppointments, upcoming } = useMemo(
+    () => selectDashboardAppointments(slots, now, timeZone),
+    [slots, now, timeZone],
+  );
+  const unifiedClientsCount = useMemo(
+    () => currentScopeKey === scopeKey
+      ? buildUnifiedBusinessClients(apiClients, manualClients, slots, clientNotes).length
+      : 0,
+    [apiClients, manualClients, slots, clientNotes, currentScopeKey, scopeKey],
+  );
+  const todayCompletedTotal = todayAppointments
+    .filter((slot) => slot.status === 'completed')
+    .reduce((sum, slot) => sum + Math.round((getCalendarAmount(slot) ?? 0) * 100), 0) / 100;
+  const todayConfirmed = todayAppointments.filter((slot) => slot.status === 'confirmed').length;
+  const stats = [
+    { label: 'Citas Hoy', value: calendarReady ? String(todayAppointments.length) : '—', icon: 'calendar', color: '#6366F1' },
+    { label: 'Clientes', value: String(unifiedClientsCount), icon: 'users', color: '#10B981' },
+    {
+      label: 'Pactado en completadas hoy',
+      value: calendarReady ? todayCompletedTotal.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) : '—',
+      icon: 'dollar-sign',
+      color: '#F59E0B',
+    },
+    { label: 'Confirmadas hoy', value: calendarReady ? String(todayConfirmed) : '—', icon: 'clock', color: '#EC4899' },
+  ];
+  const heroSubtitle = calendarFailed
+    ? 'No se pudo consultar la agenda.'
+    : !calendarReady
+    ? 'Consultando la agenda…'
+    : todayAppointments.length === 0
+    ? 'No tienes citas programadas para hoy.'
+    : todayAppointments.length === 1 ? 'Tienes una cita programada para hoy.' : `Tienes ${todayAppointments.length} citas programadas para hoy.`;
 
   const getInitials = (name?: string) => {
     if (!name) return 'US';
@@ -208,53 +139,31 @@ export function DashboardScreen() {
                   {getInitials(user?.fullName)}
                 </Text>
               </View>
-              <View>
+              <View style={s.greeting}>
                 <Text style={[s.greetingSmall, { color: colors.text.secondary }]}>
                   Panel de Negocio (Admin)
                 </Text>
-                <Text style={[s.greetingName, { color: colors.text.primary }]}>
+                <Text numberOfLines={2} style={[s.greetingName, { color: colors.text.primary }]}>
                   {user?.fullName || 'Mi Negocio'}
                 </Text>
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {/* Botón de Salto Rápido de Interfaz (Pruebas) */}
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 5,
-                  paddingHorizontal: 10,
-                  paddingVertical: 7,
-                  borderRadius: 16,
-                  backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.10)',
-                  borderWidth: 1,
-                  borderColor: isDark ? 'rgba(99, 102, 241, 0.35)' : 'rgba(99, 102, 241, 0.22)',
-                }}
-                onPress={toggleAppMode}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="swap-horizontal" size={16} color="#818CF8" />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#818CF8' }}>
-                  Ver Cliente
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  s.bellBtn,
-                  {
-                    backgroundColor: colors.background.secondary,
-                    borderColor: colors.border.main,
-                  },
-                ]}
-                onPress={() => router.push('/(main)/settings' as any)}
-                activeOpacity={0.7}
-              >
-                <Feather name="settings" size={18} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Abrir Ajustes"
+              style={[
+                s.settingsButton,
+                {
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.main,
+                },
+              ]}
+              onPress={() => router.navigate('/(main)/settings')}
+              activeOpacity={0.7}
+            >
+              <Feather name="settings" size={18} color={colors.text.primary} />
+            </TouchableOpacity>
           </View>
 
           {/* ─── HERO CARD ─── */}
@@ -418,10 +327,10 @@ export function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            {upcomingAppointmentsList.length > 0 ? (
-              upcomingAppointmentsList.map((apt, idx) => (
+            {upcoming.length > 0 ? (
+              upcoming.map((apt, idx) => (
                 <Animated.View
-                  key={apt.id}
+                  key={apt.resourceId}
                   entering={FadeInRight.duration(400).delay(350 + idx * 80)}
                   style={[
                     s.appointmentCard,
@@ -441,49 +350,33 @@ export function DashboardScreen() {
                       ]}
                     >
                       <Text style={[s.aptAvatarText, { color: colors.text.primary }]}>
-                        {getInitials(apt.name)}
+                        {getInitials(apt.clientName)}
                       </Text>
                     </View>
                     <View style={s.aptInfo}>
-                      <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.name}</Text>
+                      <Text style={[s.aptName, { color: colors.text.primary }]}>{apt.clientName || 'Cliente'}</Text>
                       <Text style={[s.aptService, { color: colors.text.secondary }]}>
-                        {apt.service}
+                        {apt.title}
                       </Text>
                     </View>
                   </View>
 
                   <View style={s.aptRight}>
-                    <Text style={[s.aptTime, { color: colors.text.primary }]}>{apt.time}</Text>
-                    <View
-                      style={[
-                        s.aptBadge,
-                        apt.status === 'confirmed'
-                          ? { backgroundColor: '#10B98120' }
-                          : apt.status === 'completed'
-                          ? { backgroundColor: '#6366F120' }
-                          : { backgroundColor: '#F59E0B20' },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          s.aptBadgeText,
-                          apt.status === 'confirmed'
-                            ? { color: '#10B981' }
-                            : apt.status === 'completed'
-                            ? { color: '#6366F1' }
-                            : { color: '#F59E0B' },
-                        ]}
-                      >
-                        {apt.status === 'confirmed'
-                          ? 'Confirmada'
-                          : apt.status === 'completed'
-                          ? 'Completada'
-                          : 'Pendiente'}
-                      </Text>
+                    <Text style={[s.aptTime, { color: colors.text.primary }]}>
+                      {new Date(apt.startTime).toLocaleString('es-MX', {
+                        timeZone, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </Text>
+                    <View style={[s.aptBadge, { backgroundColor: '#10B98120' }]}>
+                      <Text style={[s.aptBadgeText, { color: isDark ? '#34D399' : '#047857' }]}>Confirmada</Text>
                     </View>
                   </View>
                 </Animated.View>
               ))
+            ) : !calendarReady ? (
+              <Text style={[s.emptyStateSubtitle, { color: colors.text.secondary }]}>
+                {calendarFailed ? 'No se pudieron cargar las próximas citas.' : 'Cargando próximas citas…'}
+              </Text>
             ) : (
               <Animated.View
                 entering={FadeInDown.duration(400)}
@@ -504,10 +397,10 @@ export function DashboardScreen() {
                   <Feather name="calendar" size={26} color={colors.text.muted} />
                 </View>
                 <Text style={[s.emptyStateTitle, { color: colors.text.primary }]}>
-                  Aún no tienes citas registradas
+                  Sin citas próximas
                 </Text>
                 <Text style={[s.emptyStateSubtitle, { color: colors.text.secondary }]}>
-                  Las citas que agenden tus clientes o agregues desde la agenda aparecerán aquí.
+                  Aquí aparecen tus próximas citas confirmadas.
                 </Text>
                 <View style={s.emptyActionsRow}>
                   <TouchableOpacity
@@ -558,13 +451,14 @@ const s = StyleSheet.create({
   safeArea: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 12 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  headerLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 15, fontWeight: '700' },
+  greeting: { flex: 1, minWidth: 0 },
   greetingSmall: { fontSize: 13, fontWeight: '500' },
   greetingName: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  bellBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  settingsButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   heroWrapper: { marginBottom: 20 },
   heroCard: { borderRadius: 24, padding: 22, borderWidth: 1 },
   heroContent: { zIndex: 1 },

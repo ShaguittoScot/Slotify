@@ -1,3 +1,4 @@
+import { toBusinessClock } from '../model/businessTime';
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { CalendarSlot } from '@/shared/types';
@@ -7,6 +8,7 @@ import { useAppTheme } from '@/shared/theme';
 
 interface MonthViewProps {
   selectedDate: Date;
+  timeZone: string;
   slots: CalendarSlot[];
   onSelectDate: (date: Date) => void;
   onSelectSlot?: (slot: CalendarSlot) => void;
@@ -16,40 +18,41 @@ const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 export const MonthView: React.FC<MonthViewProps> = ({
   selectedDate,
+  timeZone,
   slots,
   onSelectDate,
   onSelectSlot,
 }) => {
   const { colors, isDark } = useAppTheme();
-  const currentYear = selectedDate.getFullYear();
-  const currentMonth = selectedDate.getMonth();
+  const currentYear = selectedDate.getUTCFullYear();
+  const currentMonth = selectedDate.getUTCMonth();
 
   // Genera la cuadrícula de días del mes actual con los paddings iniciales y finales
   const calendarGrid = useMemo(() => {
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const firstDay = new Date(Date.UTC(currentYear, currentMonth, 1));
+    const lastDay = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
 
     // Ajuste para que Lunes sea 0
-    let startDayIdx = firstDay.getDay() - 1;
+    let startDayIdx = firstDay.getUTCDay() - 1;
     if (startDayIdx === -1) startDayIdx = 6;
 
     const days: { date: Date; isCurrentMonth: boolean }[] = [];
 
     // Días del mes anterior
     for (let i = startDayIdx - 1; i >= 0; i--) {
-      const prev = new Date(currentYear, currentMonth, -i);
+      const prev = new Date(Date.UTC(currentYear, currentMonth, -i));
       days.push({ date: prev, isCurrentMonth: false });
     }
 
     // Días del mes actual
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push({ date: new Date(currentYear, currentMonth, i), isCurrentMonth: true });
+    for (let i = 1; i <= lastDay.getUTCDate(); i++) {
+      days.push({ date: new Date(Date.UTC(currentYear, currentMonth, i)), isCurrentMonth: true });
     }
 
     // Completar última fila
     const remaining = (7 - (days.length % 7)) % 7;
     for (let i = 1; i <= remaining; i++) {
-      days.push({ date: new Date(currentYear, currentMonth + 1, i), isCurrentMonth: false });
+      days.push({ date: new Date(Date.UTC(currentYear, currentMonth + 1, i)), isCurrentMonth: false });
     }
 
     return days;
@@ -57,13 +60,13 @@ export const MonthView: React.FC<MonthViewProps> = ({
 
   // Compara si dos fechas corresponden al mismo día local (inmune a offsets UTC)
   const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
+    d1.getUTCFullYear() === d2.getUTCFullYear() &&
+    d1.getUTCMonth() === d2.getUTCMonth() &&
+    d1.getUTCDate() === d2.getUTCDate();
 
   // Slots del día seleccionado
   const activeDaySlots = slots.filter((s) => {
-    const slotDate = new Date(s.startTime);
+    const slotDate = toBusinessClock(s.startTime, timeZone);
     return isSameDay(slotDate, selectedDate);
   });
 
@@ -100,8 +103,8 @@ export const MonthView: React.FC<MonthViewProps> = ({
         <View style={styles.gridContainer}>
           {calendarGrid.map((item, idx) => {
             const isSelected = isSameDay(item.date, selectedDate);
-            const isToday = isSameDay(item.date, new Date());
-            const hasSlots = slots.some((s) => isSameDay(new Date(s.startTime), item.date));
+            const isToday = isSameDay(item.date, toBusinessClock(Date.now(), timeZone));
+            const hasSlots = slots.some((s) => isSameDay(toBusinessClock(s.startTime, timeZone), item.date));
 
             return (
               <TouchableOpacity
@@ -137,7 +140,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     isSelected && { color: '#FFFFFF', fontWeight: '800' },
                   ]}
                 >
-                  {item.date.getDate()}
+                  {item.date.getUTCDate()}
                 </Text>
 
                 {/* Micro indicador de citas */}
@@ -161,6 +164,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
         <View style={styles.detailHeader}>
           <Text style={[styles.detailTitle, { color: colors.text.primary }]}>
             {selectedDate.toLocaleDateString('es-ES', {
+              timeZone: 'UTC',
               weekday: 'long',
               day: 'numeric',
               month: 'long',
@@ -184,7 +188,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
 
         {activeDaySlots.length > 0 ? (
           activeDaySlots.map((slot) => (
-            <CalendarSlotCard key={slot.resourceId} slot={slot} onPress={onSelectSlot} />
+            <CalendarSlotCard key={slot.resourceId} slot={slot} timeZone={timeZone} onPress={onSelectSlot} />
           ))
         ) : (
           <View

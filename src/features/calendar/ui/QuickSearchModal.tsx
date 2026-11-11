@@ -1,3 +1,4 @@
+import { formatBusinessHour, toBusinessClock } from '../model/businessTime';
 import React, { useState, useMemo } from 'react';
 import {
   Modal,
@@ -16,6 +17,7 @@ import { useAppTheme } from '@/shared/theme';
 
 interface QuickSearchModalProps {
   visible: boolean;
+  timeZone: string;
   onClose: () => void;
   slots: CalendarSlot[];
   onSelectSlot: (slot: CalendarSlot) => void;
@@ -37,8 +39,14 @@ const STATUS_CONFIG: Record<
     text: '#F59E0B',
     dot: '#F59E0B',
   },
+  no_show: {
+    label: 'Inasistencia',
+    bg: 'rgba(245, 158, 11, 0.12)',
+    text: '#B45309',
+    dot: '#F59E0B',
+  },
   completed: {
-    label: 'Cobrada',
+    label: 'Completada',
     bg: 'rgba(16, 185, 129, 0.12)',
     text: '#10B981',
     dot: '#10B981',
@@ -53,6 +61,7 @@ const STATUS_CONFIG: Record<
 
 export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   visible,
+  timeZone,
   onClose,
   slots,
   onSelectSlot,
@@ -92,10 +101,10 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   const formatSlotDate = (startTime: string, endTime: string) => {
     const start = new Date(startTime);
     const end = new Date(endTime);
-    const day = start.getDate();
-    const month = start.toLocaleDateString('es-ES', { month: 'short' });
-    const timeStart = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const timeEnd = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const day = toBusinessClock(start, timeZone).getUTCDate();
+    const month = start.toLocaleDateString('es-ES', { month: 'short', timeZone });
+    const timeStart = formatBusinessHour(start, timeZone);
+    const timeEnd = formatBusinessHour(end, timeZone);
     return `${day} ${month} • ${timeStart} - ${timeEnd}`;
   };
 

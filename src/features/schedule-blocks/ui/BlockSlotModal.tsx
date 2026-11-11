@@ -8,20 +8,23 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { formatBusinessHour, scheduleInstant } from '@/features/calendar/model/businessTime';
 
 interface BlockSlotModalProps {
   visible: boolean;
+  timeZone: string;
   onClose: () => void;
   onSave: (blockData: {
     title: string;
     reason: string;
     startTime: string;
     endTime: string;
-  }) => void;
-  initialDate?: Date;
+  }) => Promise<void> | void;
+  initialDate: Date;
   initialHour?: string;
 }
 
@@ -40,9 +43,10 @@ const TIME_OPTIONS = [
 
 export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
   visible,
+  timeZone,
   onClose,
   onSave,
-  initialDate = new Date(),
+  initialDate,
   initialHour,
 }) => {
   const { colors, isDark } = useAppTheme();
@@ -51,14 +55,14 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
   const [customReason, setCustomReason] = useState('');
   const [startHour, setStartHour] = useState('14:00');
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (visible) {
       if (initialHour) {
-        const matching = TIME_OPTIONS.find((t) => t.startsWith(initialHour.slice(0, 2))) || initialHour;
-        setStartHour(matching);
+        setStartHour(initialHour);
       } else {
-        const h = String(initialDate.getHours()).padStart(2, '0');
+        const h = String(initialDate.getUTCHours()).padStart(2, '0');
         const nearest = TIME_OPTIONS.find((t) => t.startsWith(h)) || '14:00';
         setStartHour(nearest);
       }
@@ -68,30 +72,36 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
     }
   }, [visible, initialDate, initialHour]);
 
-  const handleSave = () => {
-    const d = new Date(initialDate);
-    const [hours, minutes] = startHour.split(':').map(Number);
-    d.setHours(hours, minutes, 0, 0);
-
+  const handleSave = async () => {
+    if (isSaving) return;
+    const d = scheduleInstant(initialDate, startHour, timeZone);
+    if (!d) {
+      Alert.alert('Hora no disponible', 'Esa hora no existe en la zona del negocio. Elige otra.');
+      return;
+    }
     const end = new Date(d.getTime() + durationMinutes * 60 * 1000);
 
     const reasonText = customReason.trim() ? customReason.trim() : selectedReason.label;
 
-    onSave({
-      title: `Bloqueo: ${reasonText}`,
-      reason: reasonText,
-      startTime: d.toISOString(),
-      endTime: end.toISOString(),
-    });
-    onClose();
+    setIsSaving(true);
+    try {
+      await onSave({
+        title: `Bloqueo: ${reasonText}`,
+        reason: reasonText,
+        startTime: d.toISOString(),
+        endTime: end.toISOString(),
+      });
+      onClose();
+    } catch (error) {
+      Alert.alert('No se pudo bloquear el horario', error instanceof Error ? error.message : 'Inténtalo de nuevo.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const endHourFormatted = () => {
-    const [h, m] = startHour.split(':').map(Number);
-    const totalMinutes = h * 60 + m + durationMinutes;
-    const endH = Math.floor(totalMinutes / 60) % 24;
-    const endM = totalMinutes % 60;
-    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    const start = scheduleInstant(initialDate, startHour, timeZone);
+    return start ? formatBusinessHour(new Date(start.getTime() + durationMinutes * 60_000), timeZone) : '—';
   };
 
   return (
@@ -117,21 +127,22 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
               <View style={[styles.iconBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
                 <Feather name="slash" size={18} color="#EF4444" />
               </View>
-              <View>
+              <View style={styles.headerCopy}>
                 <Text style={[styles.title, { color: colors.text.primary }]}>
                   Bloquear Horario
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.text.muted }]}>
-                  Define tiempo no disponible en tu agenda
+                  Horario en la zona del negocio
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar bloqueo" disabled={isSaving}
+              onPress={onClose} style={[styles.close, { backgroundColor: colors.background.primary, borderColor: colors.border.main }]}>
               <Feather name="x" size={20} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Motivo Selector */}
             <Text style={[styles.sectionLabel, { color: colors.text.secondary }]}>
               Motivo del Bloqueo
@@ -323,6 +334,7 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
 
             <TouchableOpacity
               onPress={handleSave}
+              disabled={isSaving}
               style={[styles.saveBtn, { backgroundColor: '#EF4444' }]}
             >
               <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
@@ -355,6 +367,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 16,
     paddingBottom: 14,
     borderBottomWidth: 1,
@@ -363,8 +376,12 @@ const styles = StyleSheet.create({
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
     gap: 12,
   },
+  headerCopy: { flex: 1, minWidth: 0 },
+  close: { width: 44, height: 44, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   iconBadge: {
     width: 36,
     height: 36,
