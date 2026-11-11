@@ -32,6 +32,7 @@ interface FluidToggleSwitchProps {
   inactiveColor?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  accessibilityLabel?: string;
 }
 
 export const FluidToggleSwitch: React.FC<FluidToggleSwitchProps> = ({
@@ -42,6 +43,7 @@ export const FluidToggleSwitch: React.FC<FluidToggleSwitchProps> = ({
   inactiveColor = 'rgba(255, 255, 255, 0.16)',
   style,
   testID,
+  accessibilityLabel,
 }) => {
   // Desplazamiento del thumb: 0 (apagado) a 20 (encendido)
   const progress = useSharedValue(value ? 1 : 0);
@@ -108,6 +110,7 @@ export const FluidToggleSwitch: React.FC<FluidToggleSwitchProps> = ({
   return (
     <Pressable
       testID={testID}
+      accessibilityLabel={accessibilityLabel}
       accessible={true}
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled }}

@@ -3,12 +3,40 @@
  *
  * Estado reactivo para el calendario multiformato táctil.
  * Maneja la vista activa (día/semana/mes), fechas seleccionadas,
- * y la sincronización con el backend .NET (Slotify_back).
+ * aislamiento por sesión/negocio y la sincronización con el backend .NET (Slotify_back).
  */
 
 import { create } from 'zustand';
 import type { CalendarSlot, CalendarViewMode } from '@/shared/types';
 import { fetchCalendarSlots } from '../api';
+import { useAuthStore } from '@/features/auth/model';
+import { calendarRange, DEFAULT_BUSINESS_TIME_ZONE, resolveBusinessTimeZone, toBusinessClock } from './businessTime';
+
+export interface AppointmentClient {
+  businessClientId?: string;
+  fullName: string;
+  phone?: string | null;
+  email?: string;
+}
+
+export function getCalendarAmount(slot: Pick<CalendarSlot, 'agreedTotal' | 'servicePrice'>): number | undefined {
+  if (typeof slot.agreedTotal === 'number' && Number.isFinite(slot.agreedTotal)) {
+    return slot.agreedTotal;
+  }
+  const legacyAmount = parseFloat(slot.servicePrice?.replace(/[^0-9.]/g, '') ?? '');
+  return Number.isFinite(legacyAmount) ? legacyAmount : undefined;
+}
+
+export function resolveSessionScopeKey(user?: {
+  id?: string;
+  businessId?: string;
+  email?: string;
+} | null): string {
+  if (!user) return 'anonymous';
+  const uid = (user.id ?? user.email ?? 'user').trim();
+  const biz = (user.businessId ?? 'no-business').trim();
+  return `${uid}:${biz}`;
+}
 
 interface CalendarState {
   /** Modo de vista actual: 'day' | 'week' | 'month' */
@@ -16,6 +44,9 @@ interface CalendarState {
 
   /** Fecha seleccionada actualmente */
   selectedDate: Date;
+  timeZone: string | null;
+  appointmentDraft: { scopeKey: string; client: AppointmentClient } | null;
+  prepareAppointment: (draft: { scopeKey: string; client: AppointmentClient } | null) => void;
 
   /** Slots cargados del backend para el rango visible */
   slots: CalendarSlot[];
@@ -25,6 +56,12 @@ interface CalendarState {
 
   /** Error de carga */
   error: string | null;
+
+  /** Alcance actual de sesión y negocio */
+  currentScopeKey: string;
+
+  /** Contador monotónico de petición para descartar respuestas tardías al cambiar de cuenta */
+  requestId: number;
 
   // ── Acciones ──────────────────────────────────────────
   /** Cambia el modo de visualización (Día / Semana / Mes) */
@@ -42,17 +79,20 @@ interface CalendarState {
   /** Navega al período anterior según la vista activa */
   navigateBackward: () => void;
 
-  /** Carga los slots del backend para el período activo */
-  loadSlots: () => Promise<void>;
+  /** Carga los slots del backend para el período y sesión activos */
+  loadSlots: (scopeKey?: string) => Promise<void>;
 
   /** Establece los slots manualmente */
   setSlots: (slots: CalendarSlot[]) => void;
+
+  /** Reinicia el estado de la agenda al cerrar sesión o cambiar de cuenta */
+  resetCalendarState: () => void;
 
   // ── Acciones de Administrador ──────────────────────────
   /** Actualiza el estado de un slot (ej. 'confirmed' | 'cancelled' | 'completed' | 'pending') */
   updateSlotStatus: (resourceId: string, status: 'confirmed' | 'cancelled' | 'completed' | 'pending') => void;
 
-  /** Agrega un nuevo slot manualmente (cita walk-in o bloqueo) */
+  /** Agrega un nuevo slot confirmado por el servidor */
   addSlot: (slot: CalendarSlot) => void;
 
   /** Elimina un slot de la agenda (desbloquear horario o eliminar cita) */
@@ -62,43 +102,41 @@ interface CalendarState {
   rescheduleSlot: (resourceId: string, newStartTime: string, newEndTime: string) => void;
 }
 
-/** Calcula el rango ISO [startDate, endDate] para la fecha y vista actuales */
-export function getVisibleDateRange(date: Date, mode: CalendarViewMode): { startDate: string; endDate: string } {
-  const d = new Date(date);
+function calendarMonthWithNeighbors(date: Date, timeZone: string) {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  // La semana y la cuadrícula mensual pueden mostrar días de los meses vecinos.
+  return calendarRange(new Date(Date.UTC(year, month, -6)), new Date(Date.UTC(year, month + 1, 8)), timeZone);
+}
 
-  if (mode === 'day') {
-    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
-    const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
-    return { startDate: start.toISOString(), endDate: end.toISOString() };
+function moveDate(date: Date, mode: CalendarViewMode, direction: number): Date {
+  const next = new Date(date);
+  if (mode === 'month') {
+    const day = next.getUTCDate();
+    next.setUTCDate(1);
+    next.setUTCMonth(next.getUTCMonth() + direction);
+    const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+    next.setUTCDate(Math.min(day, lastDay));
+  } else {
+    next.setUTCDate(next.getUTCDate() + direction * (mode === 'week' ? 7 : 1));
   }
-
-  if (mode === 'week') {
-    const dayOfWeek = d.getDay(); // 0 es Domingo
-    const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Lunes como inicio
-    const start = new Date(d.setDate(diff));
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return { startDate: start.toISOString(), endDate: end.toISOString() };
-  }
-
-  // month
-  const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-  return { startDate: start.toISOString(), endDate: end.toISOString() };
+  return next;
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
   viewMode: 'day',
-  selectedDate: new Date(),
+  selectedDate: toBusinessClock(Date.now(), DEFAULT_BUSINESS_TIME_ZONE),
+  timeZone: null,
+  appointmentDraft: null,
+  prepareAppointment: (appointmentDraft) => set({ appointmentDraft }),
   slots: [],
   isLoading: false,
   error: null,
+  currentScopeKey: 'default',
+  requestId: 0,
 
   setViewMode: (mode) => {
     set({ viewMode: mode });
-    // Si no hay slots precargados en memoria, cargamos
     if (get().slots.length === 0) {
       get().loadSlots();
     }
@@ -106,95 +144,145 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   setSelectedDate: (date) => {
     const prev = get().selectedDate;
-    const sameMonth = prev.getFullYear() === date.getFullYear() && prev.getMonth() === date.getMonth();
+    const sameMonth = prev.getUTCFullYear() === date.getUTCFullYear() && prev.getUTCMonth() === date.getUTCMonth();
     set({ selectedDate: date });
     if (!sameMonth || get().slots.length === 0) {
       get().loadSlots();
     }
   },
 
-  goToToday: () => {
-    const today = new Date();
-    const prev = get().selectedDate;
-    const sameMonth = prev.getFullYear() === today.getFullYear() && prev.getMonth() === today.getMonth();
-    set({ selectedDate: today });
-    if (!sameMonth || get().slots.length === 0) {
-      get().loadSlots();
-    }
-  },
+  goToToday: () => get().setSelectedDate(toBusinessClock(Date.now(), get().timeZone ?? DEFAULT_BUSINESS_TIME_ZONE)),
 
-  navigateForward: () => {
-    const { selectedDate, viewMode } = get();
-    const next = new Date(selectedDate);
-    if (viewMode === 'day') next.setDate(next.getDate() + 1);
-    else if (viewMode === 'week') next.setDate(next.getDate() + 7);
-    else next.setMonth(next.getMonth() + 1);
+  navigateForward: () => get().setSelectedDate(moveDate(get().selectedDate, get().viewMode, 1)),
 
-    const sameMonth = selectedDate.getFullYear() === next.getFullYear() && selectedDate.getMonth() === next.getMonth();
-    set({ selectedDate: next });
-    if (!sameMonth || get().slots.length === 0) {
-      get().loadSlots();
-    }
-  },
+  navigateBackward: () => get().setSelectedDate(moveDate(get().selectedDate, get().viewMode, -1)),
 
-  navigateBackward: () => {
-    const { selectedDate, viewMode } = get();
-    const prev = new Date(selectedDate);
-    if (viewMode === 'day') prev.setDate(prev.getDate() - 1);
-    else if (viewMode === 'week') prev.setDate(prev.getDate() - 7);
-    else prev.setMonth(prev.getMonth() - 1);
+  loadSlots: async (explicitScopeKey) => {
+    const authUser = useAuthStore.getState().user;
+    const cleanScope =
+      explicitScopeKey ||
+      (authUser ? resolveSessionScopeKey(authUser) : get().currentScopeKey || 'default');
 
-    const sameMonth = selectedDate.getFullYear() === prev.getFullYear() && selectedDate.getMonth() === prev.getMonth();
-    set({ selectedDate: prev });
-    if (!sameMonth || get().slots.length === 0) {
-      get().loadSlots();
-    }
-  },
+    const scopeChanged = get().currentScopeKey !== cleanScope;
+    const nextRequestId = get().requestId + 1;
 
-  loadSlots: async () => {
-    const { selectedDate } = get();
-    // Cargamos la ventana completa del mes para que cambiar entre Día, Semana y Mes sea instantáneo
-    const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1, 0, 0, 0);
-    const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
-
-    // Solo activamos spinner bloqueante si no tenemos ningún slot cargado previamente
-    if (get().slots.length === 0) {
-      set({ isLoading: true, error: null });
+    if (scopeChanged) {
+      set({
+        currentScopeKey: cleanScope,
+        timeZone: null,
+        selectedDate: toBusinessClock(Date.now(), DEFAULT_BUSINESS_TIME_ZONE),
+        appointmentDraft: get().appointmentDraft?.scopeKey === cleanScope ? get().appointmentDraft : null,
+        requestId: nextRequestId,
+        slots: [],
+        isLoading: true,
+        error: null,
+      });
+    } else {
+      set({
+        currentScopeKey: cleanScope,
+        requestId: nextRequestId,
+        isLoading: get().slots.length === 0,
+        error: null,
+      });
     }
 
+    const { selectedDate, timeZone } = get();
     try {
-      const response = await fetchCalendarSlots(start.toISOString(), end.toISOString());
-      set({ slots: response.slots, isLoading: false });
+      const { startDate, endDate } = calendarMonthWithNeighbors(selectedDate, timeZone ?? DEFAULT_BUSINESS_TIME_ZONE);
+      const response = await fetchCalendarSlots(startDate, endDate, undefined, cleanScope);
+
+      // Ignorar respuestas tardías si la sesión/negocio cambió mientras estaba en vuelo
+      if (get().currentScopeKey !== cleanScope || get().requestId !== nextRequestId) {
+        return;
+      }
+
+      const businessTimeZone = resolveBusinessTimeZone(response.timeZone ?? timeZone);
+      set((state) => ({
+        slots: response.slots,
+        timeZone: businessTimeZone,
+        selectedDate: !timeZone && state.selectedDate === selectedDate
+          ? toBusinessClock(Date.now(), businessTimeZone)
+          : state.selectedDate,
+        isLoading: false,
+        error: null,
+      }));
     } catch (err: any) {
+      if (get().currentScopeKey !== cleanScope || get().requestId !== nextRequestId) {
+        return;
+      }
+
       set({ error: err.message || 'Error al cargar slots del calendario', isLoading: false });
     }
   },
 
   setSlots: (slots) => set({ slots, isLoading: false }),
 
+  resetCalendarState: () =>
+    set((state) => ({
+      slots: [],
+      isLoading: false,
+      error: null,
+      currentScopeKey: 'default',
+      timeZone: null,
+      appointmentDraft: null,
+      selectedDate: toBusinessClock(Date.now(), DEFAULT_BUSINESS_TIME_ZONE),
+      requestId: state.requestId + 1,
+    })),
+
   updateSlotStatus: (resourceId, status) => {
     set((state) => ({
+      requestId: state.requestId + 1,
+      isLoading: false,
       slots: state.slots.map((s) => (s.resourceId === resourceId ? { ...s, status } : s)),
     }));
   },
 
   addSlot: (slot) => {
     set((state) => ({
-      slots: [...state.slots, slot],
+      requestId: state.requestId + 1,
+      isLoading: false,
+      slots: [
+        ...state.slots.filter((s) => s.resourceId !== slot.resourceId),
+        slot,
+      ],
     }));
   },
 
   removeSlot: (resourceId) => {
     set((state) => ({
+      requestId: state.requestId + 1,
+      isLoading: false,
       slots: state.slots.filter((s) => s.resourceId !== resourceId),
     }));
   },
 
   rescheduleSlot: (resourceId, newStartTime, newEndTime) => {
     set((state) => ({
+      requestId: state.requestId + 1,
+      isLoading: false,
       slots: state.slots.map((s) =>
         s.resourceId === resourceId ? { ...s, startTime: newStartTime, endTime: newEndTime } : s
       ),
     }));
   },
 }));
+
+if (typeof useAuthStore?.subscribe === 'function') {
+  let previousScope = resolveSessionScopeKey(useAuthStore.getState()?.user);
+  useAuthStore.subscribe((state) => {
+    const nextScope = resolveSessionScopeKey(state.user);
+    if (nextScope !== previousScope) {
+      previousScope = nextScope;
+      useCalendarStore.setState((cal) => ({
+        slots: [],
+        isLoading: false,
+        error: null,
+        currentScopeKey: nextScope,
+        timeZone: null,
+        appointmentDraft: null,
+        selectedDate: toBusinessClock(Date.now(), DEFAULT_BUSINESS_TIME_ZONE),
+        requestId: cal.requestId + 1,
+      }));
+    }
+  });
+}

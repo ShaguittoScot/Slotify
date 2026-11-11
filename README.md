@@ -72,6 +72,8 @@ Slotify/
 
 ## Guía de Instalación y Ejecución Local
 
+Para compartir el enlace desde **Información del negocio**, configura `EXPO_PUBLIC_BOOKING_BASE_URL` con la URL HTTPS del portal web publicado. La app agrega `/book/` y el identificador del negocio que devuelve la API.
+
 ### Prerrequisitos
 * **Node.js:** Versión LTS recomendada (`v20.x` o superior)
 * **Gestor de paquetes:** `npm` (`v10.x` o superior)

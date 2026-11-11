@@ -9,9 +9,11 @@ import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
 import type { ApiResponse, CalendarResponse, CalendarSlot } from '@/shared/types';
 import { useAuthStore } from '@/features/auth/model';
+import { DEFAULT_BUSINESS_TIME_ZONE, scheduleInstant, toBusinessClock } from '../model/businessTime';
 
 export interface CreateCalendarAppointmentPayload {
   employeeId?: string;
+  businessClientId?: string;
   startTime: string;
   endTime: string;
   clientName: string;
@@ -23,17 +25,19 @@ export interface CreateCalendarAppointmentPayload {
 /** Generador de datos simulados realistas para visualización offline / preview */
 export function generateMockCalendarSlots(startDate: Date, endDate: Date): CalendarSlot[] {
   const slots: CalendarSlot[] = [];
-  const curr = new Date(startDate);
+  const curr = toBusinessClock(startDate, DEFAULT_BUSINESS_TIME_ZONE);
+  const endClock = toBusinessClock(endDate, DEFAULT_BUSINESS_TIME_ZONE);
+  const at = (time: string) => scheduleInstant(curr, time, DEFAULT_BUSINESS_TIME_ZONE)!;
 
-  while (curr <= endDate) {
-    const y = curr.getFullYear();
-    const m = curr.getMonth();
-    const d = curr.getDate();
+  while (curr < endClock) {
+    const y = curr.getUTCFullYear();
+    const m = curr.getUTCMonth();
+    const d = curr.getUTCDate();
     const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
     // Slot 1: Cita de Corte y Barba (10:00 a 11:00)
-    const slot1Start = new Date(y, m, d, 10, 0, 0);
-    const slot1End = new Date(y, m, d, 11, 0, 0);
+    const slot1Start = at('10:00');
+    const slot1End = at('11:00');
     slots.push({
       type: 'appointment',
       resourceId: `apt-1-${dateKey}`,
@@ -48,8 +52,8 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
     });
 
     // Slot 2: Cita de Tratamiento Capilar (11:30 a 13:00)
-    const slot2Start = new Date(y, m, d, 11, 30, 0);
-    const slot2End = new Date(y, m, d, 13, 0, 0);
+    const slot2Start = at('11:30');
+    const slot2End = at('13:00');
     slots.push({
       type: 'appointment',
       resourceId: `apt-2-${dateKey}`,
@@ -64,8 +68,8 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
     });
 
     // Slot 3: Bloqueo de Almuerzo / Descanso de Equipo (14:00 a 15:00)
-    const slot3Start = new Date(y, m, d, 14, 0, 0);
-    const slot3End = new Date(y, m, d, 15, 0, 0);
+    const slot3Start = at('14:00');
+    const slot3End = at('15:00');
     slots.push({
       type: 'block',
       resourceId: `blk-1-${dateKey}`,
@@ -78,8 +82,8 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
     });
 
     // Slot 4: Cita de Perfilado y Afeitado Clásico (16:30 a 17:45)
-    const slot4Start = new Date(y, m, d, 16, 30, 0);
-    const slot4End = new Date(y, m, d, 17, 45, 0);
+    const slot4Start = at('16:30');
+    const slot4End = at('17:45');
     slots.push({
       type: 'appointment',
       resourceId: `apt-3-${dateKey}`,
@@ -92,10 +96,10 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
       servicePrice: '$220 MXN',
       employeeName: 'Ariel (Master Barber)',
     });
-    curr.setDate(curr.getDate() + 1);
+    curr.setUTCDate(curr.getUTCDate() + 1);
   }
 
-  return slots;
+  return slots.filter((slot) => new Date(slot.startTime) < endDate && new Date(slot.endTime) > startDate);
 }
 
 /**
@@ -103,7 +107,23 @@ export function generateMockCalendarSlots(startDate: Date, endDate: Date): Calen
  * Endpoint protegido: GET /api/calendar/slots?startDate=...&endDate=...
  * El businessId se resuelve automáticamente en el backend a partir del JWT (US-022).
  */
-export async function fetchCalendarSlots(
+const slotRequests = new Map<string, Promise<CalendarResponse>>();
+
+export function fetchCalendarSlots(
+  startDate: string, endDate: string, employeeId?: string, scope?: string,
+): Promise<CalendarResponse> {
+  const user = useAuthStore.getState().user;
+  const key = JSON.stringify([scope ?? [user?.id, user?.businessId], startDate, endDate, employeeId]);
+  const pending = slotRequests.get(key);
+  if (pending) return pending;
+  const request = loadCalendarSlots(startDate, endDate, employeeId);
+  slotRequests.set(key, request);
+  const clear = () => { if (slotRequests.get(key) === request) slotRequests.delete(key); };
+  void request.then(clear, clear);
+  return request;
+}
+
+async function loadCalendarSlots(
   startDate: string,
   endDate: string,
   employeeId?: string,
@@ -119,6 +139,7 @@ export async function fetchCalendarSlots(
     return {
       rangeStart: startDate,
       rangeEnd: endDate,
+      timeZone: DEFAULT_BUSINESS_TIME_ZONE,
       slots: generateMockCalendarSlots(start, end),
     };
   }
@@ -157,24 +178,93 @@ export async function fetchCalendarSlots(
       rangeEnd: endDate,
       slots: [],
     };
-  } catch {
-    return {
-      rangeStart: startDate,
-      rangeEnd: endDate,
-      slots: [],
-    };
+  } catch (error) {
+    throw new Error(calendarError(error, 'No se pudo consultar la agenda.'));
   }
 }
 
 /**
  * Agenda una nueva cita en el negocio autenticado sin enviar businessId en el body (US-022).
+ * Lanza error si el servidor rechaza la operación o no devuelve un ID válido.
  */
 export async function createCalendarAppointment(
   payload: CreateCalendarAppointmentPayload,
 ): Promise<string> {
-  const response = await apiClient.post<{ id?: string; data?: string }>(
-    '/calendar/appointments',
-    payload,
-  );
-  return response.data?.id ?? response.data?.data ?? '';
+  const rawEmail = (payload.clientEmail ?? '').trim();
+  const cleanEmail =
+    rawEmail.toLowerCase() === 'cliente@ejemplo.com' ||
+    rawEmail.toLowerCase().endsWith('@clientes.slotify.app')
+      ? ''
+      : rawEmail;
+
+  const rawPhone = (payload.clientPhone ?? '').trim();
+  const cleanPhone = rawPhone === '+52 55 1234 5678' ? '' : rawPhone;
+
+  const cleanPayload: CreateCalendarAppointmentPayload = {
+    ...payload,
+    clientName: payload.clientName.trim(),
+    clientEmail: cleanEmail,
+    clientPhone: cleanPhone,
+  };
+
+  try {
+    const response = await apiClient.post<{
+      success?: boolean;
+      id?: string;
+      data?: string;
+      error?: string;
+      errors?: string[];
+      message?: string;
+    }>(API_ENDPOINTS.CALENDAR.CREATE_APPOINTMENT, cleanPayload);
+
+    const body = response?.data ?? (response as any);
+    if (body?.success === false) {
+      throw new Error(
+        body.error ||
+          (Array.isArray(body.errors) ? body.errors[0] : undefined) ||
+          body.message ||
+          'El servidor rechazó la creación de la cita.',
+      );
+    }
+
+    const realId = String(body?.id ?? body?.data ?? '').trim();
+    if (!realId) {
+      throw new Error('El servidor no devolvió un identificador válido para la cita.');
+    }
+
+    return realId;
+  } catch (error) {
+    throw new Error(calendarError(error, 'No se pudo agendar la cita en el servidor.'));
+  }
+}
+
+export interface CalendarEmployee {
+  id: string;
+  name: string;
+}
+
+export async function fetchCalendarEmployees(): Promise<CalendarEmployee[]> {
+  const { data } = await apiClient.get<ApiResponse<CalendarEmployee[]>>(API_ENDPOINTS.CALENDAR.EMPLOYEES);
+  return data.data;
+}
+
+export async function updateCalendarAppointment(
+  id: string,
+  change: { status: 'completed' | 'cancelled' } | { startTime: string; endTime: string },
+): Promise<void> {
+  try {
+    const { data } = await apiClient.patch<{ success: boolean }>(API_ENDPOINTS.CALENDAR.UPDATE_APPOINTMENT(id), change);
+    if (data?.success !== true) throw new Error('El servidor no confirmó el cambio de la cita.');
+  } catch (error) {
+    throw new Error(calendarError(error, 'No se pudo actualizar la cita.'));
+  }
+}
+
+export function calendarError(
+  error: unknown,
+  fallback: string,
+): string {
+  const response = (error as { response?: { data?: { error?: string; errors?: string[]; message?: string } } })?.response?.data;
+  return response?.error || response?.errors?.[0] || response?.message ||
+    (error instanceof Error ? error.message : fallback);
 }

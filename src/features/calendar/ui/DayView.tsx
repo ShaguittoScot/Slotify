@@ -1,3 +1,4 @@
+import { sameCalendarDay, scheduleInstant, toBusinessClock } from '../model/businessTime';
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -7,17 +8,19 @@ import { useAppTheme } from '@/shared/theme';
 
 interface DayViewProps {
   selectedDate: Date;
+  timeZone: string;
   slots: CalendarSlot[];
   onSelectSlot?: (slot: CalendarSlot) => void;
   onEmptySlotPress?: (hour: number) => void;
 }
 
-type FilterStatus = 'all' | 'pending' | 'completed' | 'confirmed' | 'block';
+type FilterStatus = 'all' | 'no_show' | 'completed' | 'confirmed' | 'block';
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 07:00 a 21:00
 
 export const DayView: React.FC<DayViewProps> = ({
   selectedDate,
+  timeZone,
   slots,
   onSelectSlot,
   onEmptySlotPress,
@@ -25,23 +28,17 @@ export const DayView: React.FC<DayViewProps> = ({
   const { colors, isDark } = useAppTheme();
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all');
 
-  // Compara si dos fechas corresponden al mismo día local (inmune a offsets UTC)
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
-
   // Filtra los slots que corresponden a la fecha seleccionada
   const daySlots = useMemo(() => {
     return slots.filter((slot) => {
-      const slotDate = new Date(slot.startTime);
-      return isSameDay(slotDate, selectedDate);
+      const slotDate = toBusinessClock(slot.startTime, timeZone);
+      return sameCalendarDay(slotDate, selectedDate);
     });
-  }, [slots, selectedDate]);
+  }, [slots, selectedDate, timeZone]);
 
   // Conteo de elementos para los chips de filtro
   const counts = useMemo(() => {
-    let pending = 0;
+    let noShow = 0;
     let completed = 0;
     let confirmed = 0;
     let block = 0;
@@ -50,7 +47,7 @@ export const DayView: React.FC<DayViewProps> = ({
       if (s.type === 'block') {
         block++;
       } else if (s.type === 'appointment') {
-        if (s.status === 'pending') pending++;
+        if (s.status === 'no_show') noShow++;
         else if (s.status === 'completed') completed++;
         else if (s.status === 'confirmed') confirmed++;
       }
@@ -58,7 +55,7 @@ export const DayView: React.FC<DayViewProps> = ({
 
     return {
       all: daySlots.length,
-      pending,
+      noShow,
       completed,
       confirmed,
       block,
@@ -75,13 +72,23 @@ export const DayView: React.FC<DayViewProps> = ({
   // Agrupa slots visibles por hora de inicio
   const slotsByHour: Record<number, CalendarSlot[]> = {};
   filteredDaySlots.forEach((slot) => {
-    const hour = new Date(slot.startTime).getHours();
+    const hour = toBusinessClock(slot.startTime, timeZone).getUTCHours();
     if (!slotsByHour[hour]) slotsByHour[hour] = [];
     slotsByHour[hour].push(slot);
   });
 
-  const isToday = isSameDay(new Date(), selectedDate);
-  const currentHour = new Date().getHours();
+  const businessNow = toBusinessClock(Date.now(), timeZone);
+  const isToday = sameCalendarDay(businessNow, selectedDate);
+  const currentHour = businessNow.getUTCHours();
+  const occupiedHours = useMemo(() => {
+    const occupiedSlots = slots.filter((slot) => slot.type !== 'available' && slot.status !== 'cancelled')
+      .map((slot) => ({ start: Date.parse(slot.startTime), end: Date.parse(slot.endTime) }));
+    return new Set(HOURS.filter((hour) => {
+      const start = scheduleInstant(selectedDate, String(hour).padStart(2, '0') + ':00', timeZone)?.getTime();
+      if (start === undefined) return true;
+      return occupiedSlots.some((slot) => slot.start < start + 3_600_000 && slot.end > start);
+    }));
+  }, [slots, selectedDate, timeZone]);
 
   return (
     <ScrollView
@@ -124,11 +131,11 @@ export const DayView: React.FC<DayViewProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {/* Chip: Pendientes */}
+          {/* Chip: Inasistencias */}
           <TouchableOpacity
             style={[
               styles.filterChip,
-              activeFilter === 'pending'
+              activeFilter === 'no_show'
                 ? {
                     backgroundColor: 'rgba(245, 158, 11, 0.18)',
                     borderColor: '#F59E0B',
@@ -138,22 +145,22 @@ export const DayView: React.FC<DayViewProps> = ({
                     borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
                   },
             ]}
-            onPress={() => setActiveFilter(activeFilter === 'pending' ? 'all' : 'pending')}
+            onPress={() => setActiveFilter(activeFilter === 'no_show' ? 'all' : 'no_show')}
             activeOpacity={0.7}
           >
             <View style={[styles.filterDot, { backgroundColor: '#F59E0B' }]} />
             <Text
               style={[
                 styles.filterChipText,
-                { color: activeFilter === 'pending' ? '#F59E0B' : colors.text.muted },
-                activeFilter === 'pending' && styles.filterChipTextActive,
+                { color: activeFilter === 'no_show' ? '#F59E0B' : colors.text.muted },
+                activeFilter === 'no_show' && styles.filterChipTextActive,
               ]}
             >
-              Pendientes ({counts.pending})
+              Inasistencias ({counts.noShow})
             </Text>
           </TouchableOpacity>
 
-          {/* Chip: Cobradas */}
+          {/* Chip: Completadas */}
           <TouchableOpacity
             style={[
               styles.filterChip,
@@ -178,7 +185,7 @@ export const DayView: React.FC<DayViewProps> = ({
                 activeFilter === 'completed' && styles.filterChipTextActive,
               ]}
             >
-              Cobradas ({counts.completed})
+              Completadas ({counts.completed})
             </Text>
           </TouchableOpacity>
 
@@ -327,11 +334,11 @@ export const DayView: React.FC<DayViewProps> = ({
                   hourSlots.map((slot) => (
                     <CalendarSlotCard
                       key={slot.resourceId}
-                      slot={slot}
+                      slot={slot} timeZone={timeZone}
                       onPress={onSelectSlot}
                     />
                   ))
-                ) : activeFilter === 'all' ? (
+                ) : activeFilter === 'all' && onEmptySlotPress ? (
                   <TouchableOpacity
                     style={[
                       styles.emptySlotTouch,
@@ -346,7 +353,7 @@ export const DayView: React.FC<DayViewProps> = ({
                     <View style={styles.tapPromptRow}>
                       <Feather name="plus" size={11} color={colors.text.muted} style={{ opacity: 0.6 }} />
                       <Text style={[styles.tapPromptText, { color: colors.text.muted }]}>
-                        Disponible • Toca para agendar
+                        {occupiedHours.has(hour) ? 'Horario con actividad' : 'Agendar aquí'}
                       </Text>
                     </View>
                   </TouchableOpacity>

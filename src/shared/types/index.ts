@@ -103,10 +103,13 @@ export interface CalendarSlot {
   startTime: string;
   endTime: string;
   title: string;
-  status: 'confirmed' | 'cancelled' | 'blocked' | 'available' | 'completed' | 'pending';
+  status: 'confirmed' | 'cancelled' | 'blocked' | 'available' | 'completed' | 'pending' | 'no_show';
   clientName?: string;
   clientPhone?: string;
+  businessClientId?: string;
   servicePrice?: string;
+  agreedTotal?: number | null;
+  employeeId?: string | null;
   notes?: string;
   employeeName?: string;
   blockReason?: string;
@@ -117,6 +120,7 @@ export interface CalendarResponse {
   rangeStart: string;
   rangeEnd: string;
   slots: CalendarSlot[];
+  timeZone?: string;
 }
 
 // ────────────────────────────────────────────────────────────

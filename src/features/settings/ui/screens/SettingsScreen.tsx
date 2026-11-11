@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,11 +18,14 @@ import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
 import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { BusinessInfoModal } from '../components/BusinessInfoModal';
+import { requestAppointmentNotificationPermission } from '../../model/appointmentNotifications';
+import { LocalNotificationsUnavailable } from '../../model/localNotifications';
+import { appointmentHaptic, settingsScope, useSettingsPreferences } from '../../model/preferences';
 
 export function SettingsScreen() {
   const router = useRouter();
   const { colors, isDark, themeMode } = useAppTheme();
-  const { user, logout, appMode, toggleAppMode } = useAuthStore();
+  const { user, logout, appMode, setAppMode } = useAuthStore();
 
   const isBusiness = appMode === 'BUSINESS';
 
@@ -29,8 +34,60 @@ export function SettingsScreen() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showBusinessInfoModal, setShowBusinessInfoModal] = useState(false);
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [requestingNotifications, setRequestingNotifications] = useState(false);
+  const preferences = useSettingsPreferences();
+  const scope = settingsScope(user);
+  const preferencesReady = preferences.ready && preferences.scope === scope;
+  const canPreview = Boolean(user?.businessId);
+  const canNotify = Platform.OS !== 'web' && Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+  const previewColor = isBusiness ? colors.action.primary : '#10B981';
+  const previewTextColor = isBusiness ? colors.action.primaryText : '#052E23';
+
+  const changeMode = () => {
+    if (!canPreview) return;
+    if (isBusiness) {
+      setAppMode('CONSUMER');
+      router.navigate('/(main)/explore');
+    } else {
+      setAppMode('BUSINESS');
+      router.navigate('/(main)');
+    }
+  };
+
+  const changeNotifications = async (enabled: boolean) => {
+    if (!scope || !canNotify || !preferencesReady || requestingNotifications) return;
+    if (!enabled) {
+      await preferences.update(scope, { notifications: false });
+      return;
+    }
+    setRequestingNotifications(true);
+    try {
+      if (await requestAppointmentNotificationPermission()) {
+        await preferences.update(scope, { notifications: true });
+      } else {
+        Alert.alert('Permiso de notificaciones', 'Permite las notificaciones en los ajustes del teléfono para activar los avisos.', [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir ajustes', onPress: () => { void Linking.openSettings().catch(() => {}); } },
+        ]);
+      }
+    } catch (failure) {
+      if (__DEV__) console.debug('[Slotify] Error al activar notificaciones locales', failure);
+      Alert.alert(
+        'Notificaciones no disponibles',
+        failure instanceof LocalNotificationsUnavailable
+          ? 'Esta instalación no pudo cargar las notificaciones locales. Si estás en Expo Go, actualízalo y vuelve a abrir Slotify.'
+          : 'No se pudo configurar el canal de notificaciones o solicitar el permiso. Vuelve a abrir Slotify e inténtalo de nuevo.',
+      );
+    } finally {
+      setRequestingNotifications(false);
+    }
+  };
+
+  const changeHaptics = (enabled: boolean) => {
+    if (!scope || !preferencesReady) return;
+    void preferences.update(scope, { haptics: enabled });
+    if (enabled) appointmentHaptic();
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -64,7 +121,7 @@ export function SettingsScreen() {
     : 'Cliente Slotify';
 
   const getInitials = (name: string) => {
-    const parts = name.trim().split(' ');
+    const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     }
@@ -91,7 +148,7 @@ export function SettingsScreen() {
             },
           ]}
         >
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
               {isBusiness ? 'Ajustes de Negocio' : 'Mi Perfil'}
             </Text>
@@ -177,7 +234,7 @@ export function SettingsScreen() {
                       },
                     ]}
                   >
-                    {isBusiness ? 'ADMINISTRADOR / PROPIETARIO' : 'CLIENTE'}
+                    {user?.role === 'DUENO' ? 'ADMINISTRADOR / PROPIETARIO' : user?.role === 'EMPLEADO' ? 'EMPLEADO' : 'CLIENTE'}
                   </Text>
                 </View>
 
@@ -198,6 +255,8 @@ export function SettingsScreen() {
                   backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
                 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Editar perfil"
               onPress={() => setShowProfileModal(true)}
               activeOpacity={0.7}
             >
@@ -205,68 +264,71 @@ export function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Tarjeta de Cambio de Modo (Mantenida prominentemente para pruebas de desarrollo) */}
-          <TouchableOpacity
-            style={[
-              styles.modeSwitcherCard,
-              {
-                backgroundColor: isBusiness
-                  ? isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)'
-                  : isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
-                borderColor: isBusiness
-                  ? isDark ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.20)'
-                  : isDark ? 'rgba(16, 185, 129, 0.28)' : 'rgba(16, 185, 129, 0.20)',
-              },
-            ]}
-            onPress={toggleAppMode}
-            activeOpacity={0.8}
-          >
-            <View style={styles.modeSwitcherLeft}>
+          {/* Vista de prueba para cuentas con un negocio asignado */}
+          {canPreview && (
+            <TouchableOpacity
+              style={[
+                styles.modeSwitcherCard,
+                {
+                  backgroundColor: isBusiness
+                    ? isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)'
+                    : isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+                  borderColor: isBusiness
+                    ? isDark ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.20)'
+                    : isDark ? 'rgba(16, 185, 129, 0.28)' : 'rgba(16, 185, 129, 0.20)',
+                },
+              ]}
+              accessibilityRole="button"
+              onPress={changeMode}
+              activeOpacity={0.8}
+            >
+              <View style={styles.modeSwitcherLeft}>
+                <View
+                  style={[
+                    styles.modeIconCircle,
+                    {
+                      backgroundColor: previewColor,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={
+                      isBusiness
+                        ? 'storefront-outline'
+                        : 'account-outline'
+                    }
+                    size={20}
+                    color={previewTextColor}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.modePillRow}>
+                    <Text style={[styles.modeSwitcherTitle, { color: colors.text.primary }]}>
+                      {isBusiness ? 'Modo Administrador Activo' : 'Modo Cliente Activo'}
+                    </Text>
+                    <View style={[styles.testBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
+                      <Text style={[styles.testBadgeText, { color: colors.text.muted }]}>PRUEBA</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.modeSwitcherSubtitle, { color: colors.text.secondary }]}>
+                    {isBusiness
+                      ? 'Toca para saltar a la interfaz de Cliente (Explorar y Reservar)'
+                      : 'Toca para saltar a la interfaz de Administrador (Gestionar Negocio)'}
+                  </Text>
+                </View>
+              </View>
               <View
                 style={[
-                  styles.modeIconCircle,
-                  {
-                    backgroundColor: isBusiness ? colors.action.primary : '#10B981',
-                  },
+                  styles.modeSwitchAction,
+                  { backgroundColor: previewColor },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name={
-                    isBusiness
-                      ? 'storefront-outline'
-                      : 'account-outline'
-                  }
-                  size={20}
-                  color="#FFFFFF"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.modePillRow}>
-                  <Text style={[styles.modeSwitcherTitle, { color: colors.text.primary }]}>
-                    {isBusiness ? 'Modo Administrador Activo' : 'Modo Cliente Activo'}
-                  </Text>
-                  <View style={[styles.testBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
-                    <Text style={[styles.testBadgeText, { color: colors.text.muted }]}>PRUEBA</Text>
-                  </View>
-                </View>
-                <Text style={[styles.modeSwitcherSubtitle, { color: colors.text.secondary }]}>
-                  {isBusiness
-                    ? 'Toca para saltar a la interfaz de Cliente (Explorar y Reservar)'
-                    : 'Toca para saltar a la interfaz de Administrador (Gestionar Negocio)'}
+                <Text style={[styles.modeSwitchActionText, { color: previewTextColor }]}>
+                  {isBusiness ? 'Saltar a Cliente' : 'Saltar a Admin'}
                 </Text>
               </View>
-            </View>
-            <View
-              style={[
-                styles.modeSwitchAction,
-                { backgroundColor: isBusiness ? colors.action.primary : '#10B981' },
-              ]}
-            >
-              <Text style={[styles.modeSwitchActionText, { color: '#FFFFFF' }]}>
-                {isBusiness ? 'Saltar a Cliente' : 'Saltar a Admin'}
-              </Text>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
 
           {/* ════════════════════════════════════════════════════════════════
               SECCIÓN ESPECÍFICA: ADMINISTRADOR vs CLIENTE
@@ -417,7 +479,7 @@ export function SettingsScreen() {
                     Información del Negocio
                   </Text>
                   <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Horarios, sucursal y enlace de reserva compartible
+                    Horarios, contacto y enlace de reserva
                   </Text>
                 </View>
                 <Feather name="chevron-right" size={18} color={colors.text.muted} />
@@ -616,14 +678,17 @@ export function SettingsScreen() {
                   Notificaciones de Citas
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  {isBusiness
+                  {canNotify
                     ? 'Recordatorios de agenda, nuevas reservas y cancelaciones'
-                    : 'Recordatorios de tus citas y confirmaciones de horario'}
+                    : 'Disponible en la app móvil con una cuenta de negocio'}
                 </Text>
               </View>
               <FluidToggleSwitch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                accessibilityLabel="Notificaciones de Citas"
+                value={canNotify && preferencesReady && preferences.notifications}
+                onValueChange={changeNotifications}
+                disabled={!canNotify || !preferencesReady || requestingNotifications}
+                inactiveColor={isDark ? '#414147' : '#D4D4D8'}
                 activeColor={isBusiness ? '#818CF8' : '#10B981'}
               />
             </View>
@@ -649,12 +714,15 @@ export function SettingsScreen() {
                   Respuesta Háptica
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Vibración táctil al interactuar y confirmar citas
+                  {Platform.OS === 'web' ? 'Disponible en la app móvil' : 'Vibración táctil en Agenda y Clientes'}
                 </Text>
               </View>
               <FluidToggleSwitch
-                value={hapticsEnabled}
-                onValueChange={setHapticsEnabled}
+                accessibilityLabel="Respuesta Háptica"
+                value={Platform.OS !== 'web' && preferencesReady && preferences.haptics}
+                onValueChange={changeHaptics}
+                disabled={Platform.OS === 'web' || !preferencesReady}
+                inactiveColor={isDark ? '#414147' : '#D4D4D8'}
                 activeColor="#10B981"
               />
             </View>
@@ -696,7 +764,7 @@ export function SettingsScreen() {
                   Centro de Ayuda
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Guías de uso, preguntas frecuentes y asistencia
+                  Contacto y asistencia
                 </Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.text.muted} />
@@ -717,7 +785,7 @@ export function SettingsScreen() {
               onPress={() =>
                 Alert.alert(
                   'Términos y Privacidad',
-                  'Tus datos y credenciales se resguardan mediante almacenamiento local seguro (KeyStore/Keychain) y conexiones cifradas de extremo a extremo.'
+                  'Consulta a soporte@slotify.app para conocer el tratamiento de tus datos.'
                 )
               }
               activeOpacity={0.7}
@@ -730,7 +798,7 @@ export function SettingsScreen() {
                   Términos y Privacidad
                 </Text>
                 <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Políticas de servicio y seguridad de datos
+                  Información sobre el tratamiento de tus datos
                 </Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.text.muted} />

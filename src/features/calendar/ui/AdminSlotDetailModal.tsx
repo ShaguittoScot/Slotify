@@ -1,3 +1,4 @@
+import { formatBusinessHour, scheduleInstant, toBusinessClock } from '../model/businessTime';
 import React from 'react';
 import {
   Modal,
@@ -16,10 +17,11 @@ import { useAppTheme } from '@/shared/theme';
 interface AdminSlotDetailModalProps {
   slot: CalendarSlot | null;
   visible: boolean;
+  timeZone: string;
   onClose: () => void;
-  onStatusChange: (resourceId: string, status: 'confirmed' | 'cancelled' | 'completed') => void;
-  onDeleteBlock: (resourceId: string) => void;
-  onReschedule?: (resourceId: string, newStartTime: string, newEndTime: string) => void;
+  onStatusChange: (resourceId: string, status: 'cancelled' | 'completed') => Promise<void>;
+  onDeleteBlock: (resourceId: string) => Promise<void>;
+  onReschedule?: (resourceId: string, newStartTime: string, newEndTime: string) => Promise<void>;
 }
 
 const RESCHEDULE_HOURS = [
@@ -32,6 +34,7 @@ const RESCHEDULE_HOURS = [
 export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   slot,
   visible,
+  timeZone,
   onClose,
   onStatusChange,
   onDeleteBlock,
@@ -40,16 +43,18 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   const { colors, isDark } = useAppTheme();
   const [isRescheduling, setIsRescheduling] = React.useState(false);
   const [selectedNewHour, setSelectedNewHour] = React.useState('10:00');
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (visible && slot) {
       setIsRescheduling(false);
-      const startH = new Date(slot.startTime).getHours();
-      const startM = new Date(slot.startTime).getMinutes();
+      const clock = toBusinessClock(slot.startTime, timeZone);
+      const startH = clock.getUTCHours();
+      const startM = clock.getUTCMinutes();
       const nearest = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
       setSelectedNewHour(RESCHEDULE_HOURS.includes(nearest) ? nearest : '10:00');
     }
-  }, [visible, slot]);
+  }, [visible, slot, timeZone]);
 
   if (!slot) return null;
 
@@ -60,10 +65,11 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   const endDate = new Date(slot.endTime);
 
   const formatHour = (d: Date) =>
-    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    formatBusinessHour(d, timeZone);
 
   const formatDateFull = (d: Date) => {
     return d.toLocaleDateString('es-ES', {
+      timeZone,
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -79,7 +85,8 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   };
 
   const handleWhatsApp = () => {
-    const rawPhone = (slot.clientPhone || '5512345678').replace(/\D/g, '');
+    const rawPhone = slot.clientPhone?.replace(/\D/g, '');
+    if (!rawPhone) return;
     const client = slot.clientName || 'Cliente';
     const text = encodeURIComponent(
       `¡Hola ${client}! Te escribimos de nuestro negocio para confirmar tu cita de ${slot.title} el día ${formatDateFull(startDate)} a las ${formatHour(startDate)}.`
@@ -90,30 +97,38 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   };
 
   const handleCall = () => {
-    const rawPhone = (slot.clientPhone || '5512345678').replace(/\D/g, '');
+    const rawPhone = slot.clientPhone?.replace(/[^\d+]/g, '');
+    if (!rawPhone) return;
     Linking.openURL(`tel:${rawPhone}`).catch(() => {
       Alert.alert('Aviso', 'No se pudo iniciar la llamada.');
     });
   };
 
-  const handleMarkCompleted = () => {
-    onStatusChange(slot.resourceId, 'completed');
-    onClose();
+  const saveChange = async (action: () => Promise<void>) => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await action();
+      onClose();
+    } catch (error) {
+      Alert.alert('No se pudo guardar el cambio', error instanceof Error ? error.message : 'Inténtalo de nuevo.');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleMarkCompleted = () => saveChange(() => onStatusChange(slot.resourceId, 'completed'));
 
   const handleCancelAppointment = () => {
     Alert.alert(
       'Cancelar Cita',
-      `¿Estás seguro de que deseas cancelar la cita de ${slot.clientName || 'este cliente'}? Esta acción notificará el horario liberado.`,
+      `¿Deseas cancelar la cita de ${slot.clientName || 'este cliente'} y liberar su horario?`,
       [
         { text: 'No, mantener', style: 'cancel' },
         {
           text: 'Sí, cancelar cita',
           style: 'destructive',
-          onPress: () => {
-            onStatusChange(slot.resourceId, 'cancelled');
-            onClose();
-          },
+          onPress: () => saveChange(() => onStatusChange(slot.resourceId, 'cancelled')),
         },
       ]
     );
@@ -128,10 +143,7 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
         {
           text: 'Sí, desbloquear',
           style: 'default',
-          onPress: () => {
-            onDeleteBlock(slot.resourceId);
-            onClose();
-          },
+          onPress: () => saveChange(() => onDeleteBlock(slot.resourceId)),
         },
       ]
     );
@@ -139,21 +151,22 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
 
   const handleConfirmReschedule = () => {
     const durationMs = endDate.getTime() - startDate.getTime();
-    const [h, m] = selectedNewHour.split(':').map(Number);
-    const newStart = new Date(startDate);
-    newStart.setHours(h, m, 0, 0);
+    const newStart = scheduleInstant(toBusinessClock(startDate, timeZone), selectedNewHour, timeZone);
+    if (!newStart) {
+      Alert.alert('Hora no disponible', 'Esa hora no existe en la zona del negocio. Elige otra.');
+      return;
+    }
     const newEnd = new Date(newStart.getTime() + durationMs);
 
-    onReschedule?.(slot.resourceId, newStart.toISOString(), newEnd.toISOString());
-    setIsRescheduling(false);
-    onClose();
+    if (onReschedule) {
+      void saveChange(() => onReschedule(slot.resourceId, newStart.toISOString(), newEnd.toISOString()));
+    }
   };
 
   const getNewEndHourFormatted = () => {
     const durationMs = endDate.getTime() - startDate.getTime();
-    const [h, m] = selectedNewHour.split(':').map(Number);
-    const newStart = new Date(startDate);
-    newStart.setHours(h, m, 0, 0);
+    const newStart = scheduleInstant(toBusinessClock(startDate, timeZone), selectedNewHour, timeZone);
+    if (!newStart) return '—';
     const newEnd = new Date(newStart.getTime() + durationMs);
     return formatHour(newEnd);
   };
@@ -161,9 +174,13 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   const getStatusBadge = () => {
     switch (slot.status) {
       case 'completed':
-        return { label: 'Completada / Cobrada', bg: 'rgba(16, 185, 129, 0.15)', color: '#34D399', icon: 'check-circle' };
+        return { label: 'Completada', bg: 'rgba(16, 185, 129, 0.15)', color: '#34D399', icon: 'check-circle' };
       case 'cancelled':
         return { label: 'Cancelada', bg: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', icon: 'x-circle' };
+      case 'no_show':
+        return { label: 'Inasistencia', bg: 'rgba(245, 158, 11, 0.15)', color: isDark ? '#FBBF24' : '#92400E', icon: 'user-x' };
+      case 'pending':
+        return { label: 'Pendiente', bg: 'rgba(245, 158, 11, 0.15)', color: isDark ? '#FBBF24' : '#92400E', icon: 'clock' };
       case 'blocked':
         return { label: 'Bloqueado', bg: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', icon: 'slash' };
       default:
@@ -231,7 +248,7 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
                       {slot.clientName || 'Cliente General'}
                     </Text>
                     <Text style={[styles.clientPhone, { color: colors.text.muted }]}>
-                      {slot.clientPhone || '+52 55 1234 5678'}
+                      {slot.clientPhone || 'Sin teléfono registrado'}
                     </Text>
                   </View>
                 </View>
@@ -240,6 +257,7 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
                 <View style={styles.contactRow}>
                   <TouchableOpacity
                     onPress={handleWhatsApp}
+                    disabled={!slot.clientPhone}
                     style={[styles.contactBtn, { backgroundColor: 'rgba(37, 211, 102, 0.12)', borderColor: 'rgba(37, 211, 102, 0.30)' }]}
                   >
                     <FontAwesome5 name="whatsapp" size={16} color="#25D366" style={{ marginRight: 8 }} />
@@ -248,6 +266,7 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
 
                   <TouchableOpacity
                     onPress={handleCall}
+                    disabled={!slot.clientPhone}
                     style={[
                       styles.contactBtn,
                       {
@@ -443,17 +462,17 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
               <>
                 {isAppointment && (
                   <>
-                    {slot.status !== 'completed' && slot.status !== 'cancelled' && (
+                    {slot.status === 'confirmed' && (
                       <TouchableOpacity
                         onPress={handleMarkCompleted}
                         style={[styles.primaryActionBtn, { backgroundColor: '#10B981' }]}
                       >
                         <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={styles.primaryActionBtnText}>Marcar como Cobrada / Completada</Text>
+                        <Text style={styles.primaryActionBtnText}>Completar cita</Text>
                       </TouchableOpacity>
                     )}
 
-                    {slot.status !== 'cancelled' && (
+                    {slot.status === 'confirmed' && (
                       <View style={styles.appointmentActionRow}>
                         <TouchableOpacity
                           onPress={() => setIsRescheduling(true)}

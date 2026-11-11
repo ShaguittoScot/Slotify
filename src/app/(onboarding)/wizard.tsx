@@ -39,7 +39,7 @@ export default function UnifiedOnboardingScreen() {
   const router = useRouter();
   const [step, setStep] = useState(1);
 
-  const { user, completeOnboarding, logout } = useAuthStore();
+  const { user, appMode, businessProfileStatus, error, completeOnboarding, logout } = useAuthStore();
 
   // State
   const [category, setCategory] = useState('');
@@ -51,6 +51,12 @@ export default function UnifiedOnboardingScreen() {
   const [servicePrice, setServicePrice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  useEffect(() => {
+    if (appMode === 'BUSINESS' && businessProfileStatus === 'ready' && !isLoading && step !== 5) {
+      router.replace('/(main)');
+    }
+  }, [appMode, businessProfileStatus, isLoading, router, step]);
 
   // BottomSheet State
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -102,8 +108,8 @@ export default function UnifiedOnboardingScreen() {
           businessPhone: '',
         });
         setStep(5);
-      } catch (error) {
-        console.error('Failed to sync profile', error);
+      } catch {
+        // El store expone el error y el formulario conserva los datos para reintentar.
       } finally {
         setIsLoading(false);
       }
@@ -135,6 +141,11 @@ export default function UnifiedOnboardingScreen() {
   // Progress percentage
   const progress = (step / 5) * 100;
 
+  const showWizard = businessProfileStatus === 'needs-setup' || (businessProfileStatus === 'ready' && step === 5);
+  if (appMode !== 'BUSINESS' || !showWizard) {
+    return null;
+  }
+
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView 
@@ -145,7 +156,7 @@ export default function UnifiedOnboardingScreen() {
           
           {/* Header con botón de cerrar sesión */}
           <View style={s.headerRow}>
-            <TouchableOpacity onPress={logout} style={s.logoutBtnSm} activeOpacity={0.7}>
+            <TouchableOpacity onPress={logout} style={s.logoutBtnSm} activeOpacity={0.7} disabled={isLoading}>
               <SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={16} tintColor="#EF4444" />
               <Text style={s.logoutTextSm}>Cerrar Sesión</Text>
             </TouchableOpacity>
@@ -393,11 +404,15 @@ export default function UnifiedOnboardingScreen() {
 
           </ScrollView>
 
+          {step === 4 && error ? (
+            <Text accessibilityRole="alert" style={s.submitError}>{error}</Text>
+          ) : null}
+
           {/* BOTTOM BAR (Hidden on Success) */}
           {step < 5 && (
             <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)} style={s.bottomBar}>
               {step > 1 ? (
-                <TouchableOpacity style={s.btnOutline} onPress={handleBack}>
+                <TouchableOpacity style={s.btnOutline} onPress={handleBack} disabled={isLoading}>
                   <SymbolView
                     name={{ ios: 'chevron.backward', android: 'arrow_back', web: 'arrow_back' }}
                     size={14}
@@ -504,6 +519,13 @@ export default function UnifiedOnboardingScreen() {
 }
 
 const s = StyleSheet.create({
+  submitError: {
+    marginHorizontal: 24,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEF2F2',
+    color: '#991B1B',
+  },
   flex1: { flex: 1 },
   screen: {
     flex: 1,
