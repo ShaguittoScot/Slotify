@@ -3,16 +3,17 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
 import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { BusinessInfoModal } from '../components/BusinessInfoModal';
@@ -35,11 +36,11 @@ export function SettingsScreen() {
   const handleLogout = () => {
     Alert.alert(
       'Cerrar Sesión',
-      '¿Estás seguro de que deseas salir de tu cuenta de Slotify?',
+      '¿Deseas cerrar tu sesión actual en Slotify?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Cerrar Sesión',
+          text: 'Salir',
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -50,15 +51,15 @@ export function SettingsScreen() {
   };
 
   const getThemeModeLabel = () => {
-    if (themeMode === 'system') return 'Automático (Dispositivo)';
     if (themeMode === 'light') return 'Modo Claro';
-    return 'Modo Oscuro (Neutral Black)';
+    if (themeMode === 'system') return 'Automático';
+    return 'Obsidian Black';
   };
 
   const displayName = isBusiness
     ? user?.fullName && user.fullName !== 'Pendiente'
       ? user.fullName
-      : user?.businessName || 'Administrador Slotify'
+      : user?.businessName || 'Administrador'
     : user?.fullName && user.fullName !== 'Pendiente'
     ? user.fullName
     : 'Cliente Slotify';
@@ -71,590 +72,287 @@ export function SettingsScreen() {
     return name.slice(0, 2).toUpperCase();
   };
 
+  const accentColor = isBusiness ? '#818CF8' : '#10B981';
+
+  const renderSettingRow = (
+    icon: any,
+    title: string,
+    subtitle: string,
+    onPress: () => void,
+    iconTint = accentColor
+  ) => (
+    <AnimatedPressable
+      style={[
+        styles.settingItem,
+        {
+          backgroundColor: isDark ? '#121216' : '#FFFFFF',
+          borderColor: isDark ? '#22222A' : '#E4E4E7',
+        },
+      ]}
+      onPress={onPress}
+    >
+      <View
+        style={[
+          styles.settingIconWrapper,
+          { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+        ]}
+      >
+        <Feather name={icon} size={16} color={iconTint} />
+      </View>
+      <View style={styles.settingTextContent}>
+        <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+          {title}
+        </Text>
+        <Text
+          style={[styles.settingValue, { color: colors.text.muted }]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={colors.text.muted} />
+    </AnimatedPressable>
+  );
+
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
-      style={[styles.safeArea, { backgroundColor: colors.background.secondary }]}
+      style={[styles.safeArea, { backgroundColor: colors.background.primary }]}
     >
-      <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-        {/* Cabecera Adaptable al Rol */}
-        <View
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background.primary },
+        ]}
+      >
+        {/* Cabecera Minimalista */}
+        <Animated.View
+          entering={FadeInDown.duration(380).springify()}
           style={[
             styles.header,
             {
-              backgroundColor: isDark
-                ? 'rgba(26, 26, 26, 0.92)'
-                : 'rgba(255, 255, 255, 0.95)',
-              borderBottomColor: isDark
-                ? 'rgba(255, 255, 255, 0.08)'
-                : 'rgba(0, 0, 0, 0.06)',
+              borderBottomColor: isDark ? '#1E1E24' : colors.border.main,
             },
           ]}
         >
           <View>
+            <View style={styles.tagRow}>
+              <View
+                style={[styles.tagDot, { backgroundColor: accentColor }]}
+              />
+              <Text style={[styles.tagLabel, { color: colors.text.muted }]}>
+                {isBusiness ? 'CONFIGURACIÓN' : 'CUENTA PERSONAL'}
+              </Text>
+            </View>
             <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-              {isBusiness ? 'Ajustes de Negocio' : 'Mi Perfil'}
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.text.muted }]}>
-              {isBusiness
-                ? 'Administración operativa y servicios de tu establecimiento'
-                : 'Tus preferencias, datos personales y reservas'}
+              {isBusiness ? 'Ajustes' : 'Mi Perfil'}
             </Text>
           </View>
-          <View
+
+          <AnimatedPressable
             style={[
-              styles.headerBadgeIcon,
+              styles.modeSwitchChip,
               {
-                backgroundColor: isDark
-                  ? 'rgba(255, 255, 255, 0.08)'
-                  : 'rgba(0, 0, 0, 0.04)',
+                backgroundColor: isDark ? '#14141A' : '#F4F4F5',
+                borderColor: `${accentColor}40`,
               },
             ]}
+            onPress={toggleAppMode}
           >
-            <Feather
-              name={isBusiness ? 'settings' : 'user'}
-              size={20}
-              color={colors.text.primary}
-            />
-          </View>
-        </View>
+            <Feather name="repeat" size={13} color={accentColor} />
+            <Text style={[styles.modeSwitchChipText, { color: accentColor }]}>
+              {isBusiness ? 'Vista Cliente' : 'Vista Admin'}
+            </Text>
+          </AnimatedPressable>
+        </Animated.View>
 
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Tarjeta de Perfil */}
-          <View
-            style={[
-              styles.profileCard,
-              {
-                backgroundColor: isDark
-                  ? 'rgba(26, 26, 26, 0.85)'
-                  : 'rgba(255, 255, 255, 0.92)',
-                borderColor: isDark
-                  ? 'rgba(255, 255, 255, 0.08)'
-                  : 'rgba(0, 0, 0, 0.06)',
-              },
-            ]}
+          {/* Tarjeta Ejecutiva de Perfil */}
+          <Animated.View
+            entering={FadeInDown.duration(420).delay(50).springify()}
           >
-            <View
+            <AnimatedPressable
+              onPress={() => setShowProfileModal(true)}
               style={[
-                styles.avatarCircle,
-                { backgroundColor: isBusiness ? '#6366F1' : '#10B981' },
-              ]}
-            >
-              <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
-            </View>
-
-            <View style={styles.profileInfo}>
-              <View style={styles.nameRow}>
-                <Text style={[styles.profileName, { color: colors.text.primary }]} numberOfLines={1}>
-                  {displayName}
-                </Text>
-              </View>
-
-              <Text style={[styles.profileEmail, { color: colors.text.muted }]} numberOfLines={1}>
-                {user?.email || (isBusiness ? 'admin@slotify.com' : 'cliente@slotify.com')}
-              </Text>
-
-              <View style={styles.badgesRow}>
-                <View
-                  style={[
-                    styles.roleBadge,
-                    {
-                      backgroundColor: isBusiness
-                        ? 'rgba(99, 102, 241, 0.16)'
-                        : 'rgba(16, 185, 129, 0.16)',
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.roleBadgeText,
-                      {
-                        color: isBusiness ? '#818CF8' : '#34D399',
-                      },
-                    ]}
-                  >
-                    {isBusiness ? 'ADMINISTRADOR / PROPIETARIO' : 'CLIENTE'}
-                  </Text>
-                </View>
-
-                {isBusiness && user?.businessName ? (
-                  <View style={styles.businessBadge}>
-                    <Text style={[styles.businessBadgeText, { color: colors.text.muted }]} numberOfLines={1}>
-                      {user.businessName}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.editProfileBtn,
+                styles.profileCard,
                 {
-                  backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
+                  borderColor: isDark ? '#22222A' : '#E4E4E7',
                 },
               ]}
-              onPress={() => setShowProfileModal(true)}
-              activeOpacity={0.7}
             >
-              <Feather name="edit-2" size={16} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Tarjeta de Cambio de Modo (Mantenida prominentemente para pruebas de desarrollo) */}
-          <TouchableOpacity
-            style={[
-              styles.modeSwitcherCard,
-              {
-                backgroundColor: isBusiness
-                  ? isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)'
-                  : isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
-                borderColor: isBusiness
-                  ? isDark ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.20)'
-                  : isDark ? 'rgba(16, 185, 129, 0.28)' : 'rgba(16, 185, 129, 0.20)',
-              },
-            ]}
-            onPress={toggleAppMode}
-            activeOpacity={0.8}
-          >
-            <View style={styles.modeSwitcherLeft}>
               <View
                 style={[
-                  styles.modeIconCircle,
+                  styles.avatarCircle,
                   {
-                    backgroundColor: isBusiness ? colors.action.primary : '#10B981',
+                    backgroundColor: isDark ? '#1A1A22' : '#EEF2FF',
+                    borderColor: `${accentColor}50`,
                   },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name={
-                    isBusiness
-                      ? 'storefront-outline'
-                      : 'account-outline'
-                  }
-                  size={20}
-                  color="#FFFFFF"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.modePillRow}>
-                  <Text style={[styles.modeSwitcherTitle, { color: colors.text.primary }]}>
-                    {isBusiness ? 'Modo Administrador Activo' : 'Modo Cliente Activo'}
-                  </Text>
-                  <View style={[styles.testBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
-                    <Text style={[styles.testBadgeText, { color: colors.text.muted }]}>PRUEBA</Text>
-                  </View>
-                </View>
-                <Text style={[styles.modeSwitcherSubtitle, { color: colors.text.secondary }]}>
-                  {isBusiness
-                    ? 'Toca para saltar a la interfaz de Cliente (Explorar y Reservar)'
-                    : 'Toca para saltar a la interfaz de Administrador (Gestionar Negocio)'}
+                <Text style={[styles.avatarText, { color: accentColor }]}>
+                  {getInitials(displayName)}
                 </Text>
               </View>
-            </View>
-            <View
-              style={[
-                styles.modeSwitchAction,
-                { backgroundColor: isBusiness ? colors.action.primary : '#10B981' },
-              ]}
-            >
-              <Text style={[styles.modeSwitchActionText, { color: '#FFFFFF' }]}>
-                {isBusiness ? 'Saltar a Cliente' : 'Saltar a Admin'}
-              </Text>
-            </View>
-          </TouchableOpacity>
 
-          {/* ════════════════════════════════════════════════════════════════
-              SECCIÓN ESPECÍFICA: ADMINISTRADOR vs CLIENTE
-          ════════════════════════════════════════════════════════════════ */}
-          {isBusiness ? (
-            /* SECCIÓN ADMIN: GESTIÓN DE NEGOCIO */
-            <View style={styles.section}>
-              <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
-                GESTIÓN DE NEGOCIO & SERVICIOS
-              </Text>
+              <View style={styles.profileInfo}>
+                <Text
+                  style={[styles.profileName, { color: colors.text.primary }]}
+                  numberOfLines={1}
+                >
+                  {displayName}
+                </Text>
+                <Text
+                  style={[styles.profileEmail, { color: colors.text.muted }]}
+                  numberOfLines={1}
+                >
+                  {user?.email ||
+                    (isBusiness ? 'admin@slotify.com' : 'cliente@slotify.com')}
+                </Text>
+              </View>
 
-              {/* Giro Comercial y Plantillas */}
-              <TouchableOpacity
+              <View
                 style={[
-                  styles.settingItem,
+                  styles.editProfileBtn,
                   {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
+                    backgroundColor: isDark ? '#1A1A22' : '#F4F4F5',
                   },
                 ]}
-                onPress={() => setShowMigrationModal(true)}
-                activeOpacity={0.7}
               >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.12)' }]}>
-                  <MaterialCommunityIcons
-                    name="shape-outline"
-                    size={18}
-                    color="#818CF8"
-                  />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Giro Comercial y Módulos
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Cambiar sector comercial y capacidades del negocio
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
+                <Feather name="edit-2" size={14} color={colors.text.primary} />
+              </View>
+            </AnimatedPressable>
+          </Animated.View>
 
-              {/* Catálogo y Plantilla de Barbería / Servicios */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(onboarding)/templates' as any,
-                    params: {
-                      sectorId: '5',
-                      sectorKey: 'barberia',
-                      isMigration: 'true',
-                    },
-                  })
-                }
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(224, 122, 95, 0.15)' }]}>
-                  <MaterialCommunityIcons
-                    name="content-cut"
-                    size={18}
-                    color="#E07A5F"
-                  />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Servicios y Catálogo Base
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Ajustar precios, duraciones, adicionales y sillones
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {/* Constructor de Formulario de Reservas & Identidad de Marca */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => router.push('/(main)/form-builder' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
-                  <MaterialCommunityIcons
-                    name="palette-swatch-outline"
-                    size={18}
-                    color="#10B981"
-                  />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Formulario & Marca Corporativa
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Personalizar logotipo, colores y campos de reservación
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {/* Información del Negocio y Enlace de Reserva */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => setShowBusinessInfoModal(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}>
-                  <MaterialCommunityIcons
-                    name="store-outline"
-                    size={18}
-                    color="#EC4899"
-                  />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Información del Negocio
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Horarios, sucursal y enlace de reserva compartible
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {/* Directorio de Clientes */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => router.push('/(main)/clients' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(59, 130, 246, 0.14)' }]}>
-                  <MaterialCommunityIcons
-                    name="account-group-outline"
-                    size={18}
-                    color="#3B82F6"
-                  />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Directorio de Clientes
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Consulta la cartera de clientes, historial y notas
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            /* SECCIÓN CLIENTE: ACTIVIDAD & RESERVAS */
-            <View style={styles.section}>
-              <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
-                MI ACTIVIDAD & RESERVAS
-              </Text>
-
-              {/* Mis Citas Agendadas */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => router.push('/(main)' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
-                  <Feather name="calendar" size={18} color="#10B981" />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Mis Citas Programadas
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Revisa horarios, direcciones y estado de tus citas
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {/* Explorar Establecimientos */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => router.push('/(main)/explore' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.14)' }]}>
-                  <Feather name="compass" size={18} color="#818CF8" />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Explorar Servicios y Establecimientos
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Descubre barberías, spas, consultorios y reserva citas
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {/* Formulario de Reservación Rápida */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => router.push('/(main)/form-preview' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(236, 72, 153, 0.14)' }]}>
-                  <Feather name="file-text" size={18} color="#EC4899" />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Formulario de Reservación
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Abre el formulario para llenar tus datos y agendar tu cita
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              {/* Mis Datos de Contacto */}
-              <TouchableOpacity
-                style={[
-                  styles.settingItem,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(26, 26, 26, 0.75)'
-                      : 'rgba(255, 255, 255, 0.85)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.06)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-                onPress={() => setShowProfileModal(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.settingIconWrapper, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}>
-                  <Feather name="user-check" size={18} color="#F59E0B" />
-                </View>
-                <View style={styles.settingTextContent}>
-                  <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                    Mis Datos Personales
-                  </Text>
-                  <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                    Nombre y datos usados al agendar tus citas
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Sección: APARIENCIA & SISTEMA (Compartida) */}
-          <View style={styles.section}>
+          {/* ─── SECCIÓN PRINCIPAL SEGÚN ROL ─── */}
+          <Animated.View
+            entering={FadeInDown.duration(460).delay(110).springify()}
+            style={styles.section}
+          >
             <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
-              APARIENCIA & SISTEMA
+              {isBusiness ? 'OPERACIÓN Y MARCA' : 'ACCESOS RÁPIDOS'}
             </Text>
 
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() => setShowThemeModal(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingIconWrapper}>
-                <Feather
-                  name={themeMode === 'system' ? 'smartphone' : isDark ? 'moon' : 'sun'}
-                  size={18}
-                  color={colors.text.primary}
-                />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Tema Visual
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  {getThemeModeLabel()}
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
+            {isBusiness ? (
+              <>
+                {renderSettingRow(
+                  'layout',
+                  'Formulario y Marca',
+                  'Logotipo, colores y campos de reserva',
+                  () => router.push('/(main)/form-builder' as any),
+                  '#818CF8'
+                )}
+                {renderSettingRow(
+                  'layers',
+                  'Giro y Plantillas',
+                  'Configuración de sector comercial',
+                  () => setShowMigrationModal(true),
+                  '#10B981'
+                )}
+                {renderSettingRow(
+                  'scissors',
+                  'Catálogo de Servicios',
+                  'Precios, duraciones y estaciones',
+                  () =>
+                    router.push({
+                      pathname: '/(onboarding)/templates' as any,
+                      params: {
+                        sectorId: '5',
+                        sectorKey: 'barberia',
+                        isMigration: 'true',
+                      },
+                    }),
+                  '#A1A1AA'
+                )}
+                {renderSettingRow(
+                  'globe',
+                  'Enlace y Sucursal',
+                  'Portal público y horarios de atención',
+                  () => setShowBusinessInfoModal(true),
+                  '#818CF8'
+                )}
+              </>
+            ) : (
+              <>
+                {renderSettingRow(
+                  'file-text',
+                  'Formulario de Reserva',
+                  'Llena tus datos y confirma una cita',
+                  () => router.push('/(main)/form-preview' as any),
+                  '#10B981'
+                )}
+                {renderSettingRow(
+                  'compass',
+                  'Explorar Establecimientos',
+                  'Directorio de negocios disponibles',
+                  () => router.push('/(main)/explore' as any),
+                  '#818CF8'
+                )}
+                {renderSettingRow(
+                  'calendar',
+                  'Mis Citas Programadas',
+                  'Consulta horarios y reservaciones',
+                  () => router.push('/(main)' as any),
+                  '#10B981'
+                )}
+              </>
+            )}
+          </Animated.View>
+
+          {/* ─── PREFERENCIAS Y SISTEMA ─── */}
+          <Animated.View
+            entering={FadeInDown.duration(500).delay(170).springify()}
+            style={styles.section}
+          >
+            <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
+              SISTEMA
+            </Text>
+
+            {renderSettingRow(
+              isDark ? 'moon' : 'sun',
+              'Apariencia',
+              getThemeModeLabel(),
+              () => setShowThemeModal(true),
+              colors.text.primary
+            )}
 
             <View
               style={[
                 styles.settingItem,
                 {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
+                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
+                  borderColor: isDark ? '#22222A' : '#E4E4E7',
                 },
               ]}
             >
-              <View style={styles.settingIconWrapper}>
-                <Feather name="bell" size={18} color={colors.text.primary} />
+              <View
+                style={[
+                  styles.settingIconWrapper,
+                  { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+                ]}
+              >
+                <Feather name="bell" size={16} color={colors.text.primary} />
               </View>
               <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Notificaciones de Citas
+                <Text
+                  style={[styles.settingLabel, { color: colors.text.primary }]}
+                >
+                  Notificaciones
                 </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  {isBusiness
-                    ? 'Recordatorios de agenda, nuevas reservas y cancelaciones'
-                    : 'Recordatorios de tus citas y confirmaciones de horario'}
+                <Text
+                  style={[styles.settingValue, { color: colors.text.muted }]}
+                >
+                  Alertas y recordatorios de agenda
                 </Text>
               </View>
               <FluidToggleSwitch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
-                activeColor={isBusiness ? '#818CF8' : '#10B981'}
+                activeColor={accentColor}
               />
             </View>
 
@@ -662,141 +360,62 @@ export function SettingsScreen() {
               style={[
                 styles.settingItem,
                 {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
+                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
+                  borderColor: isDark ? '#22222A' : '#E4E4E7',
                 },
               ]}
             >
-              <View style={styles.settingIconWrapper}>
-                <Feather name="activity" size={18} color={colors.text.primary} />
+              <View
+                style={[
+                  styles.settingIconWrapper,
+                  { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+                ]}
+              >
+                <Feather name="zap" size={16} color={colors.text.primary} />
               </View>
               <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
+                <Text
+                  style={[styles.settingLabel, { color: colors.text.primary }]}
+                >
                   Respuesta Háptica
                 </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Vibración táctil al interactuar y confirmar citas
+                <Text
+                  style={[styles.settingValue, { color: colors.text.muted }]}
+                >
+                  Vibración sutil al interactuar
                 </Text>
               </View>
               <FluidToggleSwitch
                 value={hapticsEnabled}
                 onValueChange={setHapticsEnabled}
-                activeColor="#10B981"
+                activeColor={accentColor}
               />
             </View>
-          </View>
+          </Animated.View>
 
-          {/* Sección: SOPORTE & SEGURIDAD (Compartida) */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
-              SOPORTE & SEGURIDAD
-            </Text>
-
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() =>
-                Alert.alert(
-                  'Centro de Ayuda',
-                  isBusiness
-                    ? 'Para dudas o soporte técnico escribe a soporte@slotify.app o contacta a tu asesor de implementación.'
-                    : 'Para dudas sobre reservas escribe a soporte@slotify.app.'
-                )
-              }
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingIconWrapper}>
-                <Feather name="help-circle" size={18} color={colors.text.primary} />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Centro de Ayuda
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Guías de uso, preguntas frecuentes y asistencia
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(26, 26, 26, 0.75)'
-                    : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.06)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() =>
-                Alert.alert(
-                  'Términos y Privacidad',
-                  'Tus datos y credenciales se resguardan mediante almacenamiento local seguro (KeyStore/Keychain) y conexiones cifradas de extremo a extremo.'
-                )
-              }
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingIconWrapper}>
-                <Feather name="shield" size={18} color={colors.text.primary} />
-              </View>
-              <View style={styles.settingTextContent}>
-                <Text style={[styles.settingLabel, { color: colors.text.primary }]}>
-                  Términos y Privacidad
-                </Text>
-                <Text style={[styles.settingValue, { color: colors.text.muted }]}>
-                  Políticas de servicio y seguridad de datos
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Botón Destructivo: Cerrar Sesión con margen holgado */}
-          <View style={styles.logoutSection}>
-            <TouchableOpacity
+          {/* ─── CERRAR SESIÓN ─── */}
+          <Animated.View
+            entering={FadeInDown.duration(520).delay(220).springify()}
+            style={styles.logoutSection}
+          >
+            <AnimatedPressable
               style={[
                 styles.logoutButton,
                 {
-                  backgroundColor: isDark
-                    ? 'rgba(239, 68, 68, 0.12)'
-                    : 'rgba(239, 68, 68, 0.08)',
+                  backgroundColor: isDark ? '#181114' : '#FEF2F2',
                   borderColor: isDark
-                    ? 'rgba(239, 68, 68, 0.30)'
-                    : 'rgba(239, 68, 68, 0.20)',
+                    ? 'rgba(239, 68, 68, 0.25)'
+                    : 'rgba(239, 68, 68, 0.2)',
                 },
               ]}
               onPress={handleLogout}
-              activeOpacity={0.8}
             >
-              <Feather name="log-out" size={18} color="#EF4444" />
+              <Feather name="log-out" size={16} color="#EF4444" />
               <Text style={styles.logoutText}>Cerrar Sesión</Text>
-            </TouchableOpacity>
-
-            <Text style={[styles.appVersionText, { color: colors.text.muted }]}>
-              {isBusiness
-                ? 'Slotify v1.0.0 (Build 402) • Business Owner Edition'
-                : 'Slotify v1.0.0 (Build 402) • Consumer Client Edition'}
-            </Text>
-          </View>
+            </AnimatedPressable>
+          </Animated.View>
         </ScrollView>
 
-        {/* Modales de Configuración */}
         <ThemeSettingsModal
           visible={showThemeModal}
           onClose={() => setShowThemeModal(false)}
@@ -808,7 +427,6 @@ export function SettingsScreen() {
               visible={showMigrationModal}
               onClose={() => setShowMigrationModal(false)}
             />
-
             <BusinessInfoModal
               visible={showBusinessInfoModal}
               onClose={() => setShowBusinessInfoModal(false)}
@@ -827,236 +445,152 @@ export function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
+  container: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 16,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderBottomWidth: 1,
   },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  tagDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  tagLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  headerSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-    maxWidth: 270,
-  },
-  headerBadgeIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  modeSwitchChip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  scroll: {
-    flex: 1,
+  modeSwitchChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
+  scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 160,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 130,
   },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 22,
+    padding: 15,
+    borderRadius: 18,
+    marginBottom: 22,
     borderWidth: 1,
-    marginBottom: 16,
+    gap: 12,
   },
   avatarCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
   },
   avatarText: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   profileInfo: {
     flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 2,
   },
   profileName: {
-    fontSize: 17,
+    fontSize: 15.5,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   profileEmail: {
-    fontSize: 13,
-    marginTop: 2,
-    marginBottom: 6,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  roleBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 100,
-  },
-  roleBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  businessBadge: {
-    backgroundColor: 'rgba(150, 150, 150, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 100,
-  },
-  businessBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 12.5,
   },
   editProfileBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  },
-  modeSwitcherCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    marginBottom: 20,
-    gap: 10,
-  },
-  modeSwitcherLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  modeIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modePillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  modeSwitcherTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  testBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  testBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  modeSwitcherSubtitle: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  modeSwitchAction: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    width: 34,
+    height: 34,
     borderRadius: 10,
-  },
-  modeSwitchActionText: {
-    fontSize: 12,
-    fontWeight: '700',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 22,
   },
   sectionHeader: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    letterSpacing: 0.9,
+    marginBottom: 10,
+    paddingLeft: 4,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     marginBottom: 8,
+    borderWidth: 1,
+    gap: 12,
   },
   settingIconWrapper: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   settingTextContent: {
     flex: 1,
-    marginRight: 8,
+    gap: 2,
   },
   settingLabel: {
     fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.1,
   },
   settingValue: {
     fontSize: 12,
-    marginTop: 2,
-    lineHeight: 16,
   },
   logoutSection: {
-    marginTop: 10,
-    alignItems: 'center',
-    gap: 12,
+    marginTop: 4,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 18,
+    height: 48,
+    borderRadius: 15,
     borderWidth: 1,
     gap: 8,
   },
   logoutText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#EF4444',
-  },
-  appVersionText: {
-    fontSize: 11,
-    fontWeight: '500',
   },
 });

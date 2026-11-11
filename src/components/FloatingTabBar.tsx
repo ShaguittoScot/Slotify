@@ -2,15 +2,16 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { AnimatedPressable } from './ui/AnimatedPressable';
 
 type TabsProps = React.ComponentProps<typeof Tabs>;
 export type FloatingTabBarProps = NonNullable<TabsProps['tabBar']> extends (
@@ -30,14 +31,16 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   const { appMode } = useAuthStore();
 
   const isBusiness = appMode === 'BUSINESS';
-  const currentRouteOptions = descriptors[state.routes[state.index].key]?.options;
-  const tabBarStyle = StyleSheet.flatten(currentRouteOptions?.tabBarStyle) as any;
+  const currentRouteOptions =
+    descriptors[state.routes[state.index].key]?.options;
+  const tabBarStyle = StyleSheet.flatten(
+    currentRouteOptions?.tabBarStyle
+  ) as any;
 
   if (tabBarStyle?.display === 'none') {
     return null;
   }
 
-  // Configuración de rutas visibles según el rol del usuario
   const allowedRouteNames = isBusiness
     ? ['index', 'agenda', 'clients', 'settings']
     : ['explore', 'form-preview', 'index', 'settings'];
@@ -50,53 +53,64 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
     switch (routeName) {
       case 'index':
         return {
-          label: isBusiness ? 'Inicio' : 'Mis Citas',
+          label: isBusiness ? 'Resumen' : 'Mis Citas',
           icon: (color: string) =>
             isBusiness ? (
-              <Feather name="home" size={18} color={color} />
+              <Feather name="grid" size={17} color={color} />
             ) : (
-              <Feather name="calendar" size={18} color={color} />
+              <Feather name="calendar" size={17} color={color} />
             ),
         };
       case 'agenda':
         return {
           label: 'Agenda',
-          icon: (color: string) => <Feather name="calendar" size={18} color={color} />,
+          icon: (color: string) => (
+            <Feather name="calendar" size={17} color={color} />
+          ),
         };
       case 'clients':
         return {
           label: 'Clientes',
-          icon: (color: string) => <Feather name="users" size={18} color={color} />,
+          icon: (color: string) => (
+            <Feather name="users" size={17} color={color} />
+          ),
         };
       case 'explore':
         return {
           label: 'Explorar',
-          icon: (color: string) => <Feather name="compass" size={18} color={color} />,
+          icon: (color: string) => (
+            <Feather name="compass" size={17} color={color} />
+          ),
         };
       case 'form-preview':
         return {
-          label: 'Formulario',
-          icon: (color: string) => <Feather name="file-text" size={18} color={color} />,
+          label: 'Reservar',
+          icon: (color: string) => (
+            <Feather name="file-text" size={17} color={color} />
+          ),
         };
       case 'settings':
         return {
-          label: isBusiness ? 'Ajustes' : 'Mi Perfil',
+          label: isBusiness ? 'Ajustes' : 'Perfil',
           icon: (color: string) =>
             isBusiness ? (
-              <Feather name="settings" size={18} color={color} />
+              <Feather name="sliders" size={17} color={color} />
             ) : (
-              <Feather name="user" size={18} color={color} />
+              <Feather name="user" size={17} color={color} />
             ),
         };
       default:
         return {
           label: routeName,
-          icon: (color: string) => <Feather name="circle" size={18} color={color} />,
+          icon: (color: string) => (
+            <Feather name="circle" size={17} color={color} />
+          ),
         };
     }
   };
 
-  const bottomMargin = Math.max(insets.bottom + 10, 20);
+  const bottomMargin = Math.max(insets.bottom + 8, 18);
+  const accentColor = isBusiness ? '#818CF8' : '#10B981';
 
   return (
     <View
@@ -113,14 +127,16 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           styles.container,
           {
             backgroundColor: isDark
-              ? 'rgba(26, 26, 26, 0.94)'
+              ? 'rgba(15, 15, 20, 0.96)'
               : 'rgba(255, 255, 255, 0.96)',
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+            borderColor: isDark ? '#24242E' : 'rgba(0, 0, 0, 0.08)',
           },
         ]}
       >
         {visibleRoutes.map((route: any) => {
-          const originalIndex = state.routes.findIndex((r: any) => r.key === route.key);
+          const originalIndex = state.routes.findIndex(
+            (r: any) => r.key === route.key
+          );
           const isFocused = state.index === originalIndex;
           const { label, icon } = getTabConfig(route.name);
 
@@ -136,59 +152,58 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             }
           };
 
-          const onLongPress = () => {
-            emitter.emit({
-              type: 'tabLongPress',
-              target: route.key,
-            });
-          };
-
           return (
-            <TouchableOpacity
+            <Animated.View
               key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={descriptors[route.key]?.options?.tabBarAccessibilityLabel}
-              testID={descriptors[route.key]?.options?.tabBarButtonTestID}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              style={[
-                styles.tabItem,
-                isFocused && [
-                  styles.tabItemActive,
-                  {
-                    backgroundColor: isDark ? '#383838' : '#171717',
-                  },
-                ],
-              ]}
-              activeOpacity={0.7}
+              layout={LinearTransition.springify()}
+              style={{ flex: 1 }}
             >
-              <View style={styles.iconContainer}>
-                {icon(
-                  isFocused
-                    ? '#FFFFFF'
-                    : isDark
-                    ? '#8E8E8E'
-                    : '#737373'
-                )}
-              </View>
-
-              <Text
+              <AnimatedPressable
+                scaleDown={0.93}
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                onPress={onPress}
                 style={[
-                  styles.tabLabel,
-                  {
-                    color: isFocused
-                      ? '#FFFFFF'
-                      : isDark
-                      ? '#8E8E8E'
-                      : '#737373',
-                    fontWeight: isFocused ? '700' : '500',
-                  },
+                  styles.tabItem,
+                  isFocused && [
+                    styles.tabItemActive,
+                    {
+                      backgroundColor: isDark ? '#1D1D26' : '#18181B',
+                      borderColor: isDark ? `${accentColor}40` : 'transparent',
+                    },
+                  ],
                 ]}
               >
-                {label}
-              </Text>
-            </TouchableOpacity>
+                <View style={styles.iconContainer}>
+                  {icon(
+                    isFocused
+                      ? isDark
+                        ? accentColor
+                        : '#FFFFFF'
+                      : isDark
+                      ? '#71717A'
+                      : '#737373'
+                  )}
+                </View>
+
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    {
+                      color: isFocused
+                        ? '#FAFAFA'
+                        : isDark
+                        ? '#71717A'
+                        : '#737373',
+                      fontWeight: isFocused ? '700' : '500',
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {label}
+                </Text>
+              </AnimatedPressable>
+            </Animated.View>
           );
         })}
       </View>
@@ -210,38 +225,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     maxWidth: 440,
-    height: 64,
-    borderRadius: 32,
-    paddingHorizontal: 4,
+    height: 62,
+    borderRadius: 24,
+    paddingHorizontal: 5,
     borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.35,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.45,
+        shadowRadius: 22,
       },
       android: {
-        elevation: 12,
+        elevation: 14,
       },
     }),
   },
   tabItem: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
-    borderRadius: 24,
+    minHeight: 46,
+    borderRadius: 18,
     paddingVertical: 8,
     paddingHorizontal: 6,
     marginHorizontal: 2,
     gap: 5,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   tabItemActive: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
   },

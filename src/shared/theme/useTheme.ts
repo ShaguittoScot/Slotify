@@ -16,7 +16,7 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  mode: 'system', // Por defecto sigue el tema del dispositivo
+  mode: 'dark', // Estilo oscuro elegante (Obsidian Black) por defecto
   isHydrated: false,
 
   setMode: async (mode: ThemeMode) => {
@@ -33,7 +33,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     } else if (currentMode === 'dark') {
       nextMode = 'light';
     } else {
-      nextMode = 'system';
+      nextMode = 'dark';
     }
 
     set({ mode: nextMode });
@@ -43,13 +43,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   hydrateTheme: async () => {
     try {
       const savedMode = await storage.get<ThemeMode>(THEME_STORAGE_KEY);
-      if (savedMode && (savedMode === 'system' || savedMode === 'light' || savedMode === 'dark')) {
+      if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
         set({ mode: savedMode, isHydrated: true });
       } else {
-        set({ mode: 'system', isHydrated: true });
+        set({ mode: 'dark', isHydrated: true });
       }
     } catch {
-      set({ isHydrated: true });
+      set({ mode: 'dark', isHydrated: true });
     }
   },
 }));

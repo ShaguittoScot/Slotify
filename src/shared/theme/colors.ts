@@ -5,20 +5,20 @@
  */
 
 export const palette = {
-  // Pure Neutral Dark Grays / True Charcoal (Zero blue tint: R ≈ G ≈ B)
+  // Deep Obsidian & Carbon Neutrals with subtle luxury depth
   neutral: {
-    50: '#F9F9F9',
-    100: '#F2F2F2',
-    200: '#E5E5E5',
-    300: '#D4D4D4',
-    400: '#A3A3A3',
-    500: '#737373',
-    600: '#525252',
-    700: '#3A3A3A',
-    800: '#262626',
-    850: '#1E1E1E',
-    900: '#171717',
-    950: '#121212',
+    50: '#FAFAFA',
+    100: '#F4F4F5',
+    200: '#E4E4E7',
+    300: '#D4D4D8',
+    400: '#A1A1AA',
+    500: '#71717A',
+    600: '#52525B',
+    700: '#27272A',
+    800: '#1C1C21',
+    850: '#141418',
+    900: '#0F0F12',
+    950: '#09090B',
   },
 
   // Primary Accent (Indigo / Brand Violet)

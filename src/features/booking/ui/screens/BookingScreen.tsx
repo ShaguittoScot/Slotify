@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme } from '@/shared/theme';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAuthStore } from '@/features/auth/model';
 import { useExploreStore } from '@/features/explore/model';
 import { DEFAULT_BUSINESS_CATALOG } from '@/features/explore/constants/defaultBusinesses';
@@ -637,7 +638,7 @@ export function BookingScreen() {
               </View>
 
               <View style={styles.confirmationActions}>
-                <TouchableOpacity
+                <AnimatedPressable
                   style={[
                     styles.primaryActionBtn,
                     { backgroundColor: confirmedBooking.accentColor },
@@ -646,17 +647,12 @@ export function BookingScreen() {
                     setConfirmedBooking(null);
                     router.push('/(main)' as any);
                   }}
-                  activeOpacity={0.85}
                 >
-                  <MaterialCommunityIcons
-                    name="calendar-check-outline"
-                    size={18}
-                    color="#FFFFFF"
-                  />
+                  <Feather name="calendar" size={17} color="#FFFFFF" />
                   <Text style={styles.primaryActionText}>Ver en Mis Citas</Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
 
-                <TouchableOpacity
+                <AnimatedPressable
                   style={[
                     styles.secondaryActionBtn,
                     {
@@ -664,7 +660,6 @@ export function BookingScreen() {
                     },
                   ]}
                   onPress={() => setConfirmedBooking(null)}
-                  activeOpacity={0.75}
                 >
                   <Text
                     style={[
@@ -674,7 +669,7 @@ export function BookingScreen() {
                   >
                     Hacer otra reservación
                   </Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               </View>
             </Animated.View>
           )}

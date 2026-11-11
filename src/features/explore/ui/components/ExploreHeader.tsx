@@ -7,7 +7,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAppTheme } from '@/shared/theme';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import type { Category } from '../../types';
 import { createExploreHeaderStyles } from '../styles/exploreHeader.styles';
 
@@ -34,20 +36,26 @@ export function ExploreHeader({
   const styles = useMemo(() => createExploreHeaderStyles(colors), [colors]);
 
   return (
-    <View style={styles.header}>
-      <View>
-        <Text style={styles.headerTitle}>Explorar & Agendar</Text>
-        <Text style={styles.headerSubtitle}>
-          Encuentra negocios registrados y reserva tu cita en línea
-        </Text>
+    <Animated.View
+      entering={FadeInDown.duration(380).springify()}
+      style={styles.header}
+    >
+      <View style={styles.titleRow}>
+        <View>
+          <View style={styles.tagRow}>
+            <View style={styles.tagDot} />
+            <Text style={styles.tagLabel}>DIRECTORIO</Text>
+          </View>
+          <Text style={styles.headerTitle}>Explorar</Text>
+        </View>
       </View>
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Feather name="search" size={16} color={colors.text.muted} />
+          <Feather name="search" size={15} color={colors.text.muted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar por negocio o enlace..."
+            placeholder="Buscar establecimiento o servicio..."
             placeholderTextColor={colors.text.muted}
             value={searchInput}
             onChangeText={onChangeSearch}
@@ -67,15 +75,6 @@ export function ExploreHeader({
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity
-          style={styles.searchBtn}
-          onPress={onSubmitSearch}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Ejecutar búsqueda"
-        >
-          <Feather name="arrow-right" size={17} color={colors.action.primaryText} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -86,14 +85,16 @@ export function ExploreHeader({
         {categories.map((cat) => {
           const isSelected = selectedCategoryKey === cat.key;
           return (
-            <TouchableOpacity
+            <AnimatedPressable
               key={cat.id}
+              scaleDown={0.95}
               style={[
                 styles.categoryChip,
-                isSelected ? styles.categoryChipActive : styles.categoryChipInactive,
+                isSelected
+                  ? styles.categoryChipActive
+                  : styles.categoryChipInactive,
               ]}
               onPress={() => onSelectCategory(cat.key)}
-              activeOpacity={0.75}
               accessibilityRole="tab"
               accessibilityState={{ selected: isSelected }}
             >
@@ -107,10 +108,10 @@ export function ExploreHeader({
               >
                 {cat.name}
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           );
         })}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
