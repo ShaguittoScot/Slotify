@@ -1,7 +1,7 @@
 /**
- * US-003: Calendar — Model/Store Layer (ViewModel)
+ * US-003 / US-008 / US-023: Calendar — Model/Store Layer (ViewModel)
  *
- * Estado reactivo para el calendario multiformato táctil.
+ * Estado reactivo para el calendario multiformato táctil y bloqueos funcionales de agenda.
  * Maneja la vista activa (día/semana/mes), fechas seleccionadas,
  * y la sincronización con el backend .NET (Slotify_back).
  */
@@ -9,6 +9,8 @@
 import { create } from 'zustand';
 import type { CalendarSlot, CalendarViewMode } from '@/shared/types';
 import { fetchCalendarSlots } from '../api';
+import { useAuthStore } from '@/features/auth/model';
+import { createScheduleBlock, deleteScheduleBlock } from '@/features/schedule-blocks/api';
 
 interface CalendarState {
   /** Modo de vista actual: 'day' | 'week' | 'month' */
@@ -55,7 +57,19 @@ interface CalendarState {
   /** Agrega un nuevo slot manualmente (cita walk-in o bloqueo) */
   addSlot: (slot: CalendarSlot) => void;
 
-  /** Elimina un slot de la agenda (desbloquear horario o eliminar cita) */
+  /** Crea un bloqueo de horario de forma funcional persistiendo en backend (US-008 / US-023) */
+  createBlock: (data: {
+    title: string;
+    reason: string;
+    startTime: string;
+    endTime: string;
+    employeeId?: string;
+  }) => Promise<void>;
+
+  /** Elimina un bloqueo de la agenda en backend y en memoria (US-008 / US-023) */
+  deleteBlock: (resourceId: string) => Promise<void>;
+
+  /** Elimina un slot de la agenda en memoria */
   removeSlot: (resourceId: string) => void;
 
   /** Reprograma el horario de una cita existente */
@@ -98,7 +112,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   setViewMode: (mode) => {
     set({ viewMode: mode });
-    // Si no hay slots precargados en memoria, cargamos
     if (get().slots.length === 0) {
       get().loadSlots();
     }
@@ -153,11 +166,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   loadSlots: async () => {
     const { selectedDate } = get();
-    // Cargamos la ventana completa del mes para que cambiar entre Día, Semana y Mes sea instantáneo
     const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1, 0, 0, 0);
     const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
 
-    // Solo activamos spinner bloqueante si no tenemos ningún slot cargado previamente
     if (get().slots.length === 0) {
       set({ isLoading: true, error: null });
     }
@@ -181,6 +192,64 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   addSlot: (slot) => {
     set((state) => ({
       slots: [...state.slots, slot],
+    }));
+  },
+
+  createBlock: async (data) => {
+    // El modo demo se detecta si isDemoMode está activo o por el id fijo asignado en login demo
+    const authState = useAuthStore.getState();
+    const isDemo = Boolean((authState as any).isDemoMode) || authState.user?.id === 'demo-user-123';
+
+    if (isDemo) {
+      const demoSlot: CalendarSlot = {
+        type: 'block',
+        resourceId: `blk-demo-${Date.now()}`,
+        title: data.title,
+        status: 'blocked',
+        blockReason: data.reason,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        employeeName: 'Todo el personal',
+      };
+      set((state) => ({ slots: [...state.slots, demoSlot] }));
+      return;
+    }
+
+    const blockId = await createScheduleBlock({
+      startDateTime: data.startTime,
+      endDateTime: data.endTime,
+      reason: data.reason,
+      employeeId: data.employeeId,
+    });
+
+    const newSlot: CalendarSlot = {
+      type: 'block',
+      resourceId: String(blockId || `blk-${Date.now()}`),
+      title: data.title,
+      status: 'blocked',
+      blockReason: data.reason,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      employeeName: 'Todo el personal',
+    };
+
+    set((state) => ({ slots: [...state.slots, newSlot] }));
+  },
+
+  deleteBlock: async (resourceId) => {
+    // El modo demo se detecta si isDemoMode está activo o por el id fijo asignado en login demo
+    const authState = useAuthStore.getState();
+    const isDemo = Boolean((authState as any).isDemoMode) || authState.user?.id === 'demo-user-123';
+
+    if (!isDemo) {
+      const numericId = parseInt(resourceId.replace(/\D/g, ''), 10);
+      if (!isNaN(numericId) && numericId > 0) {
+        await deleteScheduleBlock(numericId);
+      }
+    }
+
+    set((state) => ({
+      slots: state.slots.filter((s) => s.resourceId !== resourceId),
     }));
   },
 

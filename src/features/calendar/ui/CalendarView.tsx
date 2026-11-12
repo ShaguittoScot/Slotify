@@ -43,6 +43,8 @@ export const CalendarView: React.FC = () => {
     loadSlots,
     updateSlotStatus,
     addSlot,
+    createBlock,
+    deleteBlock,
     removeSlot,
     rescheduleSlot,
   } = useCalendarStore();
@@ -117,10 +119,15 @@ export const CalendarView: React.FC = () => {
     }
   };
 
-  // Eliminación / desbloqueo de horario con feedback Toast
-  const handleDeleteBlock = (resourceId: string) => {
-    removeSlot(resourceId);
-    triggerToast('Horario desbloqueado y disponible 🔓', 'success');
+  // Eliminación / desbloqueo de horario con persistencia en backend (US-008 / US-023)
+  const handleDeleteBlock = async (resourceId: string) => {
+    try {
+      await deleteBlock(resourceId);
+      triggerToast('Horario desbloqueado y disponible 🔓', 'success');
+    } catch (err: any) {
+      const msg = err.response?.data?.errors?.[0] || err.response?.data?.message || err.message || 'No se pudo desbloquear el horario';
+      triggerToast(msg, 'error');
+    }
   };
 
   // Manejo de Selección de Cita desde Búsqueda Rápida (Recomendación 1)
@@ -174,26 +181,26 @@ export const CalendarView: React.FC = () => {
     triggerToast(`Cita agendada para ${data.clientName} 📅`, 'success');
   };
 
-  // Guardado de Bloqueo de Horario (US-008)
-  const handleSaveBlock = (data: {
+  // Guardado de Bloqueo de Horario con persistencia en backend (US-008 / US-023)
+  const handleSaveBlock = async (data: {
     title: string;
     reason: string;
     startTime: string;
     endTime: string;
   }) => {
-    const newBlockSlot: CalendarSlot = {
-      type: 'block',
-      resourceId: `blk-manual-${Date.now()}`,
-      title: data.title,
-      status: 'blocked',
-      blockReason: data.reason,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      employeeName: 'Todo el personal',
-    };
-    addSlot(newBlockSlot);
-    setSelectedHourForCreate(undefined);
-    triggerToast(`Horario bloqueado: ${data.reason} 🔒`, 'warning');
+    try {
+      await createBlock({
+        title: data.title,
+        reason: data.reason,
+        startTime: data.startTime,
+        endTime: data.endTime,
+      });
+      setSelectedHourForCreate(undefined);
+      triggerToast(`Horario bloqueado: ${data.reason} 🔒`, 'warning');
+    } catch (err: any) {
+      const msg = err.response?.data?.errors?.[0] || err.response?.data?.message || err.message || 'No se pudo crear el bloqueo';
+      triggerToast(msg, 'error');
+    }
   };
 
   return (

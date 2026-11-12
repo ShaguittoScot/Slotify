@@ -48,10 +48,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
+    "start": "node -r ./node-polyfill.js ./node_modules/expo/bin/cli start",
+    "android": "node -r ./node-polyfill.js ./node_modules/expo/bin/cli run:android",
+    "ios": "node -r ./node-polyfill.js ./node_modules/expo/bin/cli run:ios",
+    "web": "node -r ./node-polyfill.js ./node_modules/expo/bin/cli start --web",
     "test": "jest",
     "lint": "node -e \"console.log('Validacion de linter completada')\"",
     "start:back": "cd ../Slotify_back && \"%USERPROFILE%\\.dotnet\\dotnet.exe\" run --project src/Slotify.API"
