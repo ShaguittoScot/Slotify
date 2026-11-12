@@ -1,3 +1,4 @@
+import { formatBusinessHour } from '../model/businessTime';
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -6,21 +7,24 @@ import { useAppTheme } from '@/shared/theme';
 
 interface CalendarSlotCardProps {
   slot: CalendarSlot;
+  timeZone: string;
   onPress?: (slot: CalendarSlot) => void;
 }
 
-export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPress }) => {
+export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPress, timeZone }) => {
   const { colors, isDark } = useAppTheme();
 
   const formatTime = (isoString: string) => {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return formatBusinessHour(isoString, timeZone);
   };
 
   const isAppointment = slot.type === 'appointment';
   const isBlock = slot.type === 'block';
   const isCompleted = slot.status === 'completed';
   const isCancelled = slot.status === 'cancelled';
+  const isNoShow = slot.status === 'no_show';
+  const isPending = slot.status === 'pending';
+  const needsAttention = isNoShow || isPending;
 
   // Determinación de superficies Glassmorphism y acentos
   const cardBg = isCompleted
@@ -65,6 +69,8 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
 
   const accentColor = isCompleted
     ? '#34D399'
+    : needsAttention
+    ? isDark ? '#FBBF24' : '#92400E'
     : isCancelled
     ? '#EF4444'
     : isAppointment
@@ -75,6 +81,10 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
 
   const badgeText = isCompleted
     ? 'COMPLETADA'
+    : isNoShow
+    ? 'INASISTENCIA'
+    : isPending
+    ? 'PENDIENTE'
     : isCancelled
     ? 'CANCELADA'
     : isAppointment
@@ -87,6 +97,8 @@ export const CalendarSlotCard: React.FC<CalendarSlotCardProps> = ({ slot, onPres
     ? isDark
       ? 'rgba(16, 185, 129, 0.22)'
       : 'rgba(16, 185, 129, 0.12)'
+    : needsAttention
+    ? 'rgba(245, 158, 11, 0.16)'
     : isCancelled || isBlock
     ? isDark
       ? 'rgba(239, 68, 68, 0.22)'

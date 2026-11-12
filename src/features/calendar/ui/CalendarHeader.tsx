@@ -56,10 +56,10 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   const [showThemeModal, setShowThemeModal] = useState(false);
 
   const formatTitle = () => {
-    const day = selectedDate.getDate();
-    const month = MONTH_NAMES[selectedDate.getMonth()];
-    const monthShort = MONTH_NAMES_SHORT[selectedDate.getMonth()];
-    const dayOfWeekShort = DAY_NAMES_SHORT[selectedDate.getDay()];
+    const day = selectedDate.getUTCDate();
+    const month = MONTH_NAMES[selectedDate.getUTCMonth()];
+    const monthShort = MONTH_NAMES_SHORT[selectedDate.getUTCMonth()];
+    const dayOfWeekShort = DAY_NAMES_SHORT[selectedDate.getUTCDay()];
 
     if (viewMode === 'day') {
       return `${dayOfWeekShort}, ${day} ${monthShort}`;
@@ -67,22 +67,22 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
     if (viewMode === 'week') {
       const d = new Date(selectedDate);
-      const dayIdx = d.getDay();
-      const diff = d.getDate() - dayIdx + (dayIdx === 0 ? -6 : 1);
-      const start = new Date(d.setDate(diff));
+      const dayIdx = d.getUTCDay();
+      const diff = d.getUTCDate() - dayIdx + (dayIdx === 0 ? -6 : 1);
+      const start = new Date(d.setUTCDate(diff));
       const end = new Date(start);
-      end.setDate(start.getDate() + 6);
+      end.setUTCDate(start.getUTCDate() + 6);
 
-      const startMonthShort = MONTH_NAMES_SHORT[start.getMonth()];
-      const endMonthShort = MONTH_NAMES_SHORT[end.getMonth()];
+      const startMonthShort = MONTH_NAMES_SHORT[start.getUTCMonth()];
+      const endMonthShort = MONTH_NAMES_SHORT[end.getUTCMonth()];
 
-      if (start.getMonth() === end.getMonth()) {
-        return `${start.getDate()} - ${end.getDate()} ${startMonthShort}`;
+      if (start.getUTCMonth() === end.getUTCMonth()) {
+        return `${start.getUTCDate()} - ${end.getUTCDate()} ${startMonthShort}`;
       }
-      return `${start.getDate()} ${startMonthShort} - ${end.getDate()} ${endMonthShort}`;
+      return `${start.getUTCDate()} ${startMonthShort} - ${end.getUTCDate()} ${endMonthShort}`;
     }
 
-    return `${month} ${selectedDate.getFullYear()}`;
+    return `${month} ${selectedDate.getUTCFullYear()}`;
   };
 
   const getThemeIcon = () => {
@@ -113,6 +113,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         <TouchableOpacity
           style={styles.titleWrapper}
           onPress={onTitleDatePress}
+          accessibilityRole="button"
+          accessibilityLabel="Cambiar fecha de la agenda"
           activeOpacity={onTitleDatePress ? 0.65 : 1}
           disabled={!onTitleDatePress}
         >
@@ -134,8 +136,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             )}
           </View>
           {viewMode !== 'month' && (
-            <Text style={[styles.yearSubtitle, { color: colors.text.muted }]}>
-              {selectedDate.getFullYear()} • Toca para saltar de fecha
+            <Text style={[styles.yearSubtitle, { color: colors.text.muted }]} numberOfLines={1}>
+              {selectedDate.getUTCFullYear()} · Cambiar fecha
             </Text>
           )}
         </TouchableOpacity>
@@ -263,7 +265,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                 <View style={styles.metricItem}>
                   <View style={[styles.metricDot, { backgroundColor: '#34D399' }]} />
                   <Text style={[styles.metricText, { color: '#34D399', fontFamily: 'Inter_600SemiBold' }]}>
-                    {completedCount} {completedCount === 1 ? 'cobrada' : 'cobradas'}
+                    {completedCount} {completedCount === 1 ? 'completada' : 'completadas'}
                   </Text>
                 </View>
               )}

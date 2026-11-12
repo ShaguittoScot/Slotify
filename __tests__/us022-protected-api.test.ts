@@ -4,6 +4,11 @@ const mockReplace = jest.fn();
 const mockLogout = jest.fn().mockResolvedValue(undefined);
 const mockSecureGet = jest.fn();
 const mockSecureRemove = jest.fn().mockResolvedValue(undefined);
+const mockGetSession = jest.fn();
+
+jest.mock('@/shared/lib/supabase', () => ({
+  supabase: { auth: { getSession: () => mockGetSession() } },
+}));
 
 jest.mock('expo-router', () => ({
   router: {
@@ -41,6 +46,7 @@ import { fetchCalendarSlots } from '@/features/calendar/api';
 describe('US-022 | Frontend API Client & Calendar Auth Protection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
   });
 
   test('adjunta el header Authorization Bearer con el accessToken de JwtService y no envía businessId en query', async () => {
@@ -105,6 +111,37 @@ describe('US-022 | Frontend API Client & Calendar Auth Protection', () => {
     expect(mockSecureRemove).toHaveBeenCalledWith('refreshToken');
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith('/(auth)');
+  });
+
+  test('renueva el JWT de Slotify con el bearer de Supabase y reintenta la operación', async () => {
+    mockSecureGet.mockResolvedValue('jwt-slotify-expirado');
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'user-owner-1' }, access_token: 'jwt-supabase' } },
+      error: null,
+    });
+    const sent: string[] = [];
+    apiClient.defaults.adapter = async (config) => {
+      const auth = String(config.headers.get('Authorization'));
+      sent.push(auth);
+      if (config.url === '/auth/login') {
+        expect(config.data).not.toBeDefined();
+        return {
+          data: { data: { accessToken: 'jwt-slotify-nuevo', user: { id: 'user-owner-1' } } },
+          status: 200, statusText: 'OK', headers: {}, config,
+        };
+      }
+      if (auth === 'Bearer jwt-slotify-nuevo') {
+        return { data: { success: true }, status: 200, statusText: 'OK', headers: {}, config };
+      }
+      throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, {}, {
+        data: {}, status: 401, statusText: 'Unauthorized', headers: {}, config,
+      });
+    };
+
+    await expect(apiClient.patch('/calendar/appointments/appointment-id', { status: 'completed' }))
+      .resolves.toMatchObject({ status: 200 });
+    expect(sent).toEqual(['Bearer jwt-slotify-expirado', 'Bearer jwt-supabase', 'Bearer jwt-slotify-nuevo']);
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 });
 

@@ -5,6 +5,8 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -17,11 +19,18 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { BusinessInfoModal } from '../components/BusinessInfoModal';
+import { requestAppointmentNotificationPermission } from '../../model/appointmentNotifications';
+import { LocalNotificationsUnavailable } from '../../model/localNotifications';
+import {
+  appointmentHaptic,
+  settingsScope,
+  useSettingsPreferences,
+} from '../../model/preferences';
 
 export function SettingsScreen() {
   const router = useRouter();
   const { colors, isDark, themeMode } = useAppTheme();
-  const { user, logout, appMode, toggleAppMode } = useAuthStore();
+  const { user, logout, appMode, setAppMode, toggleAppMode } = useAuthStore();
 
   const isBusiness = appMode === 'BUSINESS';
 
@@ -29,9 +38,75 @@ export function SettingsScreen() {
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showBusinessInfoModal, setShowBusinessInfoModal] = useState(false);
+  const [requestingNotifications, setRequestingNotifications] = useState(false);
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const preferences = useSettingsPreferences();
+  const scope = settingsScope(user);
+  const preferencesReady = preferences.ready && preferences.scope === scope;
+  const canNotify =
+    Platform.OS !== 'web' &&
+    Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+
+  const changeMode = () => {
+    if (isBusiness) {
+      setAppMode('CONSUMER');
+      router.navigate('/(main)/explore');
+    } else if (user?.businessId) {
+      setAppMode('BUSINESS');
+      router.navigate('/(main)');
+    } else {
+      toggleAppMode();
+    }
+  };
+
+  const changeNotifications = async (enabled: boolean) => {
+    if (!scope || !canNotify || !preferencesReady || requestingNotifications)
+      return;
+    if (!enabled) {
+      await preferences.update(scope, { notifications: false });
+      return;
+    }
+    setRequestingNotifications(true);
+    try {
+      if (await requestAppointmentNotificationPermission()) {
+        await preferences.update(scope, { notifications: true });
+      } else {
+        Alert.alert(
+          'Permiso de notificaciones',
+          'Permite las notificaciones en los ajustes del teléfono para activar los avisos.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Abrir ajustes',
+              onPress: () => {
+                void Linking.openSettings().catch(() => {});
+              },
+            },
+          ]
+        );
+      }
+    } catch (failure) {
+      if (__DEV__)
+        console.debug(
+          '[Slotify] Error al activar notificaciones locales',
+          failure
+        );
+      Alert.alert(
+        'Notificaciones no disponibles',
+        failure instanceof LocalNotificationsUnavailable
+          ? 'Esta instalación no pudo cargar las notificaciones locales. Si estás en Expo Go, actualízalo y vuelve a abrir Slotify.'
+          : 'No se pudo configurar el canal de notificaciones o solicitar el permiso. Vuelve a abrir Slotify e inténtalo de nuevo.'
+      );
+    } finally {
+      setRequestingNotifications(false);
+    }
+  };
+
+  const changeHaptics = (enabled: boolean) => {
+    if (!scope || !preferencesReady) return;
+    void preferences.update(scope, { haptics: enabled });
+    if (enabled) appointmentHaptic();
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -65,7 +140,7 @@ export function SettingsScreen() {
     : 'Cliente Slotify';
 
   const getInitials = (name: string) => {
-    const parts = name.trim().split(' ');
+    const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     }
@@ -150,6 +225,7 @@ export function SettingsScreen() {
           </View>
 
           <AnimatedPressable
+            accessibilityRole="button"
             style={[
               styles.modeSwitchChip,
               {
@@ -157,7 +233,7 @@ export function SettingsScreen() {
                 borderColor: `${accentColor}40`,
               },
             ]}
-            onPress={toggleAppMode}
+            onPress={changeMode}
           >
             <Feather name="repeat" size={13} color={accentColor} />
             <Text style={[styles.modeSwitchChipText, { color: accentColor }]}>
@@ -176,6 +252,8 @@ export function SettingsScreen() {
             entering={FadeInDown.duration(420).delay(50).springify()}
           >
             <AnimatedPressable
+              accessibilityRole="button"
+              accessibilityLabel="Editar perfil"
               onPress={() => setShowProfileModal(true)}
               style={[
                 styles.profileCard,
@@ -270,8 +348,8 @@ export function SettingsScreen() {
                 )}
                 {renderSettingRow(
                   'globe',
-                  'Enlace y Sucursal',
-                  'Portal público y horarios de atención',
+                  'Información del Negocio',
+                  'Horarios, contacto y enlace de reserva',
                   () => setShowBusinessInfoModal(true),
                   '#818CF8'
                 )}
@@ -341,17 +419,24 @@ export function SettingsScreen() {
                 <Text
                   style={[styles.settingLabel, { color: colors.text.primary }]}
                 >
-                  Notificaciones
+                  Notificaciones de Citas
                 </Text>
                 <Text
                   style={[styles.settingValue, { color: colors.text.muted }]}
                 >
-                  Alertas y recordatorios de agenda
+                  {canNotify
+                    ? 'Recordatorios de agenda, nuevas reservas y cancelaciones'
+                    : 'Disponible en la app móvil con una cuenta de negocio'}
                 </Text>
               </View>
               <FluidToggleSwitch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                accessibilityLabel="Notificaciones de Citas"
+                value={canNotify && preferencesReady && preferences.notifications}
+                onValueChange={changeNotifications}
+                disabled={
+                  !canNotify || !preferencesReady || requestingNotifications
+                }
+                inactiveColor={isDark ? '#414147' : '#D4D4D8'}
                 activeColor={accentColor}
               />
             </View>
@@ -382,13 +467,22 @@ export function SettingsScreen() {
                 <Text
                   style={[styles.settingValue, { color: colors.text.muted }]}
                 >
-                  Vibración sutil al interactuar
+                  {Platform.OS === 'web'
+                    ? 'Disponible en la app móvil'
+                    : 'Vibración táctil en Agenda y Clientes'}
                 </Text>
               </View>
               <FluidToggleSwitch
-                value={hapticsEnabled}
-                onValueChange={setHapticsEnabled}
-                activeColor={accentColor}
+                accessibilityLabel="Respuesta Háptica"
+                value={
+                  Platform.OS !== 'web' &&
+                  preferencesReady &&
+                  preferences.haptics
+                }
+                onValueChange={changeHaptics}
+                disabled={Platform.OS === 'web' || !preferencesReady}
+                inactiveColor={isDark ? '#414147' : '#D4D4D8'}
+                activeColor="#10B981"
               />
             </View>
           </Animated.View>

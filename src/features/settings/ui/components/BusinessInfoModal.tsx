@@ -1,20 +1,31 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
+  Platform,
+  Pressable,
   ScrollView,
   Share,
-  Alert,
-  TouchableWithoutFeedback,
-  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { authRequestMessage } from '@/features/auth/api';
 import { useAppTheme } from '@/shared/theme';
-import { useAuthStore } from '@/features/auth/model';
+import { bookingLink, fetchOwnBusinessInfo, type BusinessInfo } from '../../api';
+
+const WEEK = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
 
 interface Props {
   visible: boolean;
@@ -25,29 +36,57 @@ interface Props {
 export function BusinessInfoModal({ visible, onClose, onOpenMigration }: Props) {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
-  const { user } = useAuthStore();
-  const [copied, setCopied] = useState(false);
+  const [info, setInfo] = useState<BusinessInfo>();
+  const [error, setError] = useState<string>();
+  const [shareError, setShareError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
-  const businessName = user?.businessName || 'Mi Negocio Slotify';
-  const slug = businessName
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  useEffect(() => {
+    if (!visible) return;
+    const controller = new AbortController();
+    setInfo(undefined);
+    setError(undefined);
+    setShareError(false);
+    fetchOwnBusinessInfo(controller.signal).then(
+      (data) => {
+        if (!controller.signal.aborted) setInfo(data);
+      },
+      (failure) => {
+        if (!controller.signal.aborted)
+          setError(
+            authRequestMessage(failure, 'No se pudo cargar el negocio.')
+          );
+      }
+    );
+    return () => controller.abort();
+  }, [visible, attempt]);
 
-  const bookingUrl = `https://slotify.app/book/${slug || 'demo'}`;
-
-  const handleShare = async () => {
+  const url = bookingLink(info?.slug);
+  const share = async () => {
+    if (!url || !info) return;
+    setShareError(false);
     try {
       await Share.share({
-        message: `Reserva tu cita en ${businessName} a través de Slotify: ${bookingUrl}`,
-        url: bookingUrl,
+        message: `Consulta las reservas de ${info.name} en Slotify: ${url}`,
       });
     } catch {
-      Alert.alert('Enlace Copiado', bookingUrl);
+      setShareError(true);
     }
   };
+  const accent = isDark ? '#A5B4FC' : '#4F46E5';
+  const fields = [
+    { label: 'Razón Social / Comercial', value: info?.name, icon: 'briefcase' },
+    {
+      label: 'Teléfono',
+      value: info?.phone || 'Sin teléfono registrado',
+      icon: 'phone',
+    },
+    {
+      label: 'Zona Horaria',
+      value: info?.timeZone?.replaceAll('_', ' '),
+      icon: 'globe',
+    },
+  ] as const;
 
   return (
     <Modal
@@ -56,155 +95,269 @@ export function BusinessInfoModal({ visible, onClose, onOpenMigration }: Props) 
       transparent
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View
-              style={[
-                styles.modalCard,
-                {
-                  backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
-                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                },
-              ]}
+      <View style={styles.overlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessible={false}
+        />
+        <View
+          style={[
+            styles.modalCard,
+            {
+              backgroundColor: isDark ? '#121216' : '#FFFFFF',
+              borderColor: isDark ? '#22222A' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                Información del Negocio
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: colors.text.muted }]}>
+                Datos operativos y portal de autoservicio
+              </Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
+              onPress={onClose}
+              style={styles.closeBtn}
             >
-              <View style={styles.modalHeader}>
-                <View>
-                  <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-                    Información del Negocio
-                  </Text>
-                  <Text style={[styles.modalSubtitle, { color: colors.text.muted }]}>
-                    Datos operativos y portal de autoservicio
+              <Feather name="x" size={20} color={colors.text.muted} />
+            </TouchableOpacity>
+          </View>
+
+          {error ? (
+            <>
+              <Text
+                accessibilityRole="alert"
+                style={{ color: colors.status.error }}
+              >
+                {error}
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => setAttempt((value) => value + 1)}
+                style={styles.retryBtn}
+              >
+                <Text style={[styles.shareBtnText, { color: accent }]}>
+                  Reintentar
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : !info ? (
+            <ActivityIndicator color={accent} />
+          ) : (
+            <ScrollView
+              style={styles.details}
+              showsVerticalScrollIndicator={false}
+            >
+              <View
+                style={[
+                  styles.bookingLinkCard,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(99, 102, 241, 0.12)'
+                      : 'rgba(99, 102, 241, 0.08)',
+                    borderColor: isDark
+                      ? 'rgba(99, 102, 241, 0.25)'
+                      : 'rgba(99, 102, 241, 0.18)',
+                  },
+                ]}
+              >
+                <View style={styles.linkHeader}>
+                  <Feather name="globe" size={16} color={accent} />
+                  <Text style={[styles.linkLabel, { color: accent }]}>
+                    Tu Enlace de Reserva Pública
                   </Text>
                 </View>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                  <Feather name="x" size={20} color={colors.text.muted} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Banner de Enlace Público */}
-                <View
-                  style={[
-                    styles.bookingLinkCard,
-                    {
-                      backgroundColor: isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)',
-                      borderColor: isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.18)',
-                    },
-                  ]}
+                <Text
+                  selectable={Boolean(url)}
+                  style={[styles.linkUrlText, { color: colors.text.primary }]}
                 >
-                  <View style={styles.linkHeader}>
-                    <Feather name="globe" size={16} color={colors.action.primary} />
-                    <Text style={[styles.linkLabel, { color: colors.action.primary }]}>
-                      Tu Enlace de Reserva Pública
-                    </Text>
-                  </View>
-                  <Text style={[styles.linkUrlText, { color: colors.text.primary }]} numberOfLines={1}>
-                    {bookingUrl}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  {url ??
+                    'Disponible cuando se configure el portal público de Slotify.'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  {url && (
                     <TouchableOpacity
-                      style={[styles.shareBtn, { flex: 1, backgroundColor: colors.action.primary }]}
-                      onPress={handleShare}
-                      activeOpacity={0.8}
-                    >
-                      <Feather name="share-2" size={14} color={colors.action.primaryText} />
-                      <Text style={[styles.shareBtnText, { color: colors.action.primaryText }]}>
-                        Compartir
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
+                      accessibilityRole="button"
+                      onPress={share}
                       style={[
                         styles.shareBtn,
-                        {
-                          flex: 1,
-                          backgroundColor: isDark ? '#2A2A2E' : '#FFFFFF',
-                          borderWidth: 1,
-                          borderColor: colors.action.primary,
-                        },
+                        { flex: 1, backgroundColor: colors.action.primary },
                       ]}
-                      onPress={() => {
-                        onClose();
-                        router.push(`/book/${slug || 'mi-negocio'}` as any);
-                      }}
-                      activeOpacity={0.8}
                     >
-                      <Feather name="external-link" size={14} color={colors.action.primary} />
-                      <Text style={[styles.shareBtnText, { color: colors.action.primary }]}>
-                        Abrir Formulario
+                      <Feather
+                        name="share-2"
+                        size={14}
+                        color={colors.action.primaryText}
+                      />
+                      <Text
+                        style={[
+                          styles.shareBtnText,
+                          { color: colors.action.primaryText },
+                        ]}
+                      >
+                        Compartir Enlace
                       </Text>
                     </TouchableOpacity>
-                  </View>
-                </View>
+                  )}
 
-                {/* Detalle operativo */}
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconBox}>
-                    <MaterialCommunityIcons name="domain" size={18} color={colors.text.primary} />
-                  </View>
-                  <View style={styles.infoContent}>
-                    <Text style={[styles.infoLabel, { color: colors.text.muted }]}>Razón Social / Comercial</Text>
-                    <Text style={[styles.infoValue, { color: colors.text.primary }]}>{businessName}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconBox}>
-                    <Feather name="clock" size={18} color={colors.text.primary} />
-                  </View>
-                  <View style={styles.infoContent}>
-                    <Text style={[styles.infoLabel, { color: colors.text.muted }]}>Horario de Atención</Text>
-                    <Text style={[styles.infoValue, { color: colors.text.primary }]}>
-                      Lunes a Sábado • 09:00 AM - 07:00 PM
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconBox}>
-                    <Feather name="map-pin" size={18} color={colors.text.primary} />
-                  </View>
-                  <View style={styles.infoContent}>
-                    <Text style={[styles.infoLabel, { color: colors.text.muted }]}>Sucursal Principal</Text>
-                    <Text style={[styles.infoValue, { color: colors.text.primary }]}>
-                      Centro Comercial / Plaza Mayor, Local 14
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconBox}>
-                    <MaterialCommunityIcons name="shape-outline" size={18} color={colors.text.primary} />
-                  </View>
-                  <View style={styles.infoContent}>
-                    <Text style={[styles.infoLabel, { color: colors.text.muted }]}>Giro Comercial Activo</Text>
-                    <Text style={[styles.infoValue, { color: colors.text.primary }]}>
-                      Sector Personalizado
-                    </Text>
-                  </View>
                   <TouchableOpacity
-                    style={[styles.smallBadgeBtn, { backgroundColor: isDark ? '#2A2A2E' : '#EFEFF4' }]}
+                    accessibilityRole="button"
                     onPress={() => {
                       onClose();
-                      onOpenMigration();
+                      router.push(`/book/${info?.slug || 'mi-negocio'}` as any);
                     }}
+                    style={[
+                      styles.shareBtn,
+                      {
+                        flex: 1,
+                        backgroundColor: isDark ? '#1A1A22' : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: accent,
+                      },
+                    ]}
                   >
-                    <Text style={[styles.smallBadgeBtnText, { color: colors.text.primary }]}>Cambiar</Text>
+                    <Feather name="external-link" size={14} color={accent} />
+                    <Text style={[styles.shareBtnText, { color: accent }]}>
+                      Abrir Formulario
+                    </Text>
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
+                {shareError && (
+                  <Text
+                    accessibilityRole="alert"
+                    style={{ color: colors.status.error }}
+                  >
+                    No se pudo compartir el enlace.
+                  </Text>
+                )}
+              </View>
 
-              <TouchableOpacity
-                style={[styles.closeBottomBtn, { backgroundColor: isDark ? '#262628' : '#F2F2F7' }]}
-                onPress={onClose}
-              >
-                <Text style={[styles.closeBottomBtnText, { color: colors.text.primary }]}>Entendido</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableWithoutFeedback>
+              {fields.map(({ label, value, icon }) => (
+                <View key={label} style={styles.infoRow}>
+                  <View style={styles.infoIconBox}>
+                    <Feather
+                      name={icon}
+                      size={18}
+                      color={colors.text.primary}
+                    />
+                  </View>
+                  <View style={styles.infoContent}>
+                    <Text
+                      style={[styles.infoLabel, { color: colors.text.muted }]}
+                    >
+                      {label}
+                    </Text>
+                    <Text
+                      style={[styles.infoValue, { color: colors.text.primary }]}
+                    >
+                      {value}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconBox}>
+                  <Feather name="clock" size={18} color={colors.text.primary} />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text
+                    style={[styles.infoLabel, { color: colors.text.muted }]}
+                  >
+                    Horario de Atención
+                  </Text>
+                  {info.hours.length > 0 ? (
+                    info.hours.map((hours, index) => (
+                      <Text
+                        key={index}
+                        style={[
+                          styles.infoValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {WEEK[hours.dayOfWeek]} · {hours.startTime.slice(0, 5)}–
+                        {hours.endTime.slice(0, 5)}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text
+                      style={[styles.infoValue, { color: colors.text.primary }]}
+                    >
+                      Sin horario general configurado
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconBox}>
+                  <MaterialCommunityIcons
+                    name="shape-outline"
+                    size={18}
+                    color={colors.text.primary}
+                  />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text
+                    style={[styles.infoLabel, { color: colors.text.muted }]}
+                  >
+                    Giro Comercial Activo
+                  </Text>
+                  <Text
+                    style={[styles.infoValue, { color: colors.text.primary }]}
+                  >
+                    {info.sector || 'Sin giro asignado'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[
+                    styles.smallBadgeBtn,
+                    { backgroundColor: isDark ? '#1A1A22' : '#EFEFF4' },
+                  ]}
+                  onPress={() => {
+                    onClose();
+                    onOpenMigration();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.smallBadgeBtnText,
+                      { color: colors.text.primary },
+                    ]}
+                  >
+                    Cambiar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={onClose}
+            style={[
+              styles.closeBottomBtn,
+              { backgroundColor: isDark ? '#1A1A22' : '#F2F2F7' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.closeBottomBtnText,
+                { color: colors.text.primary },
+              ]}
+            >
+              Entendido
+            </Text>
+          </TouchableOpacity>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 }
@@ -247,6 +400,12 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     padding: 4,
+  },
+  details: { flexShrink: 1 },
+  retryBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
   },
   bookingLinkCard: {
     padding: 14,

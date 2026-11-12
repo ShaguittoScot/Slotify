@@ -1,757 +1,410 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
+  ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/shared/theme';
+import { searchClientOptions, type ClientOption } from '@/features/clients/api';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
+import type { CalendarEmployee } from '../api';
+import type { AppointmentClient } from '../model';
+import { formatBusinessHour, scheduleInstant } from '../model/businessTime';
+
+export interface ManualAppointment {
+  title: string;
+  clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  businessClientId?: string;
+  agreedTotal: number;
+  startTime: string;
+  endTime: string;
+  employeeId?: string;
+  employeeName?: string;
+}
 
 interface CreateAppointmentModalProps {
   visible: boolean;
-  onClose: () => void;
-  onSave: (appointmentData: {
-    title: string;
-    clientName: string;
-    clientPhone?: string;
-    servicePrice?: string;
-    startTime: string;
-    endTime: string;
-    employeeName?: string;
-  }) => void;
-  initialDate?: Date;
+  employees: CalendarEmployee[];
+  scopeKey: string;
+  timeZone: string;
+  initialDate: Date;
   initialHour?: string;
+  initialClient?: AppointmentClient;
+  onClose: () => void;
+  onSave: (appointment: ManualAppointment) => Promise<void>;
 }
 
-const PRESET_SERVICES = [
-  { id: 's1', name: 'Corte Clásico', price: '$200 MXN', priceNum: 200, duration: 30, icon: 'scissors-cutting' },
-  { id: 's2', name: 'Corte + Barba', price: '$320 MXN', priceNum: 320, duration: 45, icon: 'face-man-shimmer' },
-  { id: 's3', name: 'Perfilado de Barba', price: '$150 MXN', priceNum: 150, duration: 30, icon: 'face-man-shimmer' },
-  { id: 's4', name: 'Afeitado Tradicional', price: '$220 MXN', priceNum: 220, duration: 45, icon: 'content-cut' },
-  { id: 's5', name: 'Ritual Toalla Caliente', price: '$420 MXN', priceNum: 420, duration: 60, icon: 'spa' },
-];
+const TIME_OPTIONS = Array.from({ length: 24 }, (_, index) =>
+  String(8 + Math.floor(index / 2)).padStart(2, '0') + (index % 2 ? ':30' : ':00'));
+const DURATIONS = [15, 30, 45, 60, 90, 120];
+const ACCENT = '#6366F1';
+const CUSTOM_SERVICE = -1;
 
-const TIME_OPTIONS = [
-  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'
-];
+function appointmentPhone(value?: string | null) {
+  const phone = value?.trim() ?? '';
+  return phone.length <= CLIENT_PHONE_MAX_LENGTH ? phone : '';
+}
 
-export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
-  visible,
-  onClose,
-  onSave,
-  initialDate = new Date(),
-  initialHour,
-}) => {
+type Section = 'service' | 'extras' | 'employee' | 'time' | null;
+
+function Option({ label, detail, selected, onPress, expandable }: {
+  label: string;
+  detail?: string;
+  selected?: boolean;
+  onPress: () => void;
+  expandable?: boolean;
+}) {
   const { colors, isDark } = useAppTheme();
+  const accent = isDark ? '#A5B4FC' : '#4F46E5';
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={expandable ? { expanded: selected } : { selected }}
+      onPress={onPress}
+      style={[
+        s.option,
+        {
+          backgroundColor: selected ? (isDark ? '#252347' : '#EEF2FF') : colors.background.primary,
+          borderColor: selected ? ACCENT : colors.border.main,
+        },
+      ]}
+    >
+      <View style={s.optionText}>
+        <Text style={[s.optionLabel, { color: colors.text.primary }]}>{label}</Text>
+        {detail ? <Text style={[s.hint, { color: colors.text.secondary }]}>{detail}</Text> : null}
+      </View>
+      <Feather
+        name={expandable ? (selected ? 'chevron-up' : 'chevron-down') : (selected ? 'check-circle' : 'chevron-right')}
+        size={17}
+        color={selected ? accent : colors.text.muted}
+      />
+    </TouchableOpacity>
+  );
+}
+
+export function CreateAppointmentModal({
+  visible, employees, scopeKey, timeZone, initialDate, initialHour, initialClient, onClose, onSave,
+}: CreateAppointmentModalProps) {
+  const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { onboardingResult, selectedCategory } = useSectorTemplateStore();
-
-  // Resuelve dinámicamente los servicios de la plantilla activa o canónica
-  const activeServices = useMemo(() => {
-    if (onboardingResult?.finalServices && onboardingResult.finalServices.length > 0) {
-      return onboardingResult.finalServices.map((s, idx) => ({
-        id: `svc-${idx}`,
-        name: s.name,
-        price: s.price ? `$${s.price} MXN` : '$200 MXN',
-        priceNum: s.price ?? 200,
-        duration: s.durationMinutes,
-        icon: s.name.toLowerCase().includes('barba') ? 'face-man-shimmer' : 'scissors-cutting',
-      }));
-    }
-    const barberCat = CANONICAL_SECTOR_CATEGORIES.find((c) => c.key === 'barberia');
-    if (barberCat?.suggestedServices) {
-      return barberCat.suggestedServices.map((s, idx) => ({
-        id: `barber-${idx}`,
-        name: s.name,
-        price: `$${s.price ?? 200} MXN`,
-        priceNum: s.price ?? 200,
-        duration: s.durationMinutes,
-        icon: s.name.toLowerCase().includes('barba') ? 'face-man-shimmer' : 'scissors-cutting',
-      }));
-    }
-    return PRESET_SERVICES;
-  }, [onboardingResult, selectedCategory]);
-
-  // Resuelve los servicios adicionales (Add-ons) disponibles
-  const availableAddons = useMemo(() => {
-    if (onboardingResult?.selectedAddons && onboardingResult.selectedAddons.length > 0) {
-      return onboardingResult.selectedAddons;
-    }
-    const barberCat = CANONICAL_SECTOR_CATEGORIES.find((c) => c.key === 'barberia');
-    return barberCat?.suggestedAddons ?? [];
-  }, [onboardingResult, selectedCategory]);
-
-  // Resuelve los puestos de atención / sillones disponibles
-  const availableStations = useMemo(() => {
-    if (onboardingResult?.stations && onboardingResult.stations.length > 0) {
-      return onboardingResult.stations;
-    }
-    const barberCat = CANONICAL_SECTOR_CATEGORIES.find((c) => c.key === 'barberia');
-    return barberCat?.suggestedStations ?? [];
-  }, [onboardingResult, selectedCategory]);
+  const category = onboardingResult?.sectorCategory ?? selectedCategory ??
+    CANONICAL_SECTOR_CATEGORIES.find((item) => item.key === 'barberia');
+  const services = onboardingResult?.finalServices ?? category?.suggestedServices ?? [];
+  const extras = onboardingResult?.selectedAddons ?? category?.suggestedAddons ?? [];
+  const accent = isDark ? '#A5B4FC' : '#4F46E5';
 
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
-  const [selectedService, setSelectedService] = useState(activeServices[0] || PRESET_SERVICES[0]);
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
-  const [selectedStationName, setSelectedStationName] = useState<string>(
-    availableStations[0]?.name || 'Sillón 1 (Principal)'
-  );
-  const [customServiceName, setCustomServiceName] = useState('');
+  const [selectedClient, setSelectedClient] = useState<AppointmentClient>();
+  const [searching, setSearching] = useState(false);
+  const [options, setOptions] = useState<ClientOption[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const [serviceIndex, setServiceIndex] = useState(CUSTOM_SERVICE);
+  const [customName, setCustomName] = useState('');
   const [customPrice, setCustomPrice] = useState('');
+  const [extraIds, setExtraIds] = useState<string[]>([]);
+  const [employeeId, setEmployeeId] = useState('');
   const [startHour, setStartHour] = useState('10:00');
-  const [baseDurationMinutes, setBaseDurationMinutes] = useState(30);
+  const [duration, setDuration] = useState(30);
+  const [section, setSection] = useState<Section>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const defaultServiceDuration = services[0]?.durationMinutes ?? 30;
+  const hasServices = services.length > 0;
   useEffect(() => {
-    if (visible) {
-      setClientName('');
-      setClientPhone('');
-      const firstSvc = activeServices[0] || PRESET_SERVICES[0];
-      setSelectedService(firstSvc);
-      setSelectedAddonIds([]);
-      setSelectedStationName(availableStations[0]?.name || 'Sillón 1 (Principal)');
-      setCustomServiceName('');
-      setCustomPrice('');
-      setBaseDurationMinutes(firstSvc.duration);
-      if (initialHour && TIME_OPTIONS.includes(initialHour)) {
-        setStartHour(initialHour);
-      } else {
-        const h = String(initialDate.getHours()).padStart(2, '0');
-        const nearest = TIME_OPTIONS.find((t) => t.startsWith(h)) || '10:00';
-        setStartHour(nearest);
+    if (!visible) return;
+    setClientName(initialClient?.fullName ?? '');
+    setClientPhone(appointmentPhone(initialClient?.phone));
+    setSelectedClient(initialClient);
+    setSearching(false);
+    setServiceIndex(hasServices ? 0 : CUSTOM_SERVICE);
+    setCustomName('');
+    setCustomPrice('');
+    setExtraIds([]);
+    setEmployeeId('');
+    setStartHour(initialHour ?? '10:00');
+    setDuration(defaultServiceDuration);
+    setSection(null);
+    setError(null);
+  }, [visible, scopeKey, initialClient, initialHour, defaultServiceDuration, hasServices]);
+
+  const search = visible && searching && !selectedClient ? clientName.trim() : '';
+  useEffect(() => {
+    setOptions([]);
+    setSearchError(false);
+    setIsSearching(false);
+    if (search.length < 2) return;
+    const controller = new AbortController();
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const matches = await searchClientOptions(search, controller.signal);
+        if (!controller.signal.aborted) setOptions(matches);
+      } catch {
+        if (!controller.signal.aborted) setSearchError(true);
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
       }
-    }
-  }, [visible, initialDate, initialHour, activeServices, availableStations]);
+    }, 220);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search, scopeKey]);
 
-  const toggleAddon = (addonId: string) => {
-    setSelectedAddonIds((prev) =>
-      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
-    );
+  const chooseClient = (client: ClientOption) => {
+    setClientName(client.fullName);
+    setClientPhone(appointmentPhone(client.phone));
+    setSelectedClient({ businessClientId: client.id, ...client });
+    setSearching(false);
+    setError(null);
+    Keyboard.dismiss();
   };
 
-  // Cálculo acumulativo de duración (servicio base + minutos adicionales de extras)
-  const totalDuration = useMemo(() => {
-    const base = customServiceName.trim() ? baseDurationMinutes : selectedService.duration;
-    const extrasDuration = availableAddons
-      .filter((a) => selectedAddonIds.includes(a.id))
-      .reduce((acc, a) => acc + a.durationMinutes, 0);
-    return base + extrasDuration;
-  }, [customServiceName, baseDurationMinutes, selectedService, availableAddons, selectedAddonIds]);
-
-  // Cálculo acumulativo de precio (precio base + costo de extras)
-  const totalPriceFormatted = useMemo(() => {
-    if (customPrice.trim()) {
-      return `$${customPrice.replace('$', '')} MXN`;
-    }
-    const basePrice = selectedService.priceNum ?? 200;
-    const extrasPrice = availableAddons
-      .filter((a) => selectedAddonIds.includes(a.id))
-      .reduce((acc, a) => acc + a.price, 0);
-    return `$${basePrice + extrasPrice} MXN`;
-  }, [customPrice, selectedService, availableAddons, selectedAddonIds]);
-
-  const endHourFormatted = () => {
-    const [h, m] = startHour.split(':').map(Number);
-    const totalMinutes = h * 60 + m + totalDuration;
-    const endH = Math.floor(totalMinutes / 60) % 24;
-    const endM = totalMinutes % 60;
-    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  const updateClientName = (name: string) => {
+    if (selectedClient && clientPhone === appointmentPhone(selectedClient.phone)) setClientPhone('');
+    setSelectedClient(undefined);
+    setClientName(name);
+    setSearching(true);
   };
 
-  const handleSave = () => {
-    if (!clientName.trim()) {
-      Alert.alert('Datos requeridos', 'Por favor ingresa el nombre del cliente.');
-      return;
-    }
+  const service = services[serviceIndex];
+  const custom = !service;
+  const selectedExtras = extras.filter((extra) => extraIds.includes(extra.id));
+  const totalDuration = duration + selectedExtras.reduce((total, extra) => total + extra.durationMinutes, 0);
+  const rawPrice = customPrice.trim();
+  const basePrice = custom
+    ? (/^\d+([.,]\d{1,2})?$/.test(rawPrice) ? Number(rawPrice.replace(',', '.')) : NaN)
+    : service.price ?? 0;
+  const agreedTotal = (Math.round(basePrice * 100) +
+    selectedExtras.reduce((total, extra) => total + Math.round(extra.price * 100), 0)) / 100;
+  const start = scheduleInstant(initialDate, startHour, timeZone);
+  const end = start ? new Date(start.getTime() + totalDuration * 60_000) : null;
+  const employee = employees.find((item) => item.id === employeeId);
+  const dates = initialDate.toLocaleDateString('es-MX', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+  const amount = Number.isFinite(agreedTotal)
+    ? agreedTotal.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
+    : '—';
+  const times = [...new Set([...TIME_OPTIONS, startHour])].sort();
+  const durations = [...new Set([...DURATIONS, duration])].sort((a, b) => a - b);
 
-    const d = new Date(initialDate);
-    const [hours, minutes] = startHour.split(':').map(Number);
-    d.setHours(hours, minutes, 0, 0);
-
-    const end = new Date(d.getTime() + totalDuration * 60 * 1000);
-
-    const extraNames = availableAddons
-      .filter((a) => selectedAddonIds.includes(a.id))
-      .map((a) => a.name);
-
-    const baseTitle = customServiceName.trim() ? customServiceName.trim() : selectedService.name;
-    const title = extraNames.length > 0 ? `${baseTitle} (+ ${extraNames.join(', ')})` : baseTitle;
-
-    onSave({
-      title,
-      clientName: clientName.trim(),
-      clientPhone: clientPhone.trim() || undefined,
-      servicePrice: totalPriceFormatted,
-      startTime: d.toISOString(),
-      endTime: end.toISOString(),
-      employeeName: selectedStationName,
-    });
-    onClose();
+  const toggleSection = (next: Section) => {
+    setSearching(false);
+    Keyboard.dismiss();
+    setSection((current) => current === next ? null : next);
   };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    const title = service?.name ?? customName.trim();
+    if (!clientName.trim()) return setError('Escribe o selecciona el nombre del cliente.');
+    if (clientPhone.trim().length > CLIENT_PHONE_MAX_LENGTH) {
+      return setError(`El teléfono de la cita admite hasta ${CLIENT_PHONE_MAX_LENGTH} caracteres.`);
+    }
+    if (!title) return setError('Escribe el nombre del servicio.');
+    if (!Number.isFinite(agreedTotal) || agreedTotal < 0 || agreedTotal > 99999999.99) {
+      return setError('Ingresa un importe válido de hasta dos decimales.');
+    }
+    if (!start || !end) return setError('Esa hora no existe en la zona del negocio. Elige otra.');
+    if (!Number.isInteger(totalDuration) || totalDuration < 1) return setError('Selecciona una duración válida.');
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        title: [title, ...selectedExtras.map((extra) => extra.name)].join(' + '),
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim() || undefined,
+        clientEmail: selectedClient?.email || undefined,
+        businessClientId: selectedClient?.businessClientId,
+        agreedTotal,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        employeeId: employee?.id,
+        employeeName: employee?.name,
+      });
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo guardar la cita.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const fieldStyle = [s.field, { backgroundColor: colors.background.primary, borderColor: colors.border.main, color: colors.text.primary }];
+  const close = () => { if (!isSaving) onClose(); };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View
-          style={[
-            styles.modalContainer,
-            {
-              backgroundColor: isDark ? '#11131E' : '#FFFFFF',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleRow}>
-              <View style={[styles.iconBadge, { backgroundColor: 'rgba(99, 102, 241, 0.15)' }]}>
-                <Feather name="calendar" size={18} color="#818CF8" />
-              </View>
-              <View>
-                <Text style={[styles.title, { color: colors.text.primary }]}>
-                  Agendar Cita Manual
-                </Text>
-                <Text style={[styles.subtitle, { color: colors.text.muted }]}>
-                  Para clientes en local (walk-in) o vía telefónica
-                </Text>
-              </View>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <KeyboardAvoidingView style={[s.overlay, { backgroundColor: colors.background.backdrop }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[s.sheet, { backgroundColor: colors.background.secondary, paddingBottom: Math.max(14, insets.bottom) }]}>
+          <View style={[s.handle, { backgroundColor: colors.border.strong }]} />
+          <View style={s.header}>
+            <View style={[s.headerIcon, { backgroundColor: isDark ? '#252347' : '#EEF2FF' }]}>
+              <Feather name="calendar" size={20} color={accent} />
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Feather name="x" size={20} color={colors.text.muted} />
+            <View style={s.headerText}>
+              <Text style={[s.title, { color: colors.text.primary }]}>Agendar cita</Text>
+              <Text style={[s.hint, { color: colors.text.secondary }]}>{dates} · Hora del negocio</Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button" accessibilityLabel="Cerrar agenda manual" disabled={isSaving}
+              onPress={close} style={[s.close, { backgroundColor: colors.background.primary, borderColor: colors.border.main }]}
+            >
+              <Feather name="x" size={19} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {/* Cliente Info Inputs */}
-            <Text style={[styles.sectionLabel, { color: colors.text.secondary }]}>
-              Datos del Cliente
-            </Text>
-            <View style={styles.inputGroup}>
-              <View
-                style={[
-                  styles.inputRow,
-                  {
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-                  },
-                ]}
-              >
-                <Feather name="user" size={16} color={colors.text.muted} style={{ marginRight: 10 }} />
-                <TextInput
-                  value={clientName}
-                  onChangeText={setClientName}
-                  placeholder="Nombre completo *"
-                  placeholderTextColor={colors.text.muted}
-                  style={[styles.input, { color: colors.text.primary }]}
-                />
-              </View>
-
-              <View
-                style={[
-                  styles.inputRow,
-                  {
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-                    marginTop: 8,
-                  },
-                ]}
-              >
-                <Feather name="phone" size={16} color={colors.text.muted} style={{ marginRight: 10 }} />
-                <TextInput
-                  value={clientPhone}
-                  onChangeText={setClientPhone}
-                  placeholder="Teléfono / WhatsApp (opcional)"
-                  placeholderTextColor={colors.text.muted}
-                  keyboardType="phone-pad"
-                  style={[styles.input, { color: colors.text.primary }]}
-                />
-              </View>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
+            <View style={s.section}>
+              <Text style={[s.label, { color: colors.text.primary }]}>Cliente</Text>
+              <TextInput
+                accessibilityLabel="Nombre del cliente" testID="appointment-client-name" value={clientName}
+                onChangeText={updateClientName} onFocus={() => setSearching(true)} maxLength={150}
+                placeholder="Buscar cliente o escribir nombre" placeholderTextColor={colors.text.muted} style={fieldStyle}
+              />
+              {selectedClient?.businessClientId ? (
+                <Text style={[s.hint, { color: accent }]}>Vinculado a la cartera</Text>
+              ) : null}
+              {isSearching ? <ActivityIndicator color={ACCENT} /> : null}
+              {searchError ? <Text style={[s.hint, { color: colors.text.secondary }]}>No se pudo consultar la cartera. Puedes escribir el nombre.</Text> : null}
+              {options.map((option) => (
+                <Option key={option.id} label={option.fullName} detail={option.phone || option.email} onPress={() => chooseClient(option)} />
+              ))}
+              <TextInput
+                accessibilityLabel="Teléfono del cliente" value={clientPhone} onChangeText={setClientPhone}
+                onFocus={() => setSearching(false)} placeholder="Teléfono (opcional)" keyboardType="phone-pad"
+                placeholderTextColor={colors.text.muted} style={fieldStyle}
+              />
+              {selectedClient?.businessClientId && !clientPhone &&
+                (selectedClient.phone?.trim().length ?? 0) > CLIENT_PHONE_MAX_LENGTH && (
+                <Text style={[s.hint, { color: colors.text.secondary }]}>
+                  El teléfono de la ficha supera el límite de la cita. Puedes guardarla vinculada o escribir otro número.
+                </Text>
+              )}
             </View>
 
-            {/* Servicio Selector */}
-            <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-              Servicio de Barbería / Atención
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceScroll}>
-              {activeServices.map((srv) => {
-                const isSelected = selectedService.id === srv.id && !customServiceName;
-                return (
-                  <TouchableOpacity
-                    key={srv.id}
-                    onPress={() => {
-                      setSelectedService(srv);
-                      setCustomServiceName('');
-                      setCustomPrice('');
-                      setBaseDurationMinutes(srv.duration);
-                    }}
-                    style={[
-                      styles.serviceChip,
-                      {
-                        backgroundColor: isSelected
-                          ? 'rgba(224, 122, 95, 0.18)'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.04)'
-                          : 'rgba(0, 0, 0, 0.03)',
-                        borderColor: isSelected
-                          ? '#E07A5F'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.08)'
-                          : 'rgba(0, 0, 0, 0.08)',
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={srv.icon as any}
-                      size={18}
-                      color={isSelected ? '#E07A5F' : colors.text.muted}
-                      style={{ marginRight: 8 }}
+            <View style={s.section}>
+              <Text style={[s.label, { color: colors.text.primary }]}>Servicio</Text>
+              {hasServices && <Option label={service?.name ?? 'Otro servicio'} expandable selected={section === 'service'} onPress={() => toggleSection('service')} />}
+              {section === 'service' && (
+                <>
+                  {services.map((item, index) => (
+                    <Option
+                      key={index} label={item.name} detail={'$' + (item.price ?? 0) + ' · ' + item.durationMinutes + ' min'}
+                      selected={index === serviceIndex}
+                      onPress={() => { setServiceIndex(index); setDuration(item.durationMinutes); setSection(null); }}
                     />
-                    <View>
-                      <Text
-                        style={[
-                          styles.serviceChipName,
-                          {
-                            color: isSelected ? '#E07A5F' : colors.text.primary,
-                            fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
-                          },
-                        ]}
-                      >
-                        {srv.name}
-                      </Text>
-                      <Text style={[styles.serviceChipPrice, { color: colors.text.muted }]}>
-                        {srv.price} • {srv.duration} min
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Selector de Servicios Adicionales (Add-ons de Barbería) */}
-            {availableAddons.length > 0 && (
-              <>
-                <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-                  Servicios Adicionales / Extras
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceScroll}>
-                  {availableAddons.map((addon) => {
-                    const isSelected = selectedAddonIds.includes(addon.id);
-                    return (
-                      <TouchableOpacity
-                        key={addon.id}
-                        onPress={() => toggleAddon(addon.id)}
-                        style={[
-                          styles.serviceChip,
-                          {
-                            backgroundColor: isSelected
-                              ? 'rgba(224, 122, 95, 0.20)'
-                              : isDark
-                              ? 'rgba(255, 255, 255, 0.04)'
-                              : 'rgba(0, 0, 0, 0.03)',
-                            borderColor: isSelected
-                              ? '#E07A5F'
-                              : isDark
-                              ? 'rgba(255, 255, 255, 0.08)'
-                              : 'rgba(0, 0, 0, 0.08)',
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="star-four-points"
-                          size={16}
-                          color={isSelected ? '#E07A5F' : colors.text.muted}
-                          style={{ marginRight: 6 }}
-                        />
-                        <View>
-                          <Text
-                            style={[
-                              styles.serviceChipName,
-                              {
-                                color: isSelected ? '#E07A5F' : colors.text.primary,
-                                fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
-                              },
-                            ]}
-                          >
-                            {addon.name}
-                          </Text>
-                          <Text style={[styles.serviceChipPrice, { color: colors.text.muted }]}>
-                            +${addon.price} MXN • +{addon.durationMinutes}m
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            )}
-
-            {/* Asignación de Sillón / Barbero */}
-            {availableStations.length > 0 && (
-              <>
-                <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-                  Sillón / Barbero Asignado
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceScroll}>
-                  {availableStations.map((station) => {
-                    const isSelected = selectedStationName === station.name;
-                    return (
-                      <TouchableOpacity
-                        key={station.id}
-                        onPress={() => setSelectedStationName(station.name)}
-                        style={[
-                          styles.serviceChip,
-                          {
-                            backgroundColor: isSelected
-                              ? 'rgba(224, 122, 95, 0.20)'
-                              : isDark
-                              ? 'rgba(255, 255, 255, 0.04)'
-                              : 'rgba(0, 0, 0, 0.03)',
-                            borderColor: isSelected
-                              ? '#E07A5F'
-                              : isDark
-                              ? 'rgba(255, 255, 255, 0.08)'
-                              : 'rgba(0, 0, 0, 0.08)',
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="chair-rolling"
-                          size={16}
-                          color={isSelected ? '#E07A5F' : colors.text.muted}
-                          style={{ marginRight: 6 }}
-                        />
-                        <View>
-                          <Text
-                            style={[
-                              styles.serviceChipName,
-                              {
-                                color: isSelected ? '#E07A5F' : colors.text.primary,
-                                fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
-                              },
-                            ]}
-                          >
-                            {station.name}
-                          </Text>
-                          <Text style={[styles.serviceChipPrice, { color: colors.text.muted }]}>
-                            {station.assignedStaffName || 'Atención general'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            )}
-
-            {/* Hora y Duración */}
-            <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-              Horario de Inicio
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
-              {TIME_OPTIONS.map((time) => {
-                const isSelected = startHour === time;
-                return (
-                  <TouchableOpacity
-                    key={time}
-                    onPress={() => setStartHour(time)}
-                    style={[
-                      styles.timePill,
-                      {
-                        backgroundColor: isSelected
-                          ? '#E07A5F'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.04)'
-                          : 'rgba(0, 0, 0, 0.03)',
-                        borderColor: isSelected
-                          ? '#E07A5F'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.08)'
-                          : 'rgba(0, 0, 0, 0.08)',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.timePillText,
-                        {
-                          color: isSelected ? '#FFFFFF' : colors.text.secondary,
-                          fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_400Regular',
-                        },
-                      ]}
-                    >
-                      {time}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Duración */}
-            <Text style={[styles.sectionLabel, { color: colors.text.secondary, marginTop: 14 }]}>
-              Duración Base
-            </Text>
-            <View style={styles.durationRow}>
-              {[30, 45, 60, 90, 120].map((mins) => {
-                const isSelected = baseDurationMinutes === mins;
-                return (
-                  <TouchableOpacity
-                    key={mins}
-                    onPress={() => setBaseDurationMinutes(mins)}
-                    style={[
-                      styles.durationBtn,
-                      {
-                        backgroundColor: isSelected
-                          ? 'rgba(224, 122, 95, 0.18)'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.04)'
-                          : 'rgba(0, 0, 0, 0.03)',
-                        borderColor: isSelected
-                          ? '#E07A5F'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.08)'
-                          : 'rgba(0, 0, 0, 0.08)',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.durationBtnText,
-                        {
-                          color: isSelected ? '#E07A5F' : colors.text.secondary,
-                          fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_400Regular',
-                        },
-                      ]}
-                    >
-                      {mins}m
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                  ))}
+                  {hasServices && (
+                    <Option label="Otro servicio" selected={custom} onPress={() => { setServiceIndex(CUSTOM_SERVICE); setSection(null); }} />
+                  )}
+                </>
+              )}
+              {custom && (
+                <>
+                  <TextInput accessibilityLabel="Nombre del servicio" value={customName} onChangeText={setCustomName} placeholder="Nombre del servicio" placeholderTextColor={colors.text.muted} style={fieldStyle} />
+                  <TextInput accessibilityLabel="Precio base" value={customPrice} onChangeText={setCustomPrice} placeholder="Precio base" keyboardType="decimal-pad" placeholderTextColor={colors.text.muted} style={fieldStyle} />
+                </>
+              )}
+              {extras.length > 0 && (
+                <Option label={extraIds.length ? 'Extras (' + extraIds.length + ')' : 'Extras (opcional)'} expandable selected={section === 'extras'} onPress={() => toggleSection('extras')} />
+              )}
+              {section === 'extras' && extras.map((extra) => (
+                <Option
+                  key={extra.id} label={extra.name} detail={'+$' + extra.price + ' · +' + extra.durationMinutes + ' min'}
+                  selected={extraIds.includes(extra.id)}
+                  onPress={() => setExtraIds((ids) => ids.includes(extra.id) ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])}
+                />
+              ))}
             </View>
 
-            {/* Resumen del Horario */}
-            <View
-              style={[
-                styles.rangeSummary,
-                {
-                  backgroundColor: isDark ? 'rgba(224, 122, 95, 0.08)' : 'rgba(224, 122, 95, 0.05)',
-                  borderColor: 'rgba(224, 122, 95, 0.25)',
-                },
-              ]}
-            >
-              <Feather name="clock" size={15} color="#E07A5F" style={{ marginRight: 8 }} />
-              <Text style={[styles.rangeSummaryText, { color: colors.text.primary }]}>
-                Cita de <Text style={{ fontFamily: 'Inter_700Bold', color: '#E07A5F' }}>{startHour}</Text> a{' '}
-                <Text style={{ fontFamily: 'Inter_700Bold', color: '#E07A5F' }}>{endHourFormatted()}</Text> ({totalDuration} min) • {totalPriceFormatted}
-              </Text>
+            <View style={s.section}>
+              <Text style={[s.label, { color: colors.text.primary }]}>Horario</Text>
+              <Option label={'Inicio · ' + startHour} expandable selected={section === 'time'} onPress={() => toggleSection('time')} />
+              {section === 'time' && (
+                <View style={s.chips}>
+                  {times.map((hour) => (
+                    <TouchableOpacity key={hour} accessibilityRole="button" accessibilityState={{ selected: hour === startHour }}
+                      style={[s.chip, { backgroundColor: colors.background.primary, borderColor: hour === startHour ? ACCENT : colors.border.main }]}
+                      onPress={() => { setStartHour(hour); setSection(null); }}>
+                      <Text style={{ color: hour === startHour ? accent : colors.text.primary }}>{hour}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              <Text style={[s.hint, { color: colors.text.secondary }]}>Duración base</Text>
+              <View style={s.chips}>
+                {durations.map((minutes) => (
+                  <TouchableOpacity key={minutes} accessibilityRole="button" accessibilityState={{ selected: minutes === duration }}
+                    style={[s.chip, { backgroundColor: colors.background.primary, borderColor: minutes === duration ? ACCENT : colors.border.main }]}
+                    onPress={() => setDuration(minutes)}>
+                    <Text style={{ color: minutes === duration ? accent : colors.text.primary }}>{minutes} min</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {employees.length > 0 && (
+                <Option label={employee?.name ?? 'Personal · Sin asignar'} expandable selected={section === 'employee'} onPress={() => toggleSection('employee')} />
+              )}
+              {section === 'employee' && [{ id: '', name: 'Sin asignar' }, ...employees].map((item) => (
+                <Option key={item.id} label={item.name} selected={item.id === employeeId}
+                  onPress={() => { setEmployeeId(item.id); setSection(null); }} />
+              ))}
             </View>
           </ScrollView>
 
-          {/* Footer Buttons */}
-          <View style={styles.footer}>
+          <View style={[s.footer, { borderTopColor: colors.border.main }]}>
+            <View style={s.summary}>
+              <Text style={[s.hint, { color: colors.text.secondary }]}>
+                {end ? startHour + '–' + formatBusinessHour(end, timeZone) + ' · ' + totalDuration + ' min' : 'Selecciona una hora válida'}
+              </Text>
+              <Text style={[s.label, { color: colors.text.primary }]}>{amount}</Text>
+            </View>
+            {error ? <Text accessibilityRole="alert" style={[s.error, { color: colors.status.error, backgroundColor: colors.status.errorBg }]}>{error}</Text> : null}
             <TouchableOpacity
-              onPress={onClose}
-              style={[
-                styles.cancelBtn,
-                {
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
-                },
-              ]}
+              accessibilityRole="button" testID="save-manual-appointment" onPress={handleSave} disabled={isSaving}
+              style={[s.save, { backgroundColor: ACCENT, opacity: isSaving ? 0.65 : 1 }]}
             >
-              <Text style={[styles.cancelBtnText, { color: colors.text.secondary }]}>Cancelar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleSave}
-              style={[styles.saveBtn, { backgroundColor: '#6366F1' }]}
-            >
-              <Feather name="calendar" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.saveBtnText}>Guardar Cita</Text>
+              {isSaving ? <ActivityIndicator color="#FFF" /> : <Feather name="calendar" color="#FFF" size={18} />}
+              <Text style={s.saveText}>Guardar cita</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.70)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 18,
-  },
-  modalContainer: {
-    width: '100%',
-    maxWidth: 440,
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 20,
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 17,
-    fontFamily: 'Poppins_600SemiBold',
-    lineHeight: 22,
-  },
-  subtitle: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    marginTop: 1,
-  },
-  scrollContent: {
-    paddingBottom: 10,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
-  },
-  inputGroup: {
-    marginBottom: 6,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-  },
-  serviceScroll: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  serviceChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  serviceChipName: {
-    fontSize: 13,
-  },
-  serviceChipPrice: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  timeScroll: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  timePill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  timePillText: {
-    fontSize: 13,
-  },
-  durationRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  durationBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  durationBtnText: {
-    fontSize: 13,
-  },
-  rangeSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 18,
-  },
-  rangeSummaryText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-  },
-  saveBtn: {
-    flex: 1.6,
-    height: 44,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  saveBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-  },
+const s = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+  sheet: { width: '100%', maxWidth: 560, maxHeight: '94%', borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginVertical: 9 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingBottom: 12 },
+  headerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  headerText: { flex: 1, minWidth: 0, gap: 2 },
+  title: { fontSize: 20, fontWeight: '800' },
+  close: { width: 44, height: 44, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  body: { paddingHorizontal: 18, paddingBottom: 16, gap: 16 },
+  section: { gap: 7 },
+  label: { fontSize: 15, fontWeight: '700' },
+  hint: { fontSize: 12, lineHeight: 17 },
+  field: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  optionText: { flex: 1, minWidth: 0, gap: 2 },
+  optionLabel: { fontSize: 14, fontWeight: '600' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { minHeight: 40, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10, borderWidth: 1, borderRadius: 10 },
+  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 10, gap: 8 },
+  summary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
+  error: { borderRadius: 8, fontSize: 13, padding: 8 },
+  save: { minHeight: 46, borderRadius: 13, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
+  saveText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
 });
+import { CLIENT_PHONE_MAX_LENGTH } from '@/shared/lib/constants';

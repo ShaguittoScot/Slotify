@@ -335,11 +335,15 @@ export function BookingScreen() {
     addSlot({
       resourceId: newBooking.id,
       type: 'appointment',
-      title: `${summary.serviceNames.join(' + ')} (${newBooking.clientName})`,
+      title: summary.serviceNames.join(' + '),
       startTime: startDate.toISOString(),
       endTime: endDate.toISOString(),
       status: 'confirmed',
       employeeName: activeBusiness.name,
+      clientName: newBooking.clientName,
+      clientPhone: newBooking.clientPhone,
+      agreedTotal: summary.totalPrice,
+      servicePrice: `$${summary.totalPrice}`,
     });
 
     // 3. Mostrar comprobante interactivo de confirmación

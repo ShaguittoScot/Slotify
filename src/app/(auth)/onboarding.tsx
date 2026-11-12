@@ -24,7 +24,7 @@ export default function OnboardingScreen() {
   const [businessPhone, setBusinessPhone] = useState('');
   
   const completeOnboarding = useAuthStore(state => state.completeOnboarding);
-  const isLoading = useAuthStore(state => state.isLoading);
+  const [isLoading, setIsLoading] = useState(false);
   const error = useAuthStore(state => state.error);
   
   const handleNext = () => {
@@ -33,6 +33,7 @@ export default function OnboardingScreen() {
 
   const handleFinish = async () => {
     if (!businessName || !businessPhone || !selectedSector) return;
+    setIsLoading(true);
     try {
       await completeOnboarding({
         businessName,
@@ -43,8 +44,10 @@ export default function OnboardingScreen() {
         fullName: useAuthStore.getState().user?.fullName || 'Administrador'
       });
       // Routing is automatic via _layout.tsx based on businessId
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // El mensaje se muestra en el formulario.
+    } finally {
+      setIsLoading(false);
     }
   };
 

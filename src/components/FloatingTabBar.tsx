@@ -1,215 +1,163 @@
-import React from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  I18nManager,
   Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
-import { AnimatedPressable } from './ui/AnimatedPressable';
 
-type TabsProps = React.ComponentProps<typeof Tabs>;
-export type FloatingTabBarProps = NonNullable<TabsProps['tabBar']> extends (
-  props: infer P
-) => any
-  ? P
-  : any;
+type TabIcon = ComponentProps<typeof Feather>['name'];
 
-export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
-  state,
-  descriptors,
-  emitter,
-  navigateToTab,
-}) => {
-  const insets = useSafeAreaInsets();
-  const { isDark } = useAppTheme();
-  const { appMode } = useAuthStore();
+const TAB_GUTTER = 2;
+const BUSINESS_TABS = ['index', 'agenda', 'clients', 'settings'];
+const CONSUMER_TABS = ['explore', 'form-preview', 'index', 'settings'];
 
-  const isBusiness = appMode === 'BUSINESS';
-  const currentRouteOptions =
-    descriptors[state.routes[state.index].key]?.options;
-  const tabBarStyle = StyleSheet.flatten(
-    currentRouteOptions?.tabBarStyle
-  ) as any;
-
-  if (tabBarStyle?.display === 'none') {
-    return null;
+function getTabConfig(name: string, isBusiness: boolean): { label: string; icon: TabIcon } {
+  switch (name) {
+    case 'index':
+      return isBusiness ? { label: 'Inicio', icon: 'home' } : { label: 'Mis Citas', icon: 'calendar' };
+    case 'agenda':
+      return { label: 'Agenda', icon: 'calendar' };
+    case 'clients':
+      return { label: 'Clientes', icon: 'users' };
+    case 'explore':
+      return { label: 'Explorar', icon: 'compass' };
+    case 'form-preview':
+      return { label: 'Reservar', icon: 'file-text' };
+    case 'settings':
+      return isBusiness ? { label: 'Ajustes', icon: 'settings' } : { label: 'Mi Perfil', icon: 'user' };
+    default:
+      return { label: name, icon: 'circle' };
   }
+}
 
-  const allowedRouteNames = isBusiness
-    ? ['index', 'agenda', 'clients', 'settings']
-    : ['explore', 'form-preview', 'index', 'settings'];
-
-  const visibleRoutes = state.routes.filter((route: any) =>
-    allowedRouteNames.includes(route.name)
+function TabContent({ label, icon, color, focused }: {
+  label: string;
+  icon: TabIcon;
+  color: string;
+  focused: boolean;
+}) {
+  return (
+    <>
+      <Feather name={icon} size={18} color={color} />
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
+        style={[styles.tabLabel, { color, fontWeight: focused ? '700' : '500' }]}>
+        {label}
+      </Text>
+    </>
   );
+}
 
-  const getTabConfig = (routeName: string) => {
-    switch (routeName) {
-      case 'index':
-        return {
-          label: isBusiness ? 'Resumen' : 'Mis Citas',
-          icon: (color: string) =>
-            isBusiness ? (
-              <Feather name="grid" size={17} color={color} />
-            ) : (
-              <Feather name="calendar" size={17} color={color} />
-            ),
-        };
-      case 'agenda':
-        return {
-          label: 'Agenda',
-          icon: (color: string) => (
-            <Feather name="calendar" size={17} color={color} />
-          ),
-        };
-      case 'clients':
-        return {
-          label: 'Clientes',
-          icon: (color: string) => (
-            <Feather name="users" size={17} color={color} />
-          ),
-        };
-      case 'explore':
-        return {
-          label: 'Explorar',
-          icon: (color: string) => (
-            <Feather name="compass" size={17} color={color} />
-          ),
-        };
-      case 'form-preview':
-        return {
-          label: 'Reservar',
-          icon: (color: string) => (
-            <Feather name="file-text" size={17} color={color} />
-          ),
-        };
-      case 'settings':
-        return {
-          label: isBusiness ? 'Ajustes' : 'Perfil',
-          icon: (color: string) =>
-            isBusiness ? (
-              <Feather name="sliders" size={17} color={color} />
-            ) : (
-              <Feather name="user" size={17} color={color} />
-            ),
-        };
-      default:
-        return {
-          label: routeName,
-          icon: (color: string) => (
-            <Feather name="circle" size={17} color={color} />
-          ),
-        };
-    }
-  };
-
-  const bottomMargin = Math.max(insets.bottom + 8, 18);
-  const accentColor = isBusiness ? '#818CF8' : '#10B981';
+export function FloatingTabBar(props: BottomTabBarProps) {
+  const { state, descriptors, insets } = props;
+  const { isDark } = useAppTheme();
+  const appMode = useAuthStore((session) => session.appMode);
+  const options = descriptors[state.routes[state.index].key]?.options;
+  if (StyleSheet.flatten(options?.tabBarStyle)?.display === 'none') return null;
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={[
-        styles.wrapper,
-        {
-          bottom: bottomMargin,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: isDark
-              ? 'rgba(15, 15, 20, 0.96)'
-              : 'rgba(255, 255, 255, 0.96)',
-            borderColor: isDark ? '#24242E' : 'rgba(0, 0, 0, 0.08)',
-          },
-        ]}
-      >
-        {visibleRoutes.map((route: any) => {
-          const originalIndex = state.routes.findIndex(
-            (r: any) => r.key === route.key
-          );
-          const isFocused = state.index === originalIndex;
-          const { label, icon } = getTabConfig(route.name);
-
-          const onPress = () => {
-            const event = emitter.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-
-            if (!isFocused && !event.defaultPrevented) {
-              navigateToTab(route.key);
-            }
-          };
-
-          return (
-            <Animated.View
-              key={route.key}
-              layout={LinearTransition.springify()}
-              style={{ flex: 1 }}
-            >
-              <AnimatedPressable
-                scaleDown={0.93}
-                accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
-                onPress={onPress}
-                style={[
-                  styles.tabItem,
-                  isFocused && [
-                    styles.tabItemActive,
-                    {
-                      backgroundColor: isDark ? '#1D1D26' : '#18181B',
-                      borderColor: isDark ? `${accentColor}40` : 'transparent',
-                    },
-                  ],
-                ]}
-              >
-                <View style={styles.iconContainer}>
-                  {icon(
-                    isFocused
-                      ? isDark
-                        ? accentColor
-                        : '#FFFFFF'
-                      : isDark
-                      ? '#71717A'
-                      : '#737373'
-                  )}
-                </View>
-
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    {
-                      color: isFocused
-                        ? '#FAFAFA'
-                        : isDark
-                        ? '#71717A'
-                        : '#737373',
-                      fontWeight: isFocused ? '700' : '500',
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {label}
-                </Text>
-              </AnimatedPressable>
-            </Animated.View>
-          );
-        })}
+    <View pointerEvents="box-none" style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 20) }]}>
+      <View style={[styles.container, {
+        backgroundColor: isDark ? 'rgba(15, 15, 20, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+        borderColor: isDark ? '#24242E' : 'rgba(0, 0, 0, 0.08)',
+      }]}>
+        <TabTrack key={appMode} {...props} isBusiness={appMode === 'BUSINESS'} isDark={isDark} />
       </View>
     </View>
   );
-};
+}
+
+function TabTrack({ state, descriptors, emitter, navigateToTab, isBusiness, isDark }: BottomTabBarProps & {
+  isBusiness: boolean;
+  isDark: boolean;
+}) {
+  const routes = state.routes.filter(({ name }) => (isBusiness ? BUSINESS_TABS : CONSUMER_TABS).includes(name));
+  const activeKey = state.routes[state.index].key;
+  const activeIndex = routes.findIndex(({ key }) => key === activeKey);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const tabWidth = routes.length > 0 ? trackWidth / routes.length : 0;
+  const indicatorWidth = tabWidth - TAB_GUTTER * 2;
+  const indicatorIndex = useSharedValue(Math.max(0, activeIndex));
+  const direction = I18nManager.isRTL ? -1 : 1;
+  const indicatorColor = isDark ? '#383838' : '#171717';
+  const showIndicator = activeIndex >= 0 && indicatorWidth > 0;
+
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      indicatorIndex.value = withTiming(activeIndex, {
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        reduceMotion: ReduceMotion.System,
+      });
+    }
+  }, [activeIndex, indicatorIndex]);
+
+  const indicatorPosition = useAnimatedStyle(() => ({
+    transform: [{ translateX: direction * indicatorIndex.value * tabWidth }],
+  }));
+  const clippedLabelsPosition = useAnimatedStyle(() => ({
+    transform: [{ translateX: -direction * (TAB_GUTTER + indicatorIndex.value * tabWidth) }],
+  }));
+
+  return (
+    <View style={styles.track} onLayout={({ nativeEvent }) => setTrackWidth(nativeEvent.layout.width)}>
+      {routes.map((route) => {
+        const focused = route.key === activeKey;
+        const fallbackHighlight = focused && !showIndicator;
+        const tab = getTabConfig(route.name, isBusiness);
+        const onPress = () => {
+          const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigateToTab(route.key);
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: focused }}
+            accessibilityLabel={descriptors[route.key]?.options?.tabBarAccessibilityLabel ?? tab.label}
+            testID={descriptors[route.key]?.options?.tabBarButtonTestID}
+            onPress={onPress}
+            onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
+            style={[styles.tabItem, fallbackHighlight && [styles.pillShadow, { backgroundColor: indicatorColor }]]}
+            activeOpacity={0.7}
+          >
+            <TabContent {...tab} focused={focused} color={fallbackHighlight ? '#FFFFFF' : isDark ? '#8E8E8E' : '#737373'} />
+          </TouchableOpacity>
+        );
+      })}
+
+      {showIndicator && (
+        <Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+          style={[styles.pill, styles.pillShadow, { width: indicatorWidth, backgroundColor: indicatorColor }, indicatorPosition]}>
+          {/* Las etiquetas blancas quedan recortadas por la pastilla mientras se mueve. */}
+          <View style={styles.pillClip}>
+            <Animated.View style={[styles.clippedLabels, { width: trackWidth }, clippedLabelsPosition]}>
+              {routes.map((route) => (
+                <View key={route.key} style={styles.tabItem}>
+                  <TabContent {...getTabConfig(route.name, isBusiness)} focused={route.key === activeKey} color="#FFFFFF" />
+                </View>
+              ))}
+            </Animated.View>
+          </View>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -222,50 +170,70 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     width: '100%',
     maxWidth: 440,
-    height: 62,
-    borderRadius: 24,
-    paddingHorizontal: 5,
+    height: 64,
+    borderRadius: 32,
+    paddingHorizontal: 4,
     borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.45,
-        shadowRadius: 22,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.35,
+        shadowRadius: 20,
       },
       android: {
-        elevation: 14,
+        elevation: 12,
       },
     }),
   },
+  track: {
+    flex: 1,
+    flexDirection: 'row',
+  },
   tabItem: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 46,
-    borderRadius: 18,
+    minHeight: 48,
+    borderRadius: 24,
     paddingVertical: 8,
     paddingHorizontal: 6,
-    marginHorizontal: 2,
+    marginHorizontal: TAB_GUTTER,
     gap: 5,
-    borderWidth: 1,
-    borderColor: 'transparent',
   },
-  tabItemActive: {
+  pill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    start: TAB_GUTTER,
+    zIndex: 1,
+    borderRadius: 24,
+  },
+  pillShadow: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  pillClip: {
+    flex: 1,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  clippedLabels: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    start: 0,
+    flexDirection: 'row',
   },
   tabLabel: {
+    flexShrink: 1,
     fontSize: 11.5,
     letterSpacing: -0.2,
   },

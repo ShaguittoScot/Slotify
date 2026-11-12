@@ -1,3 +1,4 @@
+import { toBusinessClock } from '../model/businessTime';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -13,6 +14,7 @@ import { useAppTheme } from '@/shared/theme';
 interface JumpToDateModalProps {
   visible: boolean;
   selectedDate: Date;
+  timeZone: string;
   onSelectDate: (date: Date) => void;
   onClose: () => void;
 }
@@ -27,20 +29,21 @@ const WEEKDAY_HEADERS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 export const JumpToDateModal: React.FC<JumpToDateModalProps> = ({
   visible,
   selectedDate,
+  timeZone,
   onSelectDate,
   onClose,
 }) => {
   const { colors, isDark } = useAppTheme();
 
   // Estado para el mes y año que se está explorando en el mini-calendario
-  const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
-  const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
+  const [viewYear, setViewYear] = useState(selectedDate.getUTCFullYear());
+  const [viewMonth, setViewMonth] = useState(selectedDate.getUTCMonth());
 
   // Actualiza el mes visible cuando se abre o cambia la fecha seleccionada
   React.useEffect(() => {
     if (visible) {
-      setViewYear(selectedDate.getFullYear());
-      setViewMonth(selectedDate.getMonth());
+      setViewYear(selectedDate.getUTCFullYear());
+      setViewMonth(selectedDate.getUTCMonth());
     }
   }, [visible, selectedDate]);
 
@@ -63,24 +66,24 @@ export const JumpToDateModal: React.FC<JumpToDateModalProps> = ({
   };
 
   const handlePickDate = (day: number) => {
-    const newDate = new Date(viewYear, viewMonth, day);
+    const newDate = new Date(Date.UTC(viewYear, viewMonth, day));
     onSelectDate(newDate);
     onClose();
   };
 
   // Atajos rápidos
   const handleQuickJump = (type: 'today' | 'tomorrow' | 'week' | 'monthEnd') => {
-    const now = new Date();
-    let target = new Date();
+    const now = toBusinessClock(Date.now(), timeZone);
+    let target = toBusinessClock(Date.now(), timeZone);
 
     if (type === 'today') {
-      target = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     } else if (type === 'tomorrow') {
-      target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
     } else if (type === 'week') {
-      target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+      target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 7));
     } else if (type === 'monthEnd') {
-      target = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
     }
 
     onSelectDate(target);
@@ -88,8 +91,8 @@ export const JumpToDateModal: React.FC<JumpToDateModalProps> = ({
   };
 
   // Generación de la grilla de días del mes
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayIndex = new Date(viewYear, viewMonth, 1).getDay(); // 0 = Domingo
+  const daysInMonth = new Date(Date.UTC(viewYear, viewMonth + 1, 0)).getUTCDate();
+  const firstDayIndex = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay(); // 0 = Domingo
 
   const daysGrid: (number | null)[] = [];
   for (let i = 0; i < firstDayIndex; i++) {
@@ -99,11 +102,11 @@ export const JumpToDateModal: React.FC<JumpToDateModalProps> = ({
     daysGrid.push(d);
   }
 
-  const today = new Date();
+  const today = toBusinessClock(Date.now(), timeZone);
   const isCurrentMonthToday =
-    today.getFullYear() === viewYear && today.getMonth() === viewMonth;
+    today.getUTCFullYear() === viewYear && today.getUTCMonth() === viewMonth;
   const isCurrentMonthSelected =
-    selectedDate.getFullYear() === viewYear && selectedDate.getMonth() === viewMonth;
+    selectedDate.getUTCFullYear() === viewYear && selectedDate.getUTCMonth() === viewMonth;
 
   return (
     <Modal
@@ -245,8 +248,8 @@ export const JumpToDateModal: React.FC<JumpToDateModalProps> = ({
                 return <View key={`empty-${index}`} style={styles.dayCellEmpty} />;
               }
 
-              const isSelectedDay = isCurrentMonthSelected && selectedDate.getDate() === day;
-              const isTodayDay = isCurrentMonthToday && today.getDate() === day;
+              const isSelectedDay = isCurrentMonthSelected && selectedDate.getUTCDate() === day;
+              const isTodayDay = isCurrentMonthToday && today.getUTCDate() === day;
 
               return (
                 <TouchableOpacity

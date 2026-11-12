@@ -57,3 +57,11 @@ describe('Form Branding & Identity Configuration', () => {
   });
 });
 
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const values = new Map<string, string>();
+  return {
+    getItem: async (key: string) => values.get(key) ?? null,
+    setItem: async (key: string, value: string) => { values.set(key, value); },
+  };
+});
+

@@ -1,19 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { authRequestMessage } from '@/features/auth/api';
+import { useAppTheme } from '@/shared/theme';
+import { fetchOwnBusinessInfo, saveOwnProfile } from '../../api';
 
 interface Props {
   visible: boolean;
@@ -22,168 +13,124 @@ interface Props {
 
 export function EditProfileModal({ visible, onClose }: Props) {
   const { colors, isDark } = useAppTheme();
-  const { user, updateUser, appMode } = useAuthStore();
-  const isBusiness = appMode === 'BUSINESS';
-
-  const [fullName, setFullName] = useState('');
-  const [businessName, setBusinessName] = useState('');
+  const { user, updateUser } = useAuthStore();
+  const canRename = user?.role === 'DUENO' && Boolean(user.businessId && !user.businessId.startsWith('demo'));
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [businessName, setBusinessName] = useState<string>();
+  const [loadingBusiness, setLoadingBusiness] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
-    if (visible && user) {
-      setFullName(user.fullName || '');
-      setBusinessName(user.businessName || '');
-    }
-  }, [visible, user]);
+    if (!visible || !user) return;
+    setFirstName(user.firstName || user.fullName.split(' ')[0] || '');
+    setLastName(user.lastName || '');
+    setBusinessName(undefined);
+    setError(undefined);
+    if (!canRename) return;
+    const controller = new AbortController();
+    setLoadingBusiness(true);
+    fetchOwnBusinessInfo(controller.signal).then(
+      (info) => { if (!controller.signal.aborted) setBusinessName(info.name); },
+      () => {},
+    ).finally(() => { if (!controller.signal.aborted) setLoadingBusiness(false); });
+    return () => controller.abort();
+  }, [visible, user, canRename]);
 
-  const handleSave = () => {
-    if (!fullName.trim()) return;
-    updateUser({
-      fullName: fullName.trim(),
-      ...(isBusiness ? { businessName: businessName.trim() || undefined } : {}),
-    });
-    onClose();
+  const save = async () => {
+    if (!user || saving || !firstName.trim() || (businessName !== undefined && !businessName.trim())) return;
+    setSaving(true);
+    setError(undefined);
+    try {
+      const saved = await saveOwnProfile(user, firstName.trim(), lastName.trim(), businessName?.trim());
+      if (useAuthStore.getState().user?.id !== user.id) return;
+      updateUser(saved);
+      onClose();
+    } catch (failure) {
+      setError(authRequestMessage(failure, 'No se pudo guardar tu perfil.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const close = () => { if (!saving) onClose(); };
+  const fields = [
+    { label: 'Nombre', value: firstName, change: setFirstName, maxLength: 100, icon: 'user' as const },
+    { label: 'Apellidos', value: lastName, change: setLastName, maxLength: 100, icon: 'user' as const },
+    ...(businessName !== undefined ? [{
+      label: 'Nombre del negocio', value: businessName, change: setBusinessName, maxLength: 150, icon: 'briefcase' as const,
+    }] : []),
+  ];
+  const disabled = saving || !firstName.trim() || (businessName !== undefined && !businessName.trim());
+
+  const inputColors = {
+    backgroundColor: isDark ? '#262628' : '#F4F4F6',
+    borderColor: isDark ? '#38383A' : '#E5E5EA',
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={[
-                styles.modalCard,
-                {
-                  backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
-                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                },
-              ]}
-            >
-              <View style={styles.modalHeader}>
-                <View>
-                  <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-                    {isBusiness ? 'Editar Perfil de Administrador' : 'Editar Datos Personales'}
-                  </Text>
-                  <Text style={[styles.modalSubtitle, { color: colors.text.muted }]}>
-                    {isBusiness
-                      ? 'Actualiza tu nombre y negocio activo'
-                      : 'Actualiza tu información para citas y reservas'}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                  <Feather name="x" size={20} color={colors.text.muted} />
-                </TouchableOpacity>
-              </View>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={close}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
+        <View style={[styles.modalCard, {
+          backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+        }]}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                {user?.businessId ? 'Editar Perfil de Administrador' : 'Editar Datos Personales'}
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: colors.text.muted }]}>
+                {canRename ? 'Actualiza tu nombre y negocio activo' : 'Actualiza tu información personal'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={close} disabled={saving} accessibilityRole="button" accessibilityLabel="Cerrar" style={styles.closeBtn}>
+              <Feather name="x" size={20} color={colors.text.muted} />
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>
-                  Nombre Completo
-                </Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    {
-                      backgroundColor: isDark ? '#262628' : '#F4F4F6',
-                      borderColor: isDark ? '#38383A' : '#E5E5EA',
-                    },
-                  ]}
-                >
-                  <Feather name="user" size={16} color={colors.text.muted} style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text.primary }]}
-                    value={fullName}
-                    onChangeText={setFullName}
-                    placeholder="Tu nombre completo"
-                    placeholderTextColor={colors.text.muted}
-                  />
+          <ScrollView style={styles.fields} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {fields.map(({ label, value, change, maxLength, icon }) => (
+              <View key={label} style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>{label}</Text>
+                <View style={[styles.inputWrapper, inputColors]}>
+                  <Feather name={icon} size={16} color={colors.text.muted} style={styles.inputIcon} />
+                  <TextInput accessibilityLabel={label} style={[styles.input, { color: colors.text.primary }]}
+                    value={value} onChangeText={change} maxLength={maxLength} editable={!saving} />
                 </View>
               </View>
+            ))}
+            {canRename && businessName === undefined && (
+              <Text style={[styles.formGroup, { color: colors.text.muted }]}>
+                {loadingBusiness ? 'Consultando nombre del negocio…' : 'El nombre del negocio no está disponible. Puedes guardar tus datos personales.'}
+              </Text>
+            )}
+            <View style={styles.formGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>Correo Electrónico</Text>
+              <View style={[styles.inputWrapper, inputColors, { opacity: 0.7 }]}>
+                <Feather name="mail" size={16} color={colors.text.muted} style={styles.inputIcon} />
+                <TextInput accessibilityLabel="Correo de la cuenta" style={[styles.input, { color: colors.text.muted }]}
+                  value={user?.email ?? ''} editable={false} />
+              </View>
+            </View>
+            {error && <Text accessibilityRole="alert" style={{ color: colors.status.error }}>{error}</Text>}
+          </ScrollView>
 
-              {isBusiness && (
-                <View style={styles.formGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>
-                    Nombre del Negocio
-                  </Text>
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      {
-                        backgroundColor: isDark ? '#262628' : '#F4F4F6',
-                        borderColor: isDark ? '#38383A' : '#E5E5EA',
-                      },
-                    ]}
-                  >
-                    <Feather name="briefcase" size={16} color={colors.text.muted} style={styles.inputIcon} />
-                    <TextInput
-                      style={[styles.input, { color: colors.text.primary }]}
-                      value={businessName}
-                      onChangeText={setBusinessName}
-                      placeholder="Ej. Barbería Don Ricardo"
-                      placeholderTextColor={colors.text.muted}
-                    />
-                  </View>
-                </View>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={close}
+              style={[styles.cancelBtn, { backgroundColor: isDark ? '#2A2A2E' : '#EFEFF4' }]}>
+              <Text style={[styles.cancelBtnText, { color: colors.text.primary }]}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={save}
+              style={[styles.saveBtn, { backgroundColor: colors.action.primary, opacity: disabled ? 0.65 : 1 }]}>
+              {saving ? <ActivityIndicator color={colors.action.primaryText} /> : (
+                <Text style={[styles.saveBtnText, { color: colors.action.primaryText }]}>Guardar Cambios</Text>
               )}
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>
-                  Correo Electrónico (No modificable)
-                </Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    {
-                      backgroundColor: isDark ? '#1F1F21' : '#EBEBEF',
-                      borderColor: isDark ? '#2E2E30' : '#DBDBE0',
-                      opacity: 0.7,
-                    },
-                  ]}
-                >
-                  <Feather name="mail" size={16} color={colors.text.muted} style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text.muted }]}
-                    value={user?.email || 'usuario@slotify.com'}
-                    editable={false}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.cancelBtn,
-                    {
-                      backgroundColor: isDark ? '#2A2A2E' : '#EFEFF4',
-                    },
-                  ]}
-                  onPress={onClose}
-                >
-                  <Text style={[styles.cancelBtnText, { color: colors.text.primary }]}>
-                    Cancelar
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.saveBtn,
-                    { backgroundColor: colors.action.primary },
-                  ]}
-                  onPress={handleSave}
-                >
-                  <Text style={[styles.saveBtnText, { color: colors.action.primaryText }]}>
-                    Guardar Cambios
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </TouchableWithoutFeedback>
+            </TouchableOpacity>
+          </View>
         </View>
-      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -199,6 +146,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '88%',
     borderRadius: 24,
     padding: 22,
     borderWidth: 1,
@@ -226,6 +174,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 4,
   },
+  fields: { flexShrink: 1 },
   formGroup: {
     marginBottom: 16,
   },

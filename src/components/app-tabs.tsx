@@ -1,13 +1,17 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
+import { useReducedMotion } from 'react-native-reanimated';
 import { FloatingTabBar } from './FloatingTabBar';
 
 export default function AppTabs() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        animation: reduceMotion ? 'none' : 'fade',
       }}
     >
       <Tabs.Screen

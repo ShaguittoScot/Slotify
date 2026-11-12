@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -16,133 +16,117 @@ import Animated, {
   LinearTransition,
 } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
-import { useCalendarStore } from '@/features/calendar/model';
+import {
+  useCalendarStore,
+  getCalendarAmount,
+  resolveSessionScopeKey,
+} from '@/features/calendar/model';
+import { fetchCalendarSlots } from '@/features/calendar/api';
+import { resolveBusinessTimeZone } from '@/features/calendar/model/businessTime';
+import type { CalendarResponse, CalendarSlot } from '@/shared/types';
+import {
+  dashboardCalendarRange,
+  selectDashboardAppointments,
+} from '../../model/appointments';
+import {
+  useClientsStore,
+  buildUnifiedBusinessClients,
+} from '@/features/clients/model';
 import { useAppTheme } from '@/shared/theme';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { TemplateMigrationModal } from '../components/TemplateMigrationModal';
 
-const DEMO_UPCOMING_APPOINTMENTS = [
-  {
-    id: '1',
-    name: 'Carlos Mendoza',
-    service: 'Corte Clásico & Barba',
-    time: '10:00 AM',
-    status: 'confirmed',
-  },
-  {
-    id: '2',
-    name: 'Laura Gómez',
-    service: 'Diseño & Estilizado',
-    time: '11:30 AM',
-    status: 'confirmed',
-  },
-  {
-    id: '3',
-    name: 'Roberto Díaz',
-    service: 'Tratamiento Facial',
-    time: '02:00 PM',
-    status: 'pending',
-  },
-];
+const EMPTY_SLOTS: CalendarSlot[] = [];
 
 export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user, toggleAppMode } = useAuthStore();
-  const { slots, loadSlots } = useCalendarStore();
+  const { slots: storeSlots, loadSlots } = useCalendarStore();
+  const {
+    apiClients,
+    manualClients,
+    clientNotes,
+    loadClients,
+    currentScopeKey,
+  } = useClientsStore();
   const [migrationModalVisible, setMigrationModalVisible] = useState(false);
+  const [calendar, setCalendar] = useState<{
+    scopeKey: string;
+    data?: CalendarResponse;
+    failed?: boolean;
+  }>();
+  const [now, setNow] = useState(Date.now);
+  const scopeKey = resolveSessionScopeKey(user);
 
-  useEffect(() => {
-    loadSlots();
-  }, [loadSlots]);
-
-  const isDemo =
-    user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
-
-  const appointments = useMemo(
-    () => slots.filter((s) => s.type === 'appointment'),
-    [slots]
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const refresh = () => {
+        const currentTime = Date.now();
+        setNow(currentTime);
+        const { startDate, endDate } = dashboardCalendarRange(currentTime);
+        fetchCalendarSlots(startDate, endDate).then(
+          (data) => {
+            if (active) setCalendar({ scopeKey, data });
+          },
+          () => {
+            if (active) setCalendar({ scopeKey, failed: true });
+          }
+        );
+      };
+      refresh();
+      void loadClients(scopeKey);
+      void loadSlots(scopeKey);
+      const timer = setInterval(() => setNow(Date.now()), 60_000);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }, [loadClients, loadSlots, scopeKey])
   );
 
-  const upcomingAppointmentsList = useMemo(() => {
-    if (appointments.length > 0) {
-      const validAppointments = appointments
-        .filter((s) => s.status !== 'cancelled')
-        .sort(
-          (a, b) =>
-            new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-        );
+  const currentCalendar =
+    calendar?.scopeKey === scopeKey ? calendar : undefined;
+  const calendarReady = currentCalendar?.data !== undefined;
+  const calendarFailed = currentCalendar?.failed === true;
+  const slots = useMemo(() => {
+    const apiSlots = currentCalendar?.data?.slots ?? EMPTY_SLOTS;
+    if (apiSlots.length > 0) return apiSlots;
+    return storeSlots.length > 0 ? storeSlots : EMPTY_SLOTS;
+  }, [currentCalendar?.data?.slots, storeSlots]);
 
-      return validAppointments.slice(0, 4).map((apt) => {
-        const startDate = new Date(apt.startTime);
-        const timeStr = startDate.toLocaleTimeString('es-MX', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        });
+  const timeZone = resolveBusinessTimeZone(currentCalendar?.data?.timeZone);
 
-        return {
-          id: apt.resourceId,
-          name: apt.clientName || apt.employeeName || 'Cliente',
-          service: apt.title || 'Servicio reservado',
-          time: timeStr,
-          status: apt.status || 'confirmed',
-        };
-      });
-    }
+  const { todayAppointments, upcoming } = useMemo(
+    () => selectDashboardAppointments(slots, now, timeZone),
+    [slots, now, timeZone]
+  );
 
-    if (isDemo) {
-      return DEMO_UPCOMING_APPOINTMENTS;
-    }
+  const unifiedClientsCount = useMemo(
+    () =>
+      currentScopeKey === scopeKey
+        ? buildUnifiedBusinessClients(
+            apiClients,
+            manualClients,
+            slots,
+            clientNotes
+          ).length
+        : 0,
+    [apiClients, manualClients, slots, clientNotes, currentScopeKey, scopeKey]
+  );
 
-    return [];
-  }, [appointments, isDemo]);
-
-  const metrics = useMemo(() => {
-    if (appointments.length > 0) {
-      const isSameDay = (d1: Date, d2: Date) =>
-        d1.getFullYear() === d2.getFullYear() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getDate() === d2.getDate();
-
-      const today = new Date();
-      const todayAppointments = appointments.filter(
-        (s) =>
-          isSameDay(new Date(s.startTime), today) && s.status !== 'cancelled'
-      );
-
-      const uniqueClients = new Set(
-        appointments
-          .map((s) => s.clientName || s.clientPhone || s.title)
-          .filter(Boolean)
-      ).size;
-
-      const todayRevenue = todayAppointments
-        .filter((s) => s.status === 'completed' || s.status === 'confirmed')
-        .reduce((sum, s) => {
-          if (!s.servicePrice) return sum + 250;
-          const num = parseFloat(s.servicePrice.replace(/[^0-9.]/g, ''));
-          return sum + (isNaN(num) ? 250 : num);
-        }, 0);
-
-      return {
-        todayCount: todayAppointments.length,
-        revenue:
-          todayRevenue > 0 ? `$${todayRevenue.toLocaleString('es-MX')}` : '$0',
-        clients: uniqueClients || todayAppointments.length,
-      };
-    }
-
-    if (isDemo) {
-      return { todayCount: 3, revenue: '$1,450', clients: 12 };
-    }
-
-    return { todayCount: 0, revenue: '$0', clients: 0 };
-  }, [appointments, isDemo]);
+  const todayCompletedTotal =
+    todayAppointments
+      .filter((slot) => slot.status === 'completed' || slot.status === 'confirmed')
+      .reduce(
+        (sum, slot) => sum + Math.round((getCalendarAmount(slot) ?? 0) * 100),
+        0
+      ) / 100;
 
   const getInitials = (name?: string) => {
     if (!name) return 'SL';
-    const parts = name.trim().split(' ');
+    const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return name.slice(0, 2).toUpperCase();
   };
@@ -162,6 +146,14 @@ export function DashboardScreen() {
 
   const businessTitle =
     user?.businessName || user?.fullName || 'Panel Slotify';
+
+  const heroSubtitle = calendarFailed && slots.length === 0
+    ? 'No se pudo consultar la agenda en este momento.'
+    : !calendarReady && slots.length === 0
+    ? 'Sincronizando tu agenda del día…'
+    : todayAppointments.length === 0
+    ? 'Agenda disponible. Comparte tu enlace o registra una cita para hoy.'
+    : 'Operación en curso. Gestiona tus horarios, clientes o personaliza tu formulario.';
 
   return (
     <View style={[s.screen, { backgroundColor: colors.background.primary }]}>
@@ -188,7 +180,7 @@ export function DashboardScreen() {
               >
                 <Text style={s.avatarText}>{getInitials(businessTitle)}</Text>
               </View>
-              <View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={s.roleRow}>
                   <View style={s.accentDot} />
                   <Text style={[s.greetingSmall, { color: colors.text.muted }]}>
@@ -222,6 +214,8 @@ export function DashboardScreen() {
               </AnimatedPressable>
 
               <AnimatedPressable
+                accessibilityRole="button"
+                accessibilityLabel="Abrir Ajustes"
                 style={[
                   s.iconBtn,
                   {
@@ -229,7 +223,7 @@ export function DashboardScreen() {
                     borderColor: isDark ? '#24242C' : '#E4E4E7',
                   },
                 ]}
-                onPress={() => router.push('/(main)/settings' as any)}
+                onPress={() => router.navigate('/(main)/settings')}
               >
                 <Feather name="sliders" size={17} color={colors.text.primary} />
               </AnimatedPressable>
@@ -260,14 +254,10 @@ export function DashboardScreen() {
               </View>
 
               <Text style={s.heroMetricTitle}>
-                {metrics.todayCount}{' '}
-                {metrics.todayCount === 1 ? 'cita activa' : 'citas activas'}
+                {todayAppointments.length}{' '}
+                {todayAppointments.length === 1 ? 'cita activa' : 'citas activas'}
               </Text>
-              <Text style={s.heroSub}>
-                {metrics.todayCount > 0
-                  ? 'Operación en curso. Gestiona tus horarios o personaliza tu formulario.'
-                  : 'Agenda disponible. Comparte tu enlace para recibir reservaciones.'}
-              </Text>
+              <Text style={s.heroSub}>{heroSubtitle}</Text>
 
               <View style={s.heroBtnRow}>
                 <AnimatedPressable
@@ -308,7 +298,9 @@ export function DashboardScreen() {
                 </Text>
               </View>
               <Text style={[s.kpiValue, { color: colors.text.primary }]}>
-                {metrics.todayCount}
+                {calendarReady || slots.length > 0
+                  ? String(todayAppointments.length)
+                  : '—'}
               </Text>
             </View>
 
@@ -327,7 +319,9 @@ export function DashboardScreen() {
                 </Text>
               </View>
               <Text style={[s.kpiValue, { color: colors.text.primary }]}>
-                {metrics.revenue}
+                {calendarReady || slots.length > 0
+                  ? `$${todayCompletedTotal.toLocaleString('es-MX')}`
+                  : '—'}
               </Text>
             </View>
 
@@ -338,7 +332,10 @@ export function DashboardScreen() {
               ]}
             />
 
-            <View style={s.kpiItem}>
+            <AnimatedPressable
+              style={s.kpiItem}
+              onPress={() => router.push('/(main)/clients' as any)}
+            >
               <View style={s.kpiHeader}>
                 <Feather name="users" size={13} color="#A1A1AA" />
                 <Text style={[s.kpiLabel, { color: colors.text.muted }]}>
@@ -346,9 +343,9 @@ export function DashboardScreen() {
                 </Text>
               </View>
               <Text style={[s.kpiValue, { color: colors.text.primary }]}>
-                {metrics.clients}
+                {unifiedClientsCount}
               </Text>
-            </View>
+            </AnimatedPressable>
           </Animated.View>
 
           {/* ─── ACCIONES RÁPIDAS UNIFICADAS ─── */}
@@ -365,16 +362,16 @@ export function DashboardScreen() {
                   onPress: () => router.push('/(main)/agenda' as any),
                 },
                 {
-                  label: 'Formulario',
-                  icon: 'layout',
+                  label: 'Clientes',
+                  icon: 'users',
                   accent: '#10B981',
-                  onPress: () => router.push('/(main)/form-builder' as any),
+                  onPress: () => router.push('/(main)/clients' as any),
                 },
                 {
-                  label: 'Plantilla',
-                  icon: 'layers',
-                  accent: '#A1A1AA',
-                  onPress: () => setMigrationModalVisible(true),
+                  label: 'Formulario',
+                  icon: 'layout',
+                  accent: '#818CF8',
+                  onPress: () => router.push('/(main)/form-builder' as any),
                 },
                 {
                   label: 'Compartir',
@@ -436,12 +433,22 @@ export function DashboardScreen() {
               </AnimatedPressable>
             </View>
 
-            {upcomingAppointmentsList.length > 0 ? (
-              upcomingAppointmentsList.map((apt, idx) => {
+            {upcoming.length > 0 ? (
+              upcoming.map((apt, idx) => {
                 const isConfirmed = apt.status === 'confirmed';
+                const formattedTime = new Date(apt.startTime).toLocaleString(
+                  'es-MX',
+                  {
+                    timeZone,
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }
+                );
                 return (
                   <Animated.View
-                    key={apt.id}
+                    key={apt.resourceId}
                     layout={LinearTransition.springify()}
                     entering={FadeInRight.duration(350).delay(260 + idx * 60)}
                   >
@@ -467,7 +474,7 @@ export function DashboardScreen() {
                         <Text
                           style={[s.timePillText, { color: colors.text.primary }]}
                         >
-                          {apt.time}
+                          {formattedTime}
                         </Text>
                       </View>
 
@@ -476,13 +483,13 @@ export function DashboardScreen() {
                           style={[s.aptName, { color: colors.text.primary }]}
                           numberOfLines={1}
                         >
-                          {apt.name}
+                          {apt.clientName || 'Cliente'}
                         </Text>
                         <Text
                           style={[s.aptService, { color: colors.text.muted }]}
                           numberOfLines={1}
                         >
-                          {apt.service}
+                          {apt.title || 'Servicio reservado'}
                         </Text>
                       </View>
 
@@ -512,6 +519,24 @@ export function DashboardScreen() {
                   </Animated.View>
                 );
               })
+            ) : !calendarReady && slots.length === 0 ? (
+              <View
+                style={[
+                  s.emptyStateCard,
+                  {
+                    backgroundColor: isDark ? '#121216' : '#FFFFFF',
+                    borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  },
+                ]}
+              >
+                <Text
+                  style={[s.emptyStateSubtitle, { color: colors.text.muted }]}
+                >
+                  {calendarFailed
+                    ? 'No se pudieron cargar las próximas citas.'
+                    : 'Cargando próximas citas…'}
+                </Text>
+              </View>
             ) : (
               <View
                 style={[
@@ -533,7 +558,7 @@ export function DashboardScreen() {
                 <Text
                   style={[s.emptyStateTitle, { color: colors.text.primary }]}
                 >
-                  Sin citas programadas
+                  Sin citas próximas
                 </Text>
                 <Text
                   style={[s.emptyStateSubtitle, { color: colors.text.muted }]}
@@ -568,12 +593,14 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    gap: 12,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0,
   },
   avatarRing: {
     width: 42,

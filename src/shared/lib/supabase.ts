@@ -20,14 +20,10 @@ if (!isConfigured) {
 const activeUrl = supabaseUrl || 'https://placeholder.supabase.co';
 const activeAnonKey = supabaseAnonKey || 'placeholder-anon-key';
 
-let wsTransport: any = undefined;
-if (typeof globalThis !== 'undefined' && (globalThis as any).WebSocket) {
-  wsTransport = (globalThis as any).WebSocket;
-} else {
-  try {
-    wsTransport = require('ws');
-  } catch (e) {}
-}
+const wsTransport =
+  typeof globalThis !== 'undefined' && (globalThis as any).WebSocket
+    ? (globalThis as any).WebSocket
+    : undefined;
 
 export const supabase: SupabaseClient = createClient(activeUrl, activeAnonKey, {
   auth: {
