@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import type { CalendarSlot, CalendarViewMode } from '@/shared/types';
 import { fetchCalendarSlots } from '../api';
 import { useAuthStore } from '@/features/auth/model';
+import { createScheduleBlock, deleteScheduleBlock } from '@/features/schedule-blocks/api';
 import { calendarRange, DEFAULT_BUSINESS_TIME_ZONE, resolveBusinessTimeZone, toBusinessClock } from './businessTime';
 
 export interface AppointmentClient {
@@ -94,6 +95,18 @@ interface CalendarState {
 
   /** Agrega un nuevo slot confirmado por el servidor */
   addSlot: (slot: CalendarSlot) => void;
+
+  /** Crea un bloqueo de horario de forma funcional persistiendo en backend (US-008 / US-023) */
+  createBlock: (data: {
+    title: string;
+    reason: string;
+    startTime: string;
+    endTime: string;
+    employeeId?: string;
+  }) => Promise<void>;
+
+  /** Elimina un bloqueo de la agenda en backend y en memoria (US-008 / US-023) */
+  deleteBlock: (resourceId: string) => Promise<void>;
 
   /** Elimina un slot de la agenda (desbloquear horario o eliminar cita) */
   removeSlot: (resourceId: string) => void;
@@ -246,6 +259,62 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         slot,
       ],
     }));
+  },
+
+  createBlock: async (data) => {
+    const authState = useAuthStore.getState();
+    const isDemo =
+      Boolean((authState as any).isDemoMode) || authState.user?.id === 'demo-user-123';
+
+    if (isDemo) {
+      const demoSlot: CalendarSlot = {
+        type: 'block',
+        resourceId: `blk-demo-${Date.now()}`,
+        title: data.title,
+        status: 'blocked',
+        blockReason: data.reason,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        employeeName: 'Todo el personal',
+      };
+      get().addSlot(demoSlot);
+      return;
+    }
+
+    const blockId = await createScheduleBlock({
+      startDateTime: data.startTime,
+      endDateTime: data.endTime,
+      reason: data.reason,
+      employeeId: data.employeeId,
+    });
+
+    const newSlot: CalendarSlot = {
+      type: 'block',
+      resourceId: String(blockId || `blk-${Date.now()}`),
+      title: data.title,
+      status: 'blocked',
+      blockReason: data.reason,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      employeeName: 'Todo el personal',
+    };
+
+    get().addSlot(newSlot);
+  },
+
+  deleteBlock: async (resourceId) => {
+    const authState = useAuthStore.getState();
+    const isDemo =
+      Boolean((authState as any).isDemoMode) || authState.user?.id === 'demo-user-123';
+
+    if (!isDemo) {
+      const numericId = parseInt(resourceId.replace(/\D/g, ''), 10);
+      if (!isNaN(numericId) && numericId > 0) {
+        await deleteScheduleBlock(numericId);
+      }
+    }
+
+    get().removeSlot(resourceId);
   },
 
   removeSlot: (resourceId) => {
