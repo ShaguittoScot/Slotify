@@ -13,13 +13,31 @@ import {
   Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 
+import { useAppTheme } from '@/shared/theme';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
 import { useAuthStore } from '@/features/auth/model';
+import { bookingLink } from '@/features/settings/api';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+
+function getSectorFeatherIcon(iconName?: string): React.ComponentProps<typeof Feather>['name'] {
+  switch (iconName) {
+    case 'heart.fill':
+      return 'heart';
+    case 'sparkles':
+      return 'star';
+    case 'figure.run':
+      return 'activity';
+    case 'briefcase.fill':
+      return 'briefcase';
+    case 'square.grid.2x2':
+      return 'layers';
+    default:
+      return 'grid';
+  }
+}
 
 // Helper to generate slug
 const generateSlug = (name: string) => {
@@ -37,6 +55,7 @@ const getSuggestedService = (category: string) => {
 
 export default function UnifiedOnboardingScreen() {
   const router = useRouter();
+  const { colors, isDark } = useAppTheme();
   const [step, setStep] = useState(1);
 
   const { user, appMode, businessProfileStatus, error, completeOnboarding, logout } = useAuthStore();
@@ -127,9 +146,10 @@ export default function UnifiedOnboardingScreen() {
   };
 
   const handleShareLink = async () => {
+    const targetUrl = bookingLink(slug) || `/${slug || 'tu-negocio'}`;
     try {
       await Share.share({
-        message: `¡Reserva tu cita en mi negocio a través de Slotify! Enlace: https://slotly.app/${slug || 'tu-negocio'}`,
+        message: `¡Reserva tu cita en mi negocio a través de Slotify! Enlace: ${targetUrl}`,
       });
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 3000);
@@ -147,7 +167,7 @@ export default function UnifiedOnboardingScreen() {
   }
 
   return (
-    <SafeAreaView style={s.screen}>
+    <SafeAreaView style={[s.screen, { backgroundColor: colors.background.primary }]}>
       <KeyboardAvoidingView 
         style={s.flex1} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -156,16 +176,32 @@ export default function UnifiedOnboardingScreen() {
           
           {/* Header con botón de cerrar sesión */}
           <View style={s.headerRow}>
-            <TouchableOpacity onPress={logout} style={s.logoutBtnSm} activeOpacity={0.7} disabled={isLoading}>
-              <SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={16} tintColor="#EF4444" />
+            <TouchableOpacity
+              onPress={logout}
+              style={[
+                s.logoutBtnSm,
+                {
+                  backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#FEF2F2',
+                  borderColor: isDark ? 'rgba(239,68,68,0.28)' : '#FECACA',
+                },
+              ]}
+              activeOpacity={0.7}
+              disabled={isLoading}
+            >
+              <Feather name="log-out" size={16} color="#EF4444" />
               <Text style={s.logoutTextSm}>Cerrar Sesión</Text>
             </TouchableOpacity>
           </View>
 
           {/* Progress Bar (Hide on success) */}
           {step < 5 && (
-            <View style={s.progressBarTrack}>
-              <View style={[s.progressBarFill, { width: `${progress}%` }]} />
+            <View style={[s.progressBarTrack, { backgroundColor: colors.background.tertiary }]}>
+              <View
+                style={[
+                  s.progressBarFill,
+                  { width: `${progress}%`, backgroundColor: colors.action.primary },
+                ]}
+              />
             </View>
           )}
 
@@ -177,9 +213,11 @@ export default function UnifiedOnboardingScreen() {
             {/* STEP 1: CATEGORY */}
             {step === 1 && (
               <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
-                <Text style={s.label}>Paso 1 de 4</Text>
-                <Text style={s.heading}>¿A qué sector pertenece tu negocio?</Text>
-                <Text style={s.desc}>
+                <Text style={[s.label, { color: colors.text.muted }]}>Paso 1 de 4</Text>
+                <Text style={[s.heading, { color: colors.text.primary }]}>
+                  ¿A qué sector pertenece tu negocio?
+                </Text>
+                <Text style={[s.desc, { color: colors.text.secondary }]}>
                   Esto nos ayudará a personalizar tu experiencia y sugerir los mejores servicios para ti.
                 </Text>
 
@@ -189,29 +227,57 @@ export default function UnifiedOnboardingScreen() {
                     return (
                       <Animated.View key={cat.name} entering={FadeInDown.delay(idx * 40).springify().damping(16)}>
                         <TouchableOpacity
-                          style={[s.card, isSelected && s.cardSelected]}
+                          style={[
+                            s.card,
+                            {
+                              backgroundColor: colors.background.secondary,
+                              borderColor: isSelected ? colors.action.primary : colors.border.main,
+                            },
+                          ]}
                           onPress={() => setCategory(cat.name)}
                           activeOpacity={0.7}
                         >
-                          <View style={[s.cardIcon, isSelected && s.cardIconSelected]}>
-                            <SymbolView
-                              name={cat.iconName as any}
+                          <View
+                            style={[
+                              s.cardIcon,
+                              {
+                                backgroundColor: isSelected
+                                  ? colors.action.primary
+                                  : colors.background.primary,
+                                borderColor: isSelected
+                                  ? colors.action.primary
+                                  : colors.border.main,
+                              },
+                            ]}
+                          >
+                            <Feather
+                              name={getSectorFeatherIcon(cat.iconName)}
                               size={18}
-                              tintColor={isSelected ? '#C57747' : '#9CA3AF'}
+                              color={isSelected ? colors.action.primaryText : colors.text.muted}
                             />
                           </View>
                           <View style={s.cardBody}>
-                            <Text style={[s.cardTitle, !isSelected && s.cardTitleMuted]}>{cat.name}</Text>
-                            <Text style={s.cardSub}>{cat.description}</Text>
+                            <Text
+                              style={[
+                                s.cardTitle,
+                                { color: isSelected ? colors.text.primary : colors.text.secondary },
+                              ]}
+                            >
+                              {cat.name}
+                            </Text>
+                            <Text style={[s.cardSub, { color: colors.text.muted }]}>{cat.description}</Text>
                           </View>
-                          <View style={[s.checkCircle, isSelected && s.checkCircleOn]}>
+                          <View
+                            style={[
+                              s.checkCircle,
+                              {
+                                borderColor: isSelected ? colors.action.primary : colors.border.strong,
+                                backgroundColor: isSelected ? colors.action.primary : 'transparent',
+                              },
+                            ]}
+                          >
                             {isSelected && (
-                              <SymbolView
-                                name={{ ios: 'checkmark', android: 'check', web: 'check' }}
-                                size={13}
-                                weight="bold"
-                                tintColor="#FFFFFF"
-                              />
+                              <Feather name="check" size={13} color={colors.action.primaryText} />
                             )}
                           </View>
                         </TouchableOpacity>
@@ -225,39 +291,61 @@ export default function UnifiedOnboardingScreen() {
             {/* STEP 2: PROFILE */}
             {step === 2 && (
               <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
-                <Text style={s.label}>Paso 2 de 4</Text>
-                <Text style={s.heading}>Perfil e Identidad</Text>
-                <Text style={s.desc}>
+                <Text style={[s.label, { color: colors.text.muted }]}>Paso 2 de 4</Text>
+                <Text style={[s.heading, { color: colors.text.primary }]}>Perfil e Identidad</Text>
+                <Text style={[s.desc, { color: colors.text.secondary }]}>
                   Configura tu escaparate digital. Este será el nombre público que verán tus clientes.
                 </Text>
 
-                <Text style={s.fieldLabel}>Nombre del negocio</Text>
-                <View style={s.inputRow}>
-                  <SymbolView
-                    name={{ ios: 'storefront', android: 'storefront', web: 'storefront' }}
+                <Text style={[s.fieldLabel, { color: colors.text.secondary }]}>Nombre del negocio</Text>
+                <View
+                  style={[
+                    s.inputRow,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name="briefcase"
                     size={18}
-                    tintColor={businessName.length > 0 ? '#C57747' : '#9CA3AF'}
+                    color={businessName.length > 0 ? colors.action.primary : colors.text.muted}
                   />
                   <TextInput
                     value={businessName}
                     onChangeText={setBusinessName}
                     placeholder="Ej. Clínica Vital"
-                    placeholderTextColor="#9CA3AF"
-                    style={[s.input, Platform.OS === 'web' ? ({ outline: 'none' } as any) : {}]}
+                    placeholderTextColor={colors.text.muted}
+                    style={[
+                      s.input,
+                      { color: colors.text.primary },
+                      Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                    ]}
                   />
                 </View>
 
                 {/* SLUG PREVIEW */}
-                <View style={s.slugPreview}>
-                  <Text style={s.slugTitle}>Tu enlace único:</Text>
+                <View
+                  style={[
+                    s.slugPreview,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <Text style={[s.slugTitle, { color: colors.text.secondary }]}>Tu identificador único:</Text>
                   <View style={s.slugBox}>
-                    <SymbolView name={{ ios: 'link', android: 'link', web: 'link' }} size={14} tintColor="#6B7280" />
+                    <Feather name="link" size={14} color={colors.text.muted} />
                     <Text style={s.slugText} numberOfLines={1}>
-                      <Text style={s.slugDomain}>slotly.app/</Text>
-                      <Text style={s.slugValue}>{slug || 'tu-negocio'}</Text>
+                      <Text style={[s.slugDomain, { color: colors.text.muted }]}>/</Text>
+                      <Text style={[s.slugValue, { color: colors.text.primary }]}>{slug || 'tu-negocio'}</Text>
                     </Text>
                   </View>
-                  <Text style={s.slugHelper}>Podrás compartir este enlace para que te reserven 24/7.</Text>
+                  <Text style={[s.slugHelper, { color: colors.text.muted }]}>
+                    Podrás compartir tu enlace para que te reserven 24/7.
+                  </Text>
                 </View>
               </Animated.View>
             )}
@@ -265,46 +353,54 @@ export default function UnifiedOnboardingScreen() {
             {/* STEP 3: AVAILABILITY */}
             {step === 3 && (
               <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
-                <Text style={s.label}>Paso 3 de 4</Text>
-                <Text style={s.heading}>Disponibilidad Base</Text>
-                <Text style={s.desc}>
+                <Text style={[s.label, { color: colors.text.muted }]}>Paso 3 de 4</Text>
+                <Text style={[s.heading, { color: colors.text.primary }]}>Disponibilidad Base</Text>
+                <Text style={[s.desc, { color: colors.text.secondary }]}>
                   Para empezar rápido, configuraremos un horario estándar. Podrás añadir sedes, descansos y múltiples profesionales más adelante.
                 </Text>
 
-                <View style={s.availabilityBox}>
+                <View
+                  style={[
+                    s.availabilityBox,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
                   <View style={s.availRow}>
-                    <View style={s.availIconBox}>
-                      <SymbolView name={{ ios: 'globe', android: 'public', web: 'public' }} size={18} tintColor="#C57747" />
+                    <View style={[s.availIconBox, { backgroundColor: colors.background.tertiary }]}>
+                      <Feather name="globe" size={18} color={colors.action.primary} />
                     </View>
                     <View style={s.availContent}>
-                      <Text style={s.availLabel}>Zona Horaria</Text>
-                      <Text style={s.availValue}>{timezone}</Text>
+                      <Text style={[s.availLabel, { color: colors.text.muted }]}>Zona Horaria</Text>
+                      <Text style={[s.availValue, { color: colors.text.primary }]}>{timezone}</Text>
                     </View>
                   </View>
-                  <View style={s.availDivider} />
+                  <View style={[s.availDivider, { backgroundColor: colors.border.main }]} />
                   <View style={s.availRow}>
-                    <View style={s.availIconBox}>
-                      <SymbolView name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }} size={18} tintColor="#C57747" />
+                    <View style={[s.availIconBox, { backgroundColor: colors.background.tertiary }]}>
+                      <Feather name="calendar" size={18} color={colors.action.primary} />
                     </View>
                     <View style={s.availContent}>
-                      <Text style={s.availLabel}>Días de Trabajo</Text>
-                      <Text style={s.availValue}>{formatDays()}</Text>
+                      <Text style={[s.availLabel, { color: colors.text.muted }]}>Días de Trabajo</Text>
+                      <Text style={[s.availValue, { color: colors.text.primary }]}>{formatDays()}</Text>
                     </View>
                     <TouchableOpacity onPress={() => setIsBottomSheetOpen(true)}>
-                      <Text style={s.editLink}>Editar</Text>
+                      <Text style={[s.editLink, { color: colors.action.primary }]}>Editar</Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={s.availDivider} />
+                  <View style={[s.availDivider, { backgroundColor: colors.border.main }]} />
                   <View style={s.availRow}>
-                    <View style={s.availIconBox}>
-                      <SymbolView name={{ ios: 'clock', android: 'schedule', web: 'schedule' }} size={18} tintColor="#C57747" />
+                    <View style={[s.availIconBox, { backgroundColor: colors.background.tertiary }]}>
+                      <Feather name="clock" size={18} color={colors.action.primary} />
                     </View>
                     <View style={s.availContent}>
-                      <Text style={s.availLabel}>Horario Base</Text>
-                      <Text style={s.availValue}>{startTime} a {endTime}</Text>
+                      <Text style={[s.availLabel, { color: colors.text.muted }]}>Horario Base</Text>
+                      <Text style={[s.availValue, { color: colors.text.primary }]}>{startTime} a {endTime}</Text>
                     </View>
                     <TouchableOpacity onPress={() => setIsBottomSheetOpen(true)}>
-                      <Text style={s.editLink}>Editar</Text>
+                      <Text style={[s.editLink, { color: colors.action.primary }]}>Editar</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -314,41 +410,74 @@ export default function UnifiedOnboardingScreen() {
             {/* STEP 4: FIRST SERVICE */}
             {step === 4 && (
               <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
-                <Text style={s.label}>Último paso</Text>
-                <Text style={s.heading}>Tu Primer Servicio</Text>
-                <Text style={s.desc}>
+                <Text style={[s.label, { color: colors.text.muted }]}>Último paso</Text>
+                <Text style={[s.heading, { color: colors.text.primary }]}>Tu Primer Servicio</Text>
+                <Text style={[s.desc, { color: colors.text.secondary }]}>
                   Para {category} te sugerimos esta plantilla. Puedes ajustar los datos o cambiar el nombre por completo.
                 </Text>
 
-                <View style={s.addForm}>
+                <View
+                  style={[
+                    s.addForm,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
                   <View>
-                    <Text style={s.editLabel}>Nombre del servicio</Text>
+                    <Text style={[s.editLabel, { color: colors.text.secondary }]}>Nombre del servicio</Text>
                     <TextInput
                       value={serviceName}
                       onChangeText={setServiceName}
                       placeholder="Ej. Corte de cabello"
-                      placeholderTextColor="#9CA3AF"
-                      style={[s.editInput, Platform.OS === 'web' ? ({ outline: 'none' } as any) : {}]}
+                      placeholderTextColor={colors.text.muted}
+                      style={[
+                        s.editInput,
+                        {
+                          backgroundColor: colors.background.primary,
+                          borderColor: colors.border.main,
+                          color: colors.text.primary,
+                        },
+                        Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                      ]}
                     />
                   </View>
                   <View style={s.editRow}>
                     <View style={s.editField}>
-                      <Text style={s.editLabel}>Duración (min)</Text>
+                      <Text style={[s.editLabel, { color: colors.text.secondary }]}>Duración (min)</Text>
                       <TextInput
                         value={serviceDuration}
                         onChangeText={setServiceDuration}
                         keyboardType="number-pad"
-                        style={[s.editInput, Platform.OS === 'web' ? ({ outline: 'none' } as any) : {}]}
+                        style={[
+                          s.editInput,
+                          {
+                            backgroundColor: colors.background.primary,
+                            borderColor: colors.border.main,
+                            color: colors.text.primary,
+                          },
+                          Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                        ]}
                       />
                     </View>
                     <View style={s.editField}>
-                      <Text style={s.editLabel}>Precio ($)</Text>
+                      <Text style={[s.editLabel, { color: colors.text.secondary }]}>Precio ($)</Text>
                       <TextInput
                         value={servicePrice}
                         onChangeText={setServicePrice}
                         keyboardType="decimal-pad"
                         placeholder="0"
-                        style={[s.editInput, Platform.OS === 'web' ? ({ outline: 'none' } as any) : {}]}
+                        placeholderTextColor={colors.text.muted}
+                        style={[
+                          s.editInput,
+                          {
+                            backgroundColor: colors.background.primary,
+                            borderColor: colors.border.main,
+                            color: colors.text.primary,
+                          },
+                          Platform.OS === 'web' ? ({ outline: 'none' } as any) : {},
+                        ]}
                       />
                     </View>
                   </View>
@@ -359,42 +488,76 @@ export default function UnifiedOnboardingScreen() {
             {/* STEP 5: SUCCESS */}
             {step === 5 && (
               <Animated.View entering={FadeIn.duration(500)} style={s.successCenter}>
-                <View style={s.successCircleOuter}>
-                  <View style={s.successCircleInner}>
-                    <Feather name="check" size={38} color="#C57747" />
+                <View
+                  style={[
+                    s.successCircleOuter,
+                    {
+                      backgroundColor: colors.background.tertiary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      s.successCircleInner,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.main,
+                      },
+                    ]}
+                  >
+                    <Feather name="check" size={38} color={colors.action.primary} />
                   </View>
                 </View>
 
-                <Text style={s.successHeading}>¡Cuenta y Negocio Listos!</Text>
-                <Text style={s.successDesc}>
+                <Text style={[s.successHeading, { color: colors.text.primary }]}>
+                  ¡Cuenta y Negocio Listos!
+                </Text>
+                <Text style={[s.successDesc, { color: colors.text.secondary }]}>
                   Tu espacio de {category || 'servicios'} ha sido configurado exitosamente. Ya puedes gestionar tus reservas o compartir tu portal público.
                 </Text>
                 
-                <View style={s.successLinkBox}>
-                  <Feather name="globe" size={16} color="#C57747" style={{ marginRight: 8 }} />
+                <View
+                  style={[
+                    s.successLinkBox,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <Feather name="globe" size={16} color={colors.action.primary} style={{ marginRight: 8 }} />
                   <Text style={s.successLinkText} numberOfLines={1}>
-                    <Text style={{ color: '#9CA3AF' }}>slotly.app/</Text>
-                    <Text style={{ color: '#C57747', fontWeight: '800' }}>{slug || 'tu-negocio'}</Text>
+                    <Text style={{ color: colors.text.muted }}>/</Text>
+                    <Text style={{ color: colors.text.primary, fontWeight: '800' }}>{slug || 'tu-negocio'}</Text>
                   </Text>
                 </View>
 
                 <View style={s.successActions}>
                   <TouchableOpacity
-                    style={s.btnFilledSuccess}
+                    style={[s.btnFilledSuccess, { backgroundColor: colors.action.primary }]}
                     onPress={handleFinish}
                     activeOpacity={0.8}
                   >
-                    <Text style={s.btnFilledText}>Entrar al Dashboard</Text>
-                    <Feather name="arrow-right" size={16} color="#FFFFFF" />
+                    <Text style={[s.btnFilledText, { color: colors.action.primaryText }]}>
+                      Entrar al Dashboard
+                    </Text>
+                    <Feather name="arrow-right" size={16} color={colors.action.primaryText} />
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={s.btnOutlineSuccess}
+                    style={[
+                      s.btnOutlineSuccess,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.main,
+                      },
+                    ]}
                     onPress={handleShareLink}
                     activeOpacity={0.8}
                   >
-                    <Feather name={isCopied ? "check" : "share-2"} size={16} color="#C57747" />
-                    <Text style={[s.btnOutlineText, { color: '#C57747', fontWeight: '700' }]}>
+                    <Feather name={isCopied ? "check" : "share-2"} size={16} color={colors.text.primary} />
+                    <Text style={[s.btnOutlineText, { color: colors.text.primary, fontWeight: '700' }]}>
                       {isCopied ? '¡Enlace Compartido!' : 'Compartir enlace público'}
                     </Text>
                   </TouchableOpacity>
@@ -410,15 +573,31 @@ export default function UnifiedOnboardingScreen() {
 
           {/* BOTTOM BAR (Hidden on Success) */}
           {step < 5 && (
-            <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)} style={s.bottomBar}>
+            <Animated.View
+              entering={FadeIn.duration(400)}
+              exiting={FadeOut.duration(200)}
+              style={[
+                s.bottomBar,
+                {
+                  backgroundColor: colors.background.primary,
+                  borderTopColor: colors.border.main,
+                },
+              ]}
+            >
               {step > 1 ? (
-                <TouchableOpacity style={s.btnOutline} onPress={handleBack} disabled={isLoading}>
-                  <SymbolView
-                    name={{ ios: 'chevron.backward', android: 'arrow_back', web: 'arrow_back' }}
-                    size={14}
-                    tintColor="#374151"
-                  />
-                  <Text style={s.btnOutlineText}>Atrás</Text>
+                <TouchableOpacity
+                  style={[
+                    s.btnOutline,
+                    {
+                      backgroundColor: colors.background.secondary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                  onPress={handleBack}
+                  disabled={isLoading}
+                >
+                  <Feather name="arrow-left" size={14} color={colors.text.primary} />
+                  <Text style={[s.btnOutlineText, { color: colors.text.primary }]}>Atrás</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={{ flex: 1 }} />
@@ -427,6 +606,7 @@ export default function UnifiedOnboardingScreen() {
               <TouchableOpacity
                 style={[
                   s.btnFilled,
+                  { backgroundColor: colors.action.primary },
                   (step === 1 && !category) && s.btnFilledDisabled,
                   (step === 2 && !businessName) && s.btnFilledDisabled,
                   (step === 4 && (!serviceName || !serviceDuration)) && s.btnFilledDisabled,
@@ -440,16 +620,14 @@ export default function UnifiedOnboardingScreen() {
                 onPress={handleNext}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color={colors.action.primaryText} size="small" />
                 ) : (
                   <>
-                    <Text style={s.btnFilledText}>{step === 4 ? 'Guardar y Finalizar' : 'Continuar'}</Text>
+                    <Text style={[s.btnFilledText, { color: colors.action.primaryText }]}>
+                      {step === 4 ? 'Guardar y Finalizar' : 'Continuar'}
+                    </Text>
                     {step < 4 && (
-                      <SymbolView
-                        name={{ ios: 'chevron.forward', android: 'arrow_forward', web: 'arrow_forward' }}
-                        size={14}
-                        tintColor="#FFFFFF"
-                      />
+                      <Feather name="arrow-right" size={14} color={colors.action.primaryText} />
                     )}
                   </>
                 )}
@@ -467,50 +645,84 @@ export default function UnifiedOnboardingScreen() {
         title="Editar Disponibilidad"
       >
         <View style={s.sheetContent}>
-          <Text style={s.sheetLabel}>Días laborables</Text>
+          <Text style={[s.sheetLabel, { color: colors.text.primary }]}>Días laborables</Text>
           <View style={s.daysGrid}>
             {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => {
               const isActive = selectedDays.includes(day);
               return (
                 <TouchableOpacity 
                   key={day} 
-                  style={[s.dayCircle, isActive && s.dayCircleActive]} 
+                  style={[
+                    s.dayCircle,
+                    {
+                      backgroundColor: isActive ? colors.action.primary : colors.background.tertiary,
+                      borderColor: isActive ? colors.action.primary : colors.border.main,
+                    },
+                  ]} 
                   onPress={() => toggleDay(day)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[s.dayText, isActive && s.dayTextActive]}>{day}</Text>
+                  <Text
+                    style={[
+                      s.dayText,
+                      { color: isActive ? colors.action.primaryText : colors.text.secondary },
+                    ]}
+                  >
+                    {day}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
           
-          <Text style={s.sheetLabel}>Horario general</Text>
+          <Text style={[s.sheetLabel, { color: colors.text.primary }]}>Horario general</Text>
           <View style={s.timeRow}>
             <View style={s.timeInputBox}>
-              <Text style={s.timeLabel}>Inicio</Text>
+              <Text style={[s.timeLabel, { color: colors.text.muted }]}>Inicio</Text>
               <TextInput 
-                style={s.timeInput} 
+                style={[
+                  s.timeInput,
+                  {
+                    backgroundColor: colors.background.primary,
+                    borderColor: colors.border.main,
+                    color: colors.text.primary,
+                  },
+                ]} 
                 value={startTime} 
                 onChangeText={setStartTime} 
-                placeholder="09:00 AM" 
+                placeholder="09:00 AM"
+                placeholderTextColor={colors.text.muted}
               />
             </View>
             <View style={s.timeSeparator}>
-              <Text style={s.timeTo}>hasta</Text>
+              <Text style={[s.timeTo, { color: colors.text.muted }]}>hasta</Text>
             </View>
             <View style={s.timeInputBox}>
-              <Text style={s.timeLabel}>Fin</Text>
+              <Text style={[s.timeLabel, { color: colors.text.muted }]}>Fin</Text>
               <TextInput 
-                style={s.timeInput} 
+                style={[
+                  s.timeInput,
+                  {
+                    backgroundColor: colors.background.primary,
+                    borderColor: colors.border.main,
+                    color: colors.text.primary,
+                  },
+                ]} 
                 value={endTime} 
                 onChangeText={setEndTime} 
-                placeholder="06:00 PM" 
+                placeholder="06:00 PM"
+                placeholderTextColor={colors.text.muted}
               />
             </View>
           </View>
           
-          <TouchableOpacity style={s.sheetButton} onPress={() => setIsBottomSheetOpen(false)}>
-            <Text style={s.sheetButtonText}>Guardar Cambios</Text>
+          <TouchableOpacity
+            style={[s.sheetButton, { backgroundColor: colors.action.primary }]}
+            onPress={() => setIsBottomSheetOpen(false)}
+          >
+            <Text style={[s.sheetButtonText, { color: colors.action.primaryText }]}>
+              Guardar Cambios
+            </Text>
           </TouchableOpacity>
         </View>
       </BottomSheet>

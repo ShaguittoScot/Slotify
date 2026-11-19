@@ -37,7 +37,7 @@ afterEach(() => {
   apiClient.defaults.adapter = defaultAdapter;
 });
 
-function respond(status: number, data: object) {
+function respond(status: number, data: unknown) {
   apiClient.defaults.adapter = async (config) => {
     const response = { status, data, headers: {}, statusText: '', config };
     if (status >= 400) throw new AxiosError('HTTP error', AxiosError.ERR_BAD_REQUEST, config, {}, response);
@@ -67,6 +67,15 @@ test.each([401, 403, 404, 503])('un HTTP %s sin confirmación de perfil ausente 
   respond(status, { success: false, error: 'No disponible' });
   await useAuthStore.getState().hydrate();
   expect(useAuthStore.getState().businessProfileStatus).toBe('unavailable');
+});
+
+test('un HTTP 502 de gateway/túnel reporta error de conexión y no fallo de negocio', async () => {
+  respond(502, '<html><body>502 Bad Gateway</body></html>');
+  await useAuthStore.getState().hydrate();
+  expect(useAuthStore.getState()).toMatchObject({
+    businessProfileStatus: 'unavailable',
+    error: expect.stringContaining('No se pudo conectar'),
+  });
 });
 
 test('una cuenta sin negocio puede reintentar el guardado sin activar la carga global', async () => {

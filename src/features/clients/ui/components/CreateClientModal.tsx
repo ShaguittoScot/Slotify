@@ -1,18 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { AppModalSheet } from '@/components/ui/AppModalSheet';
 import type { BusinessClient, UpsertClientPayload } from '../../types';
 
 interface CreateClientModalProps {
@@ -111,80 +109,64 @@ export function CreateClientModal({
     }
   };
 
+  const primaryBg = colors.action?.primary ?? (isDark ? '#FAFAFA' : '#09090B');
+  const primaryText = colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF');
+
   return (
-    <Modal
+    <AppModalSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={() => { if (!isSaving) onClose(); }}
+      onClose={onClose}
+      dismissible={!isSaving}
+      keyboardAvoiding
     >
-      <KeyboardAvoidingView
-        style={s.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View
+      {/* Encabezado */}
+      <View style={s.headerRow}>
+        <View style={s.headerTitleWrap}>
+          <View
+            style={[
+              s.headerIconBox,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(99, 102, 241, 0.16)'
+                  : '#EEF2FF',
+              },
+            ]}
+          >
+            <Feather
+              name={isEditMode ? 'edit-3' : 'user-plus'}
+              size={18}
+              color="#6366F1"
+            />
+          </View>
+          <View style={s.headerCopy}>
+            <Text style={[s.title, { color: colors.text.primary }]}>
+              {isEditMode ? 'Editar Cliente' : 'Nuevo Cliente'}
+            </Text>
+            <Text style={[s.subtitle, { color: colors.text.muted }]}>
+              {isEditMode
+                ? 'Actualiza los datos de contacto y notas'
+                : 'Registra un cliente en la cartera de tu negocio'}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={onClose}
+          disabled={isSaving}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar formulario de cliente"
           style={[
-            s.sheet,
+            s.closeBtn,
             {
-              backgroundColor: colors.background.secondary,
+              backgroundColor: colors.background.primary,
               borderColor: colors.border.main,
+              borderWidth: 1,
             },
           ]}
         >
-          {/* Handle superior */}
-          <View style={s.handleWrap}>
-            <View
-              style={[
-                s.handleBar,
-                { backgroundColor: isDark ? '#3A3A3A' : '#D4D4D4' },
-              ]}
-            />
-          </View>
-
-          {/* Encabezado */}
-          <View style={s.headerRow}>
-            <View style={s.headerTitleWrap}>
-              <View
-                style={[
-                  s.headerIconBox,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(99, 102, 241, 0.16)'
-                      : '#EEF2FF',
-                  },
-                ]}
-              >
-                <Feather
-                  name={isEditMode ? 'edit-3' : 'user-plus'}
-                  size={18}
-                  color="#6366F1"
-                />
-              </View>
-              <View style={s.headerCopy}>
-                <Text style={[s.title, { color: colors.text.primary }]}>
-                  {isEditMode ? 'Editar Cliente' : 'Nuevo Cliente'}
-                </Text>
-                <Text style={[s.subtitle, { color: colors.text.muted }]}>
-                  {isEditMode
-                    ? 'Actualiza los datos de contacto y notas'
-                    : 'Registra un cliente en la cartera de tu negocio'}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={onClose}
-              disabled={isSaving}
-              accessibilityRole="button"
-              accessibilityLabel="Cerrar formulario de cliente"
-              style={[
-                s.closeBtn,
-                { backgroundColor: colors.background.primary },
-              ]}
-            >
-              <Feather name="x" size={18} color={colors.text.secondary} />
-            </TouchableOpacity>
-          </View>
+          <Feather name="x" size={18} color={colors.text.secondary} />
+        </TouchableOpacity>
+      </View>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -339,14 +321,18 @@ export function CreateClientModal({
                 testID="btn-submit-client"
                 disabled={isSaving}
                 onPress={handleSubmit}
-                style={[s.saveBtn, isSaving && { opacity: 0.7 }]}
+                style={[
+                  s.saveBtn,
+                  { backgroundColor: primaryBg },
+                  isSaving && { opacity: 0.7 },
+                ]}
               >
                 {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={primaryText} />
                 ) : (
                   <>
-                    <Feather name="check" size={16} color="#FFFFFF" />
-                    <Text style={s.saveBtnText}>
+                    <Feather name="check" size={16} color={primaryText} />
+                    <Text style={[s.saveBtnText, { color: primaryText }]}>
                       {isEditMode ? 'Guardar Cambios' : 'Registrar Cliente'}
                     </Text>
                   </>
@@ -354,9 +340,7 @@ export function CreateClientModal({
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </AppModalSheet>
   );
 }
 

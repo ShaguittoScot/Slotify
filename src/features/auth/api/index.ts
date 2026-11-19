@@ -20,7 +20,14 @@ export function authRequestMessage(error: unknown, fallback: string): string {
   if (!error.response) {
     return 'No se pudo conectar con Slotify. Revisa tu conexión e inténtalo de nuevo.';
   }
-  return error.response.data?.error || fallback;
+  const backendError = typeof error.response.data === 'object' ? error.response.data?.error : undefined;
+  if (backendError) {
+    return backendError;
+  }
+  if (error.response.status >= 502 && error.response.status <= 504) {
+    return 'No se pudo conectar con el servidor de Slotify (502/503/504). Inténtalo de nuevo.';
+  }
+  return fallback;
 }
 
 export const authApi = {

@@ -6,7 +6,6 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { exploreApi } from '../api';
 import { loadFormSchemaLocally } from '@/features/dashboard/model/formBranding';
-import { DEFAULT_BUSINESS_CATALOG } from '../constants/defaultBusinesses';
 import type { BusinessDto, Category } from '../types';
 
 export const isValidHexColor = (color?: string | null): boolean => {
@@ -43,25 +42,12 @@ const enrichWithLocalBranding = (biz: BusinessDto, localBranding: LocalBranding)
   };
 };
 
-/**
- * Combina negocios obtenidos del backend con el catálogo predeterminado de respaldo
- * asegurando unicidad por slug y que el usuario siempre tenga contenido disponible para explorar.
- */
-const mergeWithDefaultCatalog = (backendList: BusinessDto[]): BusinessDto[] => {
+const mergeBusinessCatalog = (backendList: BusinessDto[]): BusinessDto[] => {
   const map = new Map<string, BusinessDto>();
 
-  // Agrega primero los que vienen del backend
   backendList.forEach((b) => {
     if (b && b.slug) {
       map.set(b.slug.toLowerCase(), b);
-    }
-  });
-
-  // Complementa con los predeterminados para garantizar un catálogo amplio y completo
-  DEFAULT_BUSINESS_CATALOG.forEach((item) => {
-    const slugKey = item.slug.toLowerCase();
-    if (!map.has(slugKey)) {
-      map.set(slugKey, item);
     }
   });
 
@@ -86,8 +72,8 @@ interface ExploreState {
   initInterests: () => Promise<void>;
 }
 
-export const useExploreStore = create<ExploreState>((set, get) => ({
-  businesses: DEFAULT_BUSINESS_CATALOG,
+export const useExploreStore = create<ExploreState>((set) => ({
+  businesses: [],
   isLoading: false,
   isRefreshing: false,
   errorMessage: null,
@@ -103,26 +89,21 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
         set({ isLoading: true, errorMessage: null });
       }
 
-      let backendData: BusinessDto[] = [];
-      try {
-        backendData = await exploreApi.getBusinesses();
-      } catch (apiErr: any) {
-        console.warn('[explore] Endpoint remoto no disponible, usando catálogo de respaldo:', apiErr?.message);
-      }
-
+      const backendData = await exploreApi.getBusinesses();
       const localBranding = await loadLocalBrandingSafely();
       const validBackendList = Array.isArray(backendData)
         ? backendData.filter((biz) => Boolean(biz && biz.id && biz.slug))
         : [];
 
-      // Fusionamos los negocios del backend con el catálogo base
-      const merged = mergeWithDefaultCatalog(validBackendList);
+      const merged = mergeBusinessCatalog(validBackendList);
       const enriched = merged.map((biz) => enrichWithLocalBranding(biz, localBranding));
 
       set({ businesses: enriched, errorMessage: null });
-    } catch (err: any) {
-      console.warn('[explore] Error procesando negocios, usando catálogo base:', err?.message);
-      set({ businesses: DEFAULT_BUSINESS_CATALOG, errorMessage: null });
+    } catch {
+      set((state) => ({
+        businesses: state.businesses,
+        errorMessage: 'No se pudo cargar el catálogo de negocios. Revisa tu conexión e inténtalo de nuevo.',
+      }));
     } finally {
       set({ isLoading: false, isRefreshing: false });
     }

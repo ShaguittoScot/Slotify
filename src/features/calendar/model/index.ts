@@ -262,25 +262,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   createBlock: async (data) => {
-    const authState = useAuthStore.getState();
-    const isDemo =
-      Boolean((authState as any).isDemoMode) || authState.user?.id === 'demo-user-123';
-
-    if (isDemo) {
-      const demoSlot: CalendarSlot = {
-        type: 'block',
-        resourceId: `blk-demo-${Date.now()}`,
-        title: data.title,
-        status: 'blocked',
-        blockReason: data.reason,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        employeeName: 'Todo el personal',
-      };
-      get().addSlot(demoSlot);
-      return;
-    }
-
     const blockId = await createScheduleBlock({
       startDateTime: data.startTime,
       endDateTime: data.endTime,
@@ -303,15 +284,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   deleteBlock: async (resourceId) => {
-    const authState = useAuthStore.getState();
-    const isDemo =
-      Boolean((authState as any).isDemoMode) || authState.user?.id === 'demo-user-123';
-
-    if (!isDemo) {
-      const numericId = parseInt(resourceId.replace(/\D/g, ''), 10);
-      if (!isNaN(numericId) && numericId > 0) {
-        await deleteScheduleBlock(numericId);
-      }
+    const numericId = parseInt(resourceId.replace(/\D/g, ''), 10);
+    if (!isNaN(numericId) && numericId > 0) {
+      await deleteScheduleBlock(numericId);
     }
 
     get().removeSlot(resourceId);

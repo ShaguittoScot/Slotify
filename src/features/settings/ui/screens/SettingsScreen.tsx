@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,15 @@ import {
   Alert,
   Linking,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
+import { fetchOwnBusinessLogoUrl } from '../../api';
 import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
@@ -39,6 +41,32 @@ export function SettingsScreen() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showBusinessInfoModal, setShowBusinessInfoModal] = useState(false);
   const [requestingNotifications, setRequestingNotifications] = useState(false);
+  const [businessLogoUrl, setBusinessLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isBusiness || !user?.businessId) {
+        setBusinessLogoUrl(null);
+        return;
+      }
+      let active = true;
+      const controller = new AbortController();
+      fetchOwnBusinessLogoUrl(controller.signal).then(
+        (logo) => {
+          if (active) {
+            setBusinessLogoUrl(logo);
+            setLogoError(false);
+          }
+        },
+        () => {}
+      );
+      return () => {
+        active = false;
+        controller.abort();
+      };
+    }, [isBusiness, user?.businessId])
+  );
 
   const preferences = useSettingsPreferences();
   const scope = settingsScope(user);
@@ -272,9 +300,18 @@ export function SettingsScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.avatarText, { color: accentColor }]}>
-                  {getInitials(displayName)}
-                </Text>
+                {isBusiness && businessLogoUrl && !logoError ? (
+                  <Image
+                    source={{ uri: businessLogoUrl }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <Text style={[styles.avatarText, { color: accentColor }]}>
+                    {getInitials(displayName)}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.profileInfo}>
@@ -288,8 +325,7 @@ export function SettingsScreen() {
                   style={[styles.profileEmail, { color: colors.text.muted }]}
                   numberOfLines={1}
                 >
-                  {user?.email ||
-                    (isBusiness ? 'admin@slotify.com' : 'cliente@slotify.com')}
+                  {user?.email || 'Sin correo registrado'}
                 </Text>
               </View>
 
@@ -606,6 +642,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 15,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,18 @@ import {
   Image,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/shared/theme';
+import {
+  base64ToUint8Array,
+  deleteBusinessLogoIfManaged,
+  MAX_LOGO_SIZE_BYTES,
+  uploadBusinessLogo,
+} from '@/shared/lib/mediaStorage';
 import {
   CORPORATE_COLOR_PRESETS,
   COLOR_SWATCHES,
@@ -21,6 +29,7 @@ import {
 } from '../../model/formBranding';
 
 interface FormBrandIdentityCardProps {
+  businessId?: string | null;
   businessName: string;
   logoUrl?: string | null;
   accentColor: string;
@@ -34,6 +43,7 @@ interface FormBrandIdentityCardProps {
 }
 
 export function FormBrandIdentityCard({
+  businessId,
   businessName,
   logoUrl,
   accentColor,
@@ -44,34 +54,108 @@ export function FormBrandIdentityCard({
 
   const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
   const [customLogoInput, setCustomLogoInput] = useState(logoUrl || '');
+  const [isUploading, setIsUploading] = useState(false);
   const [activeColorTab, setActiveColorTab] = useState<'primary' | 'secondary'>('primary');
   const [hexInput, setHexInput] = useState(accentColor);
 
-  const handlePickFileWeb = () => {
+  useEffect(() => {
+    setCustomLogoInput(logoUrl || '');
+  }, [logoUrl]);
+
+  const uploadPickedBytes = async (
+    bytes: Uint8Array,
+    mimeType?: string | null,
+    fileName?: string | null
+  ) => {
+    if (bytes.byteLength > MAX_LOGO_SIZE_BYTES) {
+      Alert.alert('Archivo demasiado grande', 'El logotipo debe pesar menos de 4 MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { publicUrl } = await uploadBusinessLogo({
+        bytes,
+        mimeType,
+        fileName,
+        businessId,
+        previousLogoUrl: logoUrl,
+      });
+      onChangeBranding({ logoUrl: publicUrl });
+      setCustomLogoInput(publicUrl);
+    } catch (error) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Ocurrió un error al subir la imagen a Supabase Storage.';
+      Alert.alert('No se pudo subir el logotipo', msg);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadLogo = async () => {
+    if (isUploading) return;
+
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/webp,image/svg+xml';
-      input.onchange = (event: any) => {
-        const file = event?.target?.files?.[0];
+      input.accept = 'image/png,image/jpeg,image/webp';
+      input.onchange = async (event: any) => {
+        const file = event?.target?.files?.[0] as File | undefined;
         if (!file) return;
-        if (file.size > 4 * 1024 * 1024) {
-          Alert.alert('Archivo demasiado grande', 'El logotipo debe pesar menos de 4 MB.');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            onChangeBranding({ logoUrl: reader.result });
-            setCustomLogoInput(reader.result);
-          }
-        };
-        reader.readAsDataURL(file);
+        const buffer = await file.arrayBuffer();
+        await uploadPickedBytes(new Uint8Array(buffer), file.type, file.name);
       };
       input.click();
-    } else {
-      setShowLogoUrlInput(true);
+      return;
     }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permiso requerido',
+        'Autoriza el acceso a tu galería para subir el logotipo de tu negocio.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+
+    if (asset.fileSize && asset.fileSize > MAX_LOGO_SIZE_BYTES) {
+      Alert.alert('Archivo demasiado grande', 'El logotipo debe pesar menos de 4 MB.');
+      return;
+    }
+
+    try {
+      const bytes = asset.base64
+        ? base64ToUint8Array(asset.base64)
+        : new Uint8Array(await (await fetch(asset.uri)).arrayBuffer());
+      await uploadPickedBytes(bytes, asset.mimeType, asset.fileName ?? asset.uri);
+    } catch (error) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo procesar la imagen seleccionada.';
+      Alert.alert('No se pudo subir el logotipo', msg);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    if (isUploading) return;
+    const previousUrl = logoUrl;
+    onChangeBranding({ logoUrl: null });
+    setCustomLogoInput('');
+    void deleteBusinessLogoIfManaged(previousUrl);
   };
 
   const handleApplyLogoUrl = () => {
@@ -208,11 +292,9 @@ export function FormBrandIdentityCard({
           {logoUrl ? (
             <TouchableOpacity
               testID="remove-logo-button"
-              onPress={() => {
-                onChangeBranding({ logoUrl: null });
-                setCustomLogoInput('');
-              }}
-              style={styles.removeLogoBtn}
+              disabled={isUploading}
+              onPress={handleRemoveLogo}
+              style={[styles.removeLogoBtn, isUploading && { opacity: 0.5 }]}
             >
               <Feather name="trash-2" size={13} color={colors.status.error} />
               <Text style={[styles.removeLogoText, { color: colors.status.error }]}>
@@ -225,19 +307,29 @@ export function FormBrandIdentityCard({
         <View style={styles.logoActionsRow}>
           <TouchableOpacity
             testID="upload-logo-button"
+            disabled={isUploading}
             style={[
               styles.uploadBtn,
               {
                 backgroundColor: `${accentColor}15`,
                 borderColor: accentColor,
               },
+              isUploading && { opacity: 0.7 },
             ]}
-            onPress={handlePickFileWeb}
+            onPress={handleUploadLogo}
             activeOpacity={0.75}
           >
-            <Feather name="upload" size={16} color={accentColor} />
+            {isUploading ? (
+              <ActivityIndicator size="small" color={accentColor} />
+            ) : (
+              <Feather name="upload" size={16} color={accentColor} />
+            )}
             <Text style={[styles.uploadBtnText, { color: accentColor }]}>
-              {logoUrl ? 'Cambiar Logotipo' : 'Cargar Logotipo'}
+              {isUploading
+                ? 'Subiendo...'
+                : logoUrl
+                ? 'Cambiar Logotipo'
+                : 'Subir Logotipo'}
             </Text>
           </TouchableOpacity>
 
@@ -272,7 +364,7 @@ export function FormBrandIdentityCard({
             ]}
           >
             <Text style={[styles.helperLabel, { color: colors.text.secondary }]}>
-              Pega el enlace directo de tu logotipo (PNG, JPG, SVG):
+              Pega el enlace directo de tu logotipo (PNG, JPG, WEBP):
             </Text>
             <View style={styles.urlInputRow}>
               <TextInput

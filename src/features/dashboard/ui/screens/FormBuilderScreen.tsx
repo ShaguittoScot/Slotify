@@ -20,6 +20,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
 import { apiClient } from '@/shared/lib/api';
+import { fetchOwnBusinessInfo } from '@/features/settings/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FormViewer } from '../components/FormViewer';
 import { FormBrandIdentityCard } from '../components/FormBrandIdentityCard';
@@ -145,10 +146,39 @@ export function FormBuilderScreen() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Hidrata el esquema y la identidad de marca guardada localmente
+  // Hidrata el esquema y la identidad de marca desde el backend (con respaldo local)
   useEffect(() => {
     let mounted = true;
-    loadFormSchemaLocally().then((saved) => {
+    const controller = new AbortController();
+
+    const hydrate = async () => {
+      if (user?.businessId) {
+        try {
+          const info = await fetchOwnBusinessInfo(controller.signal);
+          if (info.slug && mounted) {
+            const { data } = await apiClient.get<Partial<FormSchema>>(
+              `/businesses/${encodeURIComponent(info.slug)}/booking-config`,
+              { signal: controller.signal }
+            );
+            if (mounted && data && Array.isArray(data.fields) && data.fields.length > 0) {
+              setSchema((prev) => ({
+                ...prev,
+                ...data,
+                title: data.title || prev.title,
+                description: data.description ?? prev.description,
+                accentColor: data.accentColor || prev.accentColor,
+                secondaryColor: data.secondaryColor || data.accentColor || prev.secondaryColor,
+                businessName: data.businessName || info.name || prev.businessName || defaultBusinessName,
+              }));
+              return;
+            }
+          }
+        } catch {
+          // Respaldo al caché local si aún no hay conexión o configuración previa
+        }
+      }
+
+      const saved = await loadFormSchemaLocally();
       if (mounted && saved && saved.title && Array.isArray(saved.fields)) {
         setSchema((prev) => ({
           ...prev,
@@ -157,11 +187,14 @@ export function FormBuilderScreen() {
           businessName: saved.businessName || prev.businessName || defaultBusinessName,
         }));
       }
-    });
+    };
+
+    void hydrate();
     return () => {
       mounted = false;
+      controller.abort();
     };
-  }, []);
+  }, [user?.businessId, defaultBusinessName]);
 
   // Funciones de utilidad
   const addField = (type: FieldType) => {
@@ -257,46 +290,36 @@ export function FormBuilderScreen() {
   };
 
   const saveForm = async () => {
+    const businessId = user?.businessId;
+    if (!businessId) {
+      Alert.alert(
+        'Negocio no vinculado',
+        'Inicia sesión con una cuenta de administrador vinculada a un negocio para guardar tu formulario.'
+      );
+      return;
+    }
+
     try {
       setIsSaving(true);
-      await saveFormSchemaLocally(schema);
-
-      const businessId = user?.businessId;
-
-      // Si estamos en modo demo local, confirmamos guardado local
-      if (
-        !businessId ||
-        businessId.startsWith('demo') ||
-        businessId === 'synced-backend'
-      ) {
-        await new Promise((r) => setTimeout(r, 400));
-        Alert.alert(
-          'Identidad y Formulario Guardados',
-          'Tu logotipo, colores corporativos y preguntas se han aplicado a la interfaz pública de reservas.'
-        );
-        return;
-      }
-
-      // Conexión real autenticada vía apiClient (adjunta Bearer token y gestiona 401/403 - US-022)
       await apiClient.put(`/businesses/${businessId}/booking-config`, {
         formConfig: schema,
       });
+      await saveFormSchemaLocally(schema);
 
       Alert.alert(
         '¡Éxito!',
         'El formulario y la identidad de marca se han guardado permanentemente.'
       );
     } catch (e: any) {
-      const status = e?.response?.status;
-      const apiError = e?.response?.data?.error;
-      if (status && status >= 400 && status < 500) {
-        Alert.alert('Error', apiError || 'No se pudo guardar la configuración.');
-      } else {
-        Alert.alert(
-          'Guardado en Dispositivo',
-          'Tu logotipo y colores corporativos se guardaron localmente para la interfaz pública de reservas.'
-        );
-      }
+      const apiError =
+        e?.response?.data?.error ||
+        e?.response?.data?.errors?.[0] ||
+        e?.response?.data?.message ||
+        e?.message;
+      Alert.alert(
+        'No se pudo guardar',
+        apiError || 'Verifica tu conexión e inténtalo nuevamente.'
+      );
     } finally {
       setIsSaving(false);
     }
@@ -391,6 +414,7 @@ export function FormBuilderScreen() {
           {/* ─── Identidad de Marca: Logotipo y Colores Corporativos ─── */}
           <Animated.View entering={FadeInDown.duration(400).delay(50)}>
             <FormBrandIdentityCard
+              businessId={user?.businessId}
               businessName={schema.businessName || defaultBusinessName}
               logoUrl={schema.logoUrl}
               accentColor={schema.accentColor}

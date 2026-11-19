@@ -210,10 +210,24 @@ export function ClientsScreen() {
               testID="btn-open-create-client"
               activeOpacity={0.82}
               onPress={handleOpenCreate}
-              style={s.addClientBtn}
+              style={[
+                s.addClientBtn,
+                { backgroundColor: colors.action?.primary ?? (isDark ? '#FAFAFA' : '#09090B') },
+              ]}
             >
-              <Feather name="user-plus" size={15} color="#FFFFFF" />
-              <Text style={s.addClientBtnText}>+ Nuevo</Text>
+              <Feather
+                name="user-plus"
+                size={15}
+                color={colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF')}
+              />
+              <Text
+                style={[
+                  s.addClientBtnText,
+                  { color: colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF') },
+                ]}
+              >
+                + Nuevo
+              </Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

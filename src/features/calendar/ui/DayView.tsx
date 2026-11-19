@@ -131,32 +131,32 @@ export const DayView: React.FC<DayViewProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {/* Chip: Inasistencias */}
+          {/* Chip: Confirmadas */}
           <TouchableOpacity
             style={[
               styles.filterChip,
-              activeFilter === 'no_show'
+              activeFilter === 'confirmed'
                 ? {
-                    backgroundColor: 'rgba(245, 158, 11, 0.18)',
-                    borderColor: '#F59E0B',
+                    backgroundColor: 'rgba(99, 102, 241, 0.18)',
+                    borderColor: '#818CF8',
                   }
                 : {
                     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
                     borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
                   },
             ]}
-            onPress={() => setActiveFilter(activeFilter === 'no_show' ? 'all' : 'no_show')}
+            onPress={() => setActiveFilter(activeFilter === 'confirmed' ? 'all' : 'confirmed')}
             activeOpacity={0.7}
           >
-            <View style={[styles.filterDot, { backgroundColor: '#F59E0B' }]} />
+            <View style={[styles.filterDot, { backgroundColor: '#818CF8' }]} />
             <Text
               style={[
                 styles.filterChipText,
-                { color: activeFilter === 'no_show' ? '#F59E0B' : colors.text.muted },
-                activeFilter === 'no_show' && styles.filterChipTextActive,
+                { color: activeFilter === 'confirmed' ? '#818CF8' : colors.text.muted },
+                activeFilter === 'confirmed' && styles.filterChipTextActive,
               ]}
             >
-              Inasistencias ({counts.noShow})
+              Confirmadas ({counts.confirmed})
             </Text>
           </TouchableOpacity>
 
@@ -189,32 +189,32 @@ export const DayView: React.FC<DayViewProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {/* Chip: Confirmadas */}
+          {/* Chip: Inasistencias */}
           <TouchableOpacity
             style={[
               styles.filterChip,
-              activeFilter === 'confirmed'
+              activeFilter === 'no_show'
                 ? {
-                    backgroundColor: 'rgba(99, 102, 241, 0.18)',
-                    borderColor: '#818CF8',
+                    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                    borderColor: '#F59E0B',
                   }
                 : {
                     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
                     borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
                   },
             ]}
-            onPress={() => setActiveFilter(activeFilter === 'confirmed' ? 'all' : 'confirmed')}
+            onPress={() => setActiveFilter(activeFilter === 'no_show' ? 'all' : 'no_show')}
             activeOpacity={0.7}
           >
-            <View style={[styles.filterDot, { backgroundColor: '#818CF8' }]} />
+            <View style={[styles.filterDot, { backgroundColor: '#F59E0B' }]} />
             <Text
               style={[
                 styles.filterChipText,
-                { color: activeFilter === 'confirmed' ? '#818CF8' : colors.text.muted },
-                activeFilter === 'confirmed' && styles.filterChipTextActive,
+                { color: activeFilter === 'no_show' ? '#F59E0B' : colors.text.muted },
+                activeFilter === 'no_show' && styles.filterChipTextActive,
               ]}
             >
-              Confirmadas ({counts.confirmed})
+              Inasistencias ({counts.noShow})
             </Text>
           </TouchableOpacity>
 

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Slotify",
+    "slug": "slotify",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "slotify",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -37,6 +37,12 @@
       "expo-notifications",
       "expo-font",
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite que Slotify acceda a tu galería para subir el logotipo de tu negocio."
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser"
     ],

@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 import { lightColors, darkColors, ThemeColors, palette } from './colors';
-import { storage } from '@/shared/lib/storage';
+
+function getStorage() {
+  return (require('@/shared/lib/storage') as typeof import('@/shared/lib/storage')).storage;
+}
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -21,7 +24,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   setMode: async (mode: ThemeMode) => {
     set({ mode });
-    await storage.set(THEME_STORAGE_KEY, mode);
+    await getStorage().set(THEME_STORAGE_KEY, mode);
   },
 
   toggleTheme: async () => {
@@ -37,12 +40,12 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     }
 
     set({ mode: nextMode });
-    await storage.set(THEME_STORAGE_KEY, nextMode);
+    await getStorage().set(THEME_STORAGE_KEY, nextMode);
   },
 
   hydrateTheme: async () => {
     try {
-      const savedMode = await storage.get<ThemeMode>(THEME_STORAGE_KEY);
+      const savedMode = await getStorage().get<ThemeMode>(THEME_STORAGE_KEY);
       if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
         set({ mode: savedMode, isHydrated: true });
       } else {

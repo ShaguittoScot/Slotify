@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,20 +7,30 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  Pressable,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { isAxiosError } from 'axios';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme } from '@/shared/theme';
+import { apiClient } from '@/shared/lib/api';
+import { API_ENDPOINTS } from '@/shared/lib/constants';
+import { supabase } from '@/shared/lib/supabase';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAuthStore } from '@/features/auth/model';
 import { useExploreStore } from '@/features/explore/model';
-import { DEFAULT_BUSINESS_CATALOG } from '@/features/explore/constants/defaultBusinesses';
 import type { BusinessDto } from '@/features/explore/types';
 import { useCalendarStore } from '@/features/calendar/model';
+import {
+  resolveBusinessTimeZone,
+  scheduleInstant,
+  toBusinessClock,
+} from '@/features/calendar/model/businessTime';
 import {
   FormSchema,
   FormField,
@@ -36,11 +46,49 @@ import {
   ConsumerBookedAppointment,
 } from '@/features/dashboard/model/formBranding';
 
-const SECONDARY_COLOR_BY_SLUG: Record<string, string> = {
-  'central-barber': '#C57747',
-  'dental-sonrisas': '#2563EB',
-  'zen-spa': '#0D9488',
-  'glam-studio': '#F43F5E',
+interface PublicBusinessBookingDto {
+  id: string;
+  name: string;
+  slug: string;
+  phone?: string | null;
+  timeZone?: string;
+  sector?: string | null;
+  logoUrl?: string | null;
+  brandColor?: string | null;
+  minAdvanceHours?: number;
+  maxAdvanceDays?: number;
+  services?: {
+    id: string;
+    name: string;
+    durationMinutes: number;
+    price: number;
+  }[];
+  formConfig?: {
+    title?: string;
+    description?: string;
+    presentationStyle?: PresentationStyle;
+    accentColor?: string;
+    secondaryColor?: string;
+    logoUrl?: string | null;
+    businessName?: string;
+    fields?: FormField[];
+  } | null;
+}
+
+interface PublicAppointmentConfirmationDto {
+  id: string;
+  businessName: string;
+  businessSlug: string;
+  startTime: string;
+  endTime: string;
+  clientName: string;
+  agreedTotal: number;
+  status: string;
+  cancellationToken?: string;
+}
+
+type ConfirmedReceipt = ConsumerBookedAppointment & {
+  cancellationToken?: string;
 };
 
 const SECTOR_OPTIONS_BY_CATEGORY: Record<string, { question: string; options: string[] }> = {
@@ -62,28 +110,25 @@ const SECTOR_OPTIONS_BY_CATEGORY: Record<string, { question: string; options: st
   },
 };
 
-function formatSlugToTitle(slug: string): string {
-  return slug
-    .split('-')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+function parseTimeLabelTo24h(label: string): string {
+  const cleaned = label.trim().toUpperCase();
+  const match = /^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/.exec(cleaned);
+  if (!match) return '10:00';
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const meridiem = match[3];
+  if (meridiem === 'PM' && hours < 12) hours += 12;
+  if (meridiem === 'AM' && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-/**
- * Construye un FormSchema completo y pulido para cualquier establecimiento,
- * garantizando que el cliente siempre pueda elegir servicios, fecha/hora y llenar sus datos.
- */
 function buildClientFormSchema(
   business: BusinessDto,
   savedCustomSchema: FormSchema | null,
   overrideStyle?: PresentationStyle
 ): FormSchema {
-  const accentColor = business.brandColor || savedCustomSchema?.accentColor || '#6366F1';
-  const secondaryColor =
-    SECONDARY_COLOR_BY_SLUG[business.slug] ||
-    savedCustomSchema?.secondaryColor ||
-    accentColor;
+  const accentColor = business.brandColor || savedCustomSchema?.accentColor || '#18181B';
+  const secondaryColor = savedCustomSchema?.secondaryColor || accentColor;
 
   const services = (business.services || []).map((s) => ({
     id: s.id,
@@ -180,19 +225,25 @@ export function BookingScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
-  const { businesses: storeBusinesses } = useExploreStore();
+  const {
+    businesses: storeBusinesses,
+    isLoading: exploreLoading,
+    fetchBusinesses,
+  } = useExploreStore();
   const { addSlot } = useCalendarStore();
 
-  const [loading, setLoading] = useState(true);
   const [savedLocalSchema, setSavedLocalSchema] = useState<FormSchema | null>(null);
-  const [selectedSlug, setSelectedSlug] = useState<string>(
-    routeSlug || 'central-barber'
-  );
+  const [selectedSlug, setSelectedSlug] = useState<string>(routeSlug || '');
+  const [publicBusiness, setPublicBusiness] = useState<PublicBusinessBookingDto | null>(null);
+  const [loadingBusiness, setLoadingBusiness] = useState<boolean>(Boolean(routeSlug));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [styleOverride, setStyleOverride] = useState<PresentationStyle | undefined>(
     undefined
   );
   const [confirmedBooking, setConfirmedBooking] =
-    useState<ConsumerBookedAppointment | null>(null);
+    useState<ConfirmedReceipt | null>(null);
 
   // Sincronizar cuando cambia el parámetro de ruta `slug`
   useEffect(() => {
@@ -201,88 +252,176 @@ export function BookingScreen() {
     }
   }, [routeSlug]);
 
-  // Cargar formulario personalizado guardado localmente si existe
+  // Cargar catálogo público desde backend cuando no viene `routeSlug`
+  useEffect(() => {
+    if (!routeSlug && storeBusinesses.length === 0) {
+      void fetchBusinesses();
+    }
+  }, [routeSlug, storeBusinesses.length, fetchBusinesses]);
+
+  // Seleccionar el primer negocio real disponible si no hubo `slug` inicial
+  useEffect(() => {
+    if (!selectedSlug && storeBusinesses.length > 0) {
+      setSelectedSlug(storeBusinesses[0].slug);
+    }
+  }, [selectedSlug, storeBusinesses]);
+
+  // Cargar esquema local opcional del admin si aplica
   useEffect(() => {
     let mounted = true;
-    const init = async () => {
-      setLoading(true);
-      try {
-        const local = await loadFormSchemaLocally();
+    loadFormSchemaLocally()
+      .then((local) => {
         if (mounted && local && local.title && Array.isArray(local.fields)) {
           setSavedLocalSchema(local);
         }
-      } catch {
-        // Fallback silencioso a catálogo por defecto
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    init();
+      })
+      .catch(() => {
+        // Sin esquema local guardado
+      });
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Catálogo combinado de negocios disponibles para el cliente
-  const availableBusinesses = useMemo<BusinessDto[]>(() => {
-    const baseList =
-      storeBusinesses.length > 0 ? storeBusinesses : DEFAULT_BUSINESS_CATALOG;
-
-    // Si el admin guardó una identidad propia en el constructor, la agregamos como opción destacada
-    if (savedLocalSchema?.businessName) {
-      const customSlug = 'mi-negocio';
-      const alreadyExists = baseList.some(
-        (b) =>
-          b.slug === customSlug ||
-          b.name.toLowerCase() === savedLocalSchema.businessName?.toLowerCase()
-      );
-      if (!alreadyExists) {
-        const customBiz: BusinessDto = {
-          id: 'custom-admin-biz',
-          name: savedLocalSchema.businessName,
-          slug: customSlug,
-          category: 'Destacado',
-          logoUrl: savedLocalSchema.logoUrl || null,
-          brandColor: savedLocalSchema.accentColor || '#6366F1',
-          phone: '+52 55 8899 0011',
-          minAdvanceHours: 1,
-          services: DEFAULT_BUSINESS_CATALOG[0].services,
-        };
-        return [customBiz, ...baseList];
-      }
+  // Obtener configuración pública del negocio activo desde el backend
+  useEffect(() => {
+    if (!selectedSlug) {
+      setPublicBusiness(null);
+      setLoadingBusiness(false);
+      return;
     }
 
-    return baseList;
-  }, [storeBusinesses, savedLocalSchema]);
-
-  // Resolver el establecimiento activo según `selectedSlug`
-  const activeBusiness = useMemo<BusinessDto>(() => {
-    const found = availableBusinesses.find(
-      (b) => b.slug.toLowerCase() === selectedSlug.toLowerCase()
-    );
-    if (found) return found;
-
-    return {
-      id: `custom-${selectedSlug}`,
-      name:
-        savedLocalSchema?.businessName || formatSlugToTitle(selectedSlug || 'Slotify'),
-      slug: selectedSlug || 'central-barber',
-      category: 'Servicios Profesionales',
-      logoUrl:
-        savedLocalSchema?.logoUrl || DEFAULT_BUSINESS_CATALOG[0].logoUrl,
-      brandColor: savedLocalSchema?.accentColor || '#6366F1',
-      phone: '+52 55 1234 5678',
-      minAdvanceHours: 2,
-      services: DEFAULT_BUSINESS_CATALOG[0].services,
+    let cancelled = false;
+    const loadPublicBusiness = async () => {
+      setLoadingBusiness(true);
+      setLoadError(null);
+      try {
+        const res = await apiClient.get<{ data: PublicBusinessBookingDto }>(
+          API_ENDPOINTS.PUBLIC_BOOKING.GET_BUSINESS(selectedSlug)
+        );
+        if (cancelled) return;
+        if (res.data?.data?.id) {
+          setPublicBusiness(res.data.data);
+        } else {
+          setPublicBusiness(null);
+          setLoadError('No se encontró la información del establecimiento.');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setPublicBusiness(null);
+        const message = isAxiosError<{ error?: string; message?: string }>(err)
+          ? err.response?.data?.error ||
+            err.response?.data?.message ||
+            err.message ||
+            'No se pudo cargar el formulario de reserva.'
+          : 'No se pudo cargar el formulario de reserva.';
+        setLoadError(message);
+      } finally {
+        if (!cancelled) setLoadingBusiness(false);
+      }
     };
-  }, [availableBusinesses, selectedSlug, savedLocalSchema]);
 
-  // Esquema final activo para FormViewer
-  const activeSchema = useMemo<FormSchema>(() => {
-    return buildClientFormSchema(activeBusiness, savedLocalSchema, styleOverride);
-  }, [activeBusiness, savedLocalSchema, styleOverride]);
+    void loadPublicBusiness();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSlug, retryKey]);
 
-  // Pre-llenado inteligente con los datos del cliente autenticado
+  const availableBusinesses = useMemo<BusinessDto[]>(() => {
+    const map = new Map<string, BusinessDto>();
+    storeBusinesses.forEach((b) => {
+      if (b?.slug) map.set(b.slug.toLowerCase(), b);
+    });
+    if (publicBusiness?.slug && !map.has(publicBusiness.slug.toLowerCase())) {
+      map.set(publicBusiness.slug.toLowerCase(), {
+        id: publicBusiness.id,
+        name: publicBusiness.name,
+        slug: publicBusiness.slug,
+        phone: publicBusiness.phone ?? undefined,
+        category: publicBusiness.sector || 'Servicios Profesionales',
+        timeZone: publicBusiness.timeZone,
+        minAdvanceHours: publicBusiness.minAdvanceHours,
+        maxAdvanceDays: publicBusiness.maxAdvanceDays,
+        logoUrl: publicBusiness.logoUrl,
+        brandColor: publicBusiness.brandColor,
+        services: (publicBusiness.services || []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          durationMinutes: s.durationMinutes,
+          price: s.price,
+        })),
+      });
+    }
+    return Array.from(map.values());
+  }, [storeBusinesses, publicBusiness]);
+
+  const activeBusiness = useMemo<BusinessDto | null>(() => {
+    if (publicBusiness) {
+      return {
+        id: publicBusiness.id,
+        name: publicBusiness.name,
+        slug: publicBusiness.slug,
+        phone: publicBusiness.phone ?? undefined,
+        category: publicBusiness.sector || 'Servicios Profesionales',
+        timeZone: publicBusiness.timeZone,
+        minAdvanceHours: publicBusiness.minAdvanceHours,
+        maxAdvanceDays: publicBusiness.maxAdvanceDays,
+        logoUrl: publicBusiness.logoUrl,
+        brandColor: publicBusiness.brandColor,
+        services: (publicBusiness.services || []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          durationMinutes: s.durationMinutes,
+          price: s.price,
+        })),
+      };
+    }
+
+    if (!selectedSlug) return null;
+    return (
+      availableBusinesses.find(
+        (b) => b.slug.toLowerCase() === selectedSlug.toLowerCase()
+      ) ?? null
+    );
+  }, [publicBusiness, availableBusinesses, selectedSlug]);
+
+  const effectiveFormSchema = useMemo<FormSchema | null>(() => {
+    if (!activeBusiness) return null;
+
+    if (publicBusiness?.formConfig && Array.isArray(publicBusiness.formConfig.fields)) {
+      return {
+        title: publicBusiness.formConfig.title || 'Reserva tu Cita en Línea',
+        description:
+          publicBusiness.formConfig.description ||
+          `Completa tus datos para confirmar tu espacio en ${activeBusiness.name}.`,
+        presentationStyle:
+          publicBusiness.formConfig.presentationStyle || 'classic_scroll',
+        accentColor:
+          publicBusiness.formConfig.accentColor ||
+          activeBusiness.brandColor ||
+          '#18181B',
+        secondaryColor: publicBusiness.formConfig.secondaryColor,
+        logoUrl: publicBusiness.formConfig.logoUrl ?? activeBusiness.logoUrl ?? null,
+        businessName: publicBusiness.formConfig.businessName || activeBusiness.name,
+        fields: publicBusiness.formConfig.fields,
+      };
+    }
+
+    const matchingLocal =
+      savedLocalSchema?.businessName &&
+      savedLocalSchema.businessName.trim().toLowerCase() ===
+        activeBusiness.name.trim().toLowerCase()
+        ? savedLocalSchema
+        : null;
+
+    return matchingLocal;
+  }, [activeBusiness, publicBusiness, savedLocalSchema]);
+
+  const activeSchema = useMemo<FormSchema | null>(() => {
+    if (!activeBusiness) return null;
+    return buildClientFormSchema(activeBusiness, effectiveFormSchema, styleOverride);
+  }, [activeBusiness, effectiveFormSchema, styleOverride]);
+
   const initialClientAnswers = useMemo(() => {
     const prefill: Record<string, any> = {};
     if (user?.fullName && user.fullName !== 'Pendiente') {
@@ -292,65 +431,128 @@ export function BookingScreen() {
     return prefill;
   }, [user?.fullName]);
 
+  const handleRetry = useCallback(() => {
+    if (!routeSlug && storeBusinesses.length === 0) {
+      void fetchBusinesses();
+    }
+    setRetryKey((k) => k + 1);
+  }, [routeSlug, storeBusinesses.length, fetchBusinesses]);
+
   const handleFormSubmit = async (
     _answers: Record<string, any>,
     summary: BookingSubmissionSummary
   ) => {
-    const newBooking: ConsumerBookedAppointment = {
-      id: `apt-${Date.now()}`,
-      businessSlug: activeBusiness.slug,
-      businessName: activeBusiness.name,
-      accentColor: activeSchema.accentColor,
-      clientName:
-        summary.clientName || user?.fullName || 'Cliente Slotify',
-      clientPhone: summary.clientPhone || '+52 55 0000 0000',
-      serviceNames: summary.serviceNames,
-      totalPrice: summary.totalPrice,
-      totalDuration: summary.totalDuration,
-      dateLabel: summary.dateLabel,
-      isoDate: summary.isoDate,
-      timeLabel: summary.timeLabel,
-      notes: summary.notes,
-      status: 'confirmed',
-      createdAt: new Date().toISOString(),
-    };
+    if (!activeBusiness || !activeSchema || isSubmitting) return;
 
-    // 1. Persistir en almacenamiento local de citas de cliente
-    await saveConsumerAppointmentLocally(newBooking);
-
-    // 2. Sincronizar con useCalendarStore para que aparezca de inmediato en Mis Citas y Agenda
-    const startDate = new Date(summary.isoDate);
-    const isPM = summary.timeLabel.includes('PM');
-    const [timePart] = summary.timeLabel.split(' ');
-    const [rawHours, rawMinutes] = (timePart || '10:00').split(':').map(Number);
-    let hours = rawHours || 10;
-    if (isPM && hours < 12) hours += 12;
-    if (!isPM && hours === 12) hours = 0;
-    startDate.setHours(hours, rawMinutes || 0, 0, 0);
-
-    const endDate = new Date(
-      startDate.getTime() + (summary.totalDuration || 30) * 60000
+    const tz = resolveBusinessTimeZone(
+      publicBusiness?.timeZone || activeBusiness.timeZone
     );
+    const wallDay = toBusinessClock(summary.isoDate, tz);
+    const time24 = parseTimeLabelTo24h(summary.timeLabel);
+    const startDate = scheduleInstant(wallDay, time24, tz);
 
-    addSlot({
-      resourceId: newBooking.id,
-      type: 'appointment',
-      title: summary.serviceNames.join(' + '),
-      startTime: startDate.toISOString(),
-      endTime: endDate.toISOString(),
-      status: 'confirmed',
-      employeeName: activeBusiness.name,
-      clientName: newBooking.clientName,
-      clientPhone: newBooking.clientPhone,
-      agreedTotal: summary.totalPrice,
-      servicePrice: `$${summary.totalPrice}`,
-    });
+    if (!startDate) {
+      Alert.alert(
+        'Horario no válido',
+        'No fue posible interpretar la fecha u hora elegida. Intenta con otro horario.'
+      );
+      return;
+    }
 
-    // 3. Mostrar comprobante interactivo de confirmación
-    setConfirmedBooking(newBooking);
+    const durationMinutes = Math.max(5, summary.totalDuration || 30);
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60_000);
+    const clientName =
+      summary.clientName || user?.fullName || 'Cliente Slotify';
+    const clientPhone =
+      summary.clientPhone && summary.clientPhone !== 'Sin especificar'
+        ? summary.clientPhone
+        : undefined;
+
+    setIsSubmitting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      const res = await apiClient.post<{ data: PublicAppointmentConfirmationDto }>(
+        API_ENDPOINTS.PUBLIC_BOOKING.CREATE_APPOINTMENT(activeBusiness.slug),
+        {
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
+          durationMinutes,
+          clientName,
+          clientPhone,
+          clientEmail: user?.email || undefined,
+          agreedTotal: summary.totalPrice,
+          notes: summary.notes || undefined,
+        },
+        accessToken
+          ? { headers: { Authorization: `Bearer ${accessToken}` } }
+          : undefined
+      );
+
+      const created = res.data?.data;
+      if (!created?.id) {
+        Alert.alert(
+          'No se pudo agendar',
+          'El servidor no confirmó la creación de la cita.'
+        );
+        return;
+      }
+
+      const normalizedStatus: 'confirmed' | 'pending' =
+        created.status === 'pending' ? 'pending' : 'confirmed';
+
+      const newBooking: ConfirmedReceipt = {
+        id: created.id,
+        businessSlug: created.businessSlug || activeBusiness.slug,
+        businessName: created.businessName || activeBusiness.name,
+        accentColor: activeSchema.accentColor,
+        clientName: created.clientName || clientName,
+        clientPhone: clientPhone || 'Sin especificar',
+        serviceNames: summary.serviceNames,
+        totalPrice: Number(created.agreedTotal ?? summary.totalPrice),
+        totalDuration: durationMinutes,
+        dateLabel: summary.dateLabel,
+        isoDate: created.startTime || startDate.toISOString(),
+        timeLabel: summary.timeLabel,
+        notes: summary.notes,
+        status: normalizedStatus,
+        createdAt: new Date().toISOString(),
+        cancellationToken: created.cancellationToken,
+      };
+
+      await saveConsumerAppointmentLocally(newBooking);
+
+      addSlot({
+        resourceId: created.id,
+        type: 'appointment',
+        title: summary.serviceNames.join(' + '),
+        startTime: created.startTime || startDate.toISOString(),
+        endTime: created.endTime || endDate.toISOString(),
+        status: normalizedStatus,
+        employeeName: activeBusiness.name,
+        clientName: newBooking.clientName,
+        clientPhone: clientPhone,
+        agreedTotal: newBooking.totalPrice,
+        servicePrice: `$${newBooking.totalPrice}`,
+      });
+
+      setConfirmedBooking(newBooking);
+    } catch (err) {
+      const message = isAxiosError<{ error?: string; message?: string; errors?: string[] }>(err)
+        ? err.response?.data?.error ||
+          err.response?.data?.errors?.[0] ||
+          err.response?.data?.message ||
+          err.message ||
+          'No se pudo agendar tu cita. Intenta de nuevo.'
+        : 'No se pudo agendar tu cita. Intenta de nuevo.';
+      Alert.alert('No se pudo agendar', message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (loading) {
+  if (loadingBusiness || (exploreLoading && !activeBusiness)) {
     return (
       <View
         style={[
@@ -363,6 +565,86 @@ export function BookingScreen() {
           Preparando formulario de reservación...
         </Text>
       </View>
+    );
+  }
+
+  if (loadError || !activeBusiness || !activeSchema) {
+    return (
+      <SafeAreaView
+        edges={['top', 'left', 'right']}
+        style={[
+          styles.safeArea,
+          { backgroundColor: colors.background.primary },
+        ]}
+      >
+        <View style={styles.centered}>
+          <View
+            style={[
+              styles.feedbackCard,
+              {
+                backgroundColor: colors.background.secondary,
+                borderColor: colors.border.main,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.feedbackIconCircle,
+                { backgroundColor: colors.background.tertiary },
+              ]}
+            >
+              <Feather
+                name={loadError ? 'alert-circle' : 'calendar'}
+                size={24}
+                color={loadError ? colors.status.error : colors.text.muted}
+              />
+            </View>
+            <Text style={[styles.feedbackTitle, { color: colors.text.primary }]}>
+              {loadError
+                ? 'No pudimos cargar el formulario'
+                : 'No hay negocios disponibles aún'}
+            </Text>
+            <Text style={[styles.feedbackBody, { color: colors.text.secondary }]}>
+              {loadError ||
+                'Explora los establecimientos registrados para elegir dónde reservar tu cita.'}
+            </Text>
+            <View style={styles.feedbackActions}>
+              <AnimatedPressable
+                onPress={handleRetry}
+                style={[
+                  styles.feedbackPrimaryBtn,
+                  { backgroundColor: colors.action.primary },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.feedbackPrimaryText,
+                    { color: colors.action.primaryText },
+                  ]}
+                >
+                  Reintentar
+                </Text>
+              </AnimatedPressable>
+              <AnimatedPressable
+                onPress={() => router.push('/(main)/explore' as any)}
+                style={[
+                  styles.feedbackSecondaryBtn,
+                  { backgroundColor: colors.background.tertiary },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.feedbackSecondaryText,
+                    { color: colors.text.primary },
+                  ]}
+                >
+                  Explorar negocios
+                </Text>
+              </AnimatedPressable>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -529,8 +811,28 @@ export function BookingScreen() {
           schema={activeSchema}
           initialAnswers={initialClientAnswers}
           onSubmit={handleFormSubmit}
-          submitButtonLabel="Confirmar y Agendar Cita"
+          submitButtonLabel={
+            isSubmitting ? 'Registrando reserva...' : 'Confirmar y Agendar Cita'
+          }
         />
+        {isSubmitting && (
+          <View style={styles.submittingOverlay}>
+            <View
+              style={[
+                styles.submittingBox,
+                {
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.main,
+                },
+              ]}
+            >
+              <ActivityIndicator size="small" color={colors.action.primary} />
+              <Text style={[styles.loadingText, { color: colors.text.primary, marginTop: 10 }]}>
+                Confirmando disponibilidad...
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* ─── Modal Pulido de Confirmación de Reserva ─── */}
@@ -540,37 +842,52 @@ export function BookingScreen() {
         animationType="fade"
         onRequestClose={() => setConfirmedBooking(null)}
       >
-        <View style={styles.modalOverlay}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setConfirmedBooking(null)}
+        >
           {confirmedBooking && (
-            <Animated.View
-              entering={ZoomIn.duration(300)}
-              style={[
-                styles.confirmationCard,
-                {
-                  backgroundColor: isDark ? '#1A1A1E' : '#FFFFFF',
-                  borderColor: isDark
-                    ? 'rgba(255,255,255,0.12)'
-                    : 'rgba(0,0,0,0.08)',
-                },
-              ]}
+            <Pressable
+              onPress={(e) => e.stopPropagation()}
+              style={styles.confirmationCardPressWrap}
             >
-              <LinearGradient
-                colors={[
-                  confirmedBooking.accentColor,
-                  activeSchema.secondaryColor || confirmedBooking.accentColor,
+              <Animated.View
+                entering={ZoomIn.duration(300)}
+                style={[
+                  styles.confirmationCard,
+                  {
+                    backgroundColor: isDark ? '#1A1A1E' : '#FFFFFF',
+                    borderColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.08)',
+                  },
                 ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.confirmationBanner}
               >
-                <View style={styles.checkIconCircle}>
-                  <Feather name="check" size={30} color={confirmedBooking.accentColor} />
-                </View>
-                <Text style={styles.confirmationTitle}>¡Reserva Confirmada!</Text>
-                <Text style={styles.confirmationSubtitle}>
-                  Tu cita en {confirmedBooking.businessName} ha sido registrada con éxito.
-                </Text>
-              </LinearGradient>
+                <LinearGradient
+                  colors={[
+                    confirmedBooking.accentColor,
+                    activeSchema.secondaryColor || confirmedBooking.accentColor,
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.confirmationBanner}
+                >
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Cerrar comprobante"
+                    onPress={() => setConfirmedBooking(null)}
+                    style={styles.modalCloseBtn}
+                  >
+                    <Feather name="x" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <View style={styles.checkIconCircle}>
+                    <Feather name="check" size={30} color={confirmedBooking.accentColor} />
+                  </View>
+                  <Text style={styles.confirmationTitle}>¡Reserva Confirmada!</Text>
+                  <Text style={styles.confirmationSubtitle}>
+                    Tu cita en {confirmedBooking.businessName} ha sido registrada con éxito.
+                  </Text>
+                </LinearGradient>
 
               <View style={styles.summaryList}>
                 <View style={styles.summaryRow}>
@@ -675,9 +992,10 @@ export function BookingScreen() {
                   </Text>
                 </AnimatedPressable>
               </View>
-            </Animated.View>
+              </Animated.View>
+            </Pressable>
           )}
-        </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
@@ -881,6 +1199,89 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  confirmationCardPressWrap: {
+    width: '100%',
+    maxWidth: 420,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submittingOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  submittingBox: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  feedbackCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+  },
+  feedbackIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  feedbackTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  feedbackBody: {
+    fontSize: 13.5,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  feedbackActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  feedbackPrimaryBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  feedbackPrimaryText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  feedbackSecondaryBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  feedbackSecondaryText: {
+    fontSize: 13.5,
     fontWeight: '600',
   },
 });

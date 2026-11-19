@@ -50,6 +50,14 @@ export const API_ENDPOINTS = {
     ARCHIVE: '/clients/archive',
     RESTORE: (id: string) => `/clients/${id}/restore`,
   },
+  PUBLIC_BOOKING: {
+    GET_BUSINESS: (slug: string) => `/public/businesses/${encodeURIComponent(slug)}`,
+    AVAILABILITY: (slug: string) => `/public/businesses/${encodeURIComponent(slug)}/availability`,
+    CREATE_APPOINTMENT: (slug: string) => `/public/businesses/${encodeURIComponent(slug)}/appointments`,
+  },
+  CONSUMER: {
+    APPOINTMENTS: '/consumer/appointments',
+  },
 } as const;
 
 export const QUERY_KEYS = {

@@ -9,7 +9,6 @@ import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
 import type { ApiResponse, CalendarResponse, CalendarSlot } from '@/shared/types';
 import { useAuthStore } from '@/features/auth/model';
-import { DEFAULT_BUSINESS_TIME_ZONE, scheduleInstant, toBusinessClock } from '../model/businessTime';
 
 export interface CreateCalendarAppointmentPayload {
   employeeId?: string;
@@ -20,86 +19,6 @@ export interface CreateCalendarAppointmentPayload {
   clientEmail?: string;
   clientPhone?: string;
   agreedTotal?: number;
-}
-
-/** Generador de datos simulados realistas para visualización offline / preview */
-export function generateMockCalendarSlots(startDate: Date, endDate: Date): CalendarSlot[] {
-  const slots: CalendarSlot[] = [];
-  const curr = toBusinessClock(startDate, DEFAULT_BUSINESS_TIME_ZONE);
-  const endClock = toBusinessClock(endDate, DEFAULT_BUSINESS_TIME_ZONE);
-  const at = (time: string) => scheduleInstant(curr, time, DEFAULT_BUSINESS_TIME_ZONE)!;
-
-  while (curr < endClock) {
-    const y = curr.getUTCFullYear();
-    const m = curr.getUTCMonth();
-    const d = curr.getUTCDate();
-    const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
-    // Slot 1: Cita de Corte y Barba (10:00 a 11:00)
-    const slot1Start = at('10:00');
-    const slot1End = at('11:00');
-    slots.push({
-      type: 'appointment',
-      resourceId: `apt-1-${dateKey}`,
-      startTime: slot1Start.toISOString(),
-      endTime: slot1End.toISOString(),
-      title: 'Corte de Cabello y Barba',
-      status: 'confirmed',
-      clientName: 'Carlos Mendoza',
-      clientPhone: '+52 55 1234 5678',
-      servicePrice: '$280 MXN',
-      employeeName: 'Ariel (Master Barber)',
-    });
-
-    // Slot 2: Cita de Tratamiento Capilar (11:30 a 13:00)
-    const slot2Start = at('11:30');
-    const slot2End = at('13:00');
-    slots.push({
-      type: 'appointment',
-      resourceId: `apt-2-${dateKey}`,
-      startTime: slot2Start.toISOString(),
-      endTime: slot2End.toISOString(),
-      title: 'Tratamiento Capilar',
-      status: 'confirmed',
-      clientName: 'Sofía Valenzuela',
-      clientPhone: '+52 55 8765 4321',
-      servicePrice: '$450 MXN',
-      employeeName: 'Evan (Estilista)',
-    });
-
-    // Slot 3: Bloqueo de Almuerzo / Descanso de Equipo (14:00 a 15:00)
-    const slot3Start = at('14:00');
-    const slot3End = at('15:00');
-    slots.push({
-      type: 'block',
-      resourceId: `blk-1-${dateKey}`,
-      startTime: slot3Start.toISOString(),
-      endTime: slot3End.toISOString(),
-      title: 'Almuerzo / Descanso de Equipo',
-      status: 'blocked',
-      blockReason: 'Horario de comida',
-      employeeName: 'Todo el personal',
-    });
-
-    // Slot 4: Cita de Perfilado y Afeitado Clásico (16:30 a 17:45)
-    const slot4Start = at('16:30');
-    const slot4End = at('17:45');
-    slots.push({
-      type: 'appointment',
-      resourceId: `apt-3-${dateKey}`,
-      startTime: slot4Start.toISOString(),
-      endTime: slot4End.toISOString(),
-      title: 'Perfilado y Afeitado Clásico',
-      status: 'confirmed',
-      clientName: 'Alejandro Rivera',
-      clientPhone: '+52 55 9988 7766',
-      servicePrice: '$220 MXN',
-      employeeName: 'Ariel (Master Barber)',
-    });
-    curr.setUTCDate(curr.getUTCDate() + 1);
-  }
-
-  return slots.filter((slot) => new Date(slot.startTime) < endDate && new Date(slot.endTime) > startDate);
 }
 
 /**
@@ -128,22 +47,6 @@ async function loadCalendarSlots(
   endDate: string,
   employeeId?: string,
 ): Promise<CalendarResponse> {
-  const currentUser = useAuthStore.getState().user;
-  const isDemo =
-    currentUser?.email === 'demo@slotify.com' ||
-    currentUser?.email === 'admin@slotify.com';
-
-  if (isDemo) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    return {
-      rangeStart: startDate,
-      rangeEnd: endDate,
-      timeZone: DEFAULT_BUSINESS_TIME_ZONE,
-      slots: generateMockCalendarSlots(start, end),
-    };
-  }
-
   try {
     const params: Record<string, string> = { startDate, endDate };
     if (employeeId) {

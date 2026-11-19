@@ -21,3 +21,11 @@ jest.mock('expo-symbols', () => ({
   SymbolView: () => null,
 }));
 
+jest.mock('@expo/vector-icons', () => ({
+  Feather: () => null,
+  MaterialCommunityIcons: () => null,
+  FontAwesome5: () => null,
+  AntDesign: () => null,
+  Ionicons: () => null,
+}));
+

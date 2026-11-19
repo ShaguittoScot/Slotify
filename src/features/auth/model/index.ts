@@ -139,30 +139,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (credentials) => {
     set({ isLoading: true, error: null });
 
-    // Modo Demo para pruebas locales y evaluación del sprint
-    if (
-      credentials.email === 'demo@slotify.com' ||
-      credentials.email === 'admin@slotify.com'
-    ) {
-      const demoUser: AuthUser = {
-        id: 'demo-user-123',
-        firstName: 'Administrador',
-        lastName: 'Slotify',
-        fullName: 'Administrador Slotify',
-        email: credentials.email,
-        role: 'DUENO',
-        businessId: 'demo-biz-456',
-      };
-      set({
-        user: demoUser,
-        isAuthenticated: true,
-        isLoading: false,
-        appMode: 'BUSINESS',
-        businessProfileStatus: 'ready',
-      });
-      return;
-    }
-
     try {
       const data = await authApi.login(credentials);
 

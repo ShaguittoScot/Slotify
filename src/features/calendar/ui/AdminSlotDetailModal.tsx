@@ -1,7 +1,6 @@
 import { formatBusinessHour, scheduleInstant, toBusinessClock } from '../model/businessTime';
 import React from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import {
 import { Feather, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import type { CalendarSlot } from '@/shared/types';
 import { useAppTheme } from '@/shared/theme';
+import { AppModalSheet } from '@/components/ui/AppModalSheet';
 
 interface AdminSlotDetailModalProps {
   slot: CalendarSlot | null;
@@ -191,27 +191,7 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
   const badge = getStatusBadge();
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View
-          style={[
-            styles.sheetContainer,
-            {
-              backgroundColor: isDark ? '#11131E' : '#FFFFFF',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-            },
-          ]}
-        >
-          {/* Handle bar */}
-          <View style={styles.handleContainer}>
-            <View style={[styles.handleBar, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(0, 0, 0, 0.20)' }]} />
-          </View>
-
+    <AppModalSheet visible={visible} onClose={onClose} sheetStyle={{ maxHeight: '85%' }}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -227,8 +207,20 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Feather name="x" size={22} color={colors.text.muted} />
+            <TouchableOpacity
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar detalle de agenda"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[
+                styles.closeCircleBtn,
+                {
+                  backgroundColor: colors.background.primary,
+                  borderColor: colors.border.main,
+                },
+              ]}
+            >
+              <Feather name="x" size={18} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -452,10 +444,20 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
 
                 <TouchableOpacity
                   onPress={handleConfirmReschedule}
-                  style={[styles.primaryActionBtn, { backgroundColor: '#6366F1', flex: 1.6 }]}
+                  style={[
+                    styles.primaryActionBtn,
+                    { backgroundColor: colors.action.primary, flex: 1.6 },
+                  ]}
                 >
-                  <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.primaryActionBtnText}>Guardar Cambio</Text>
+                  <Feather
+                    name="check"
+                    size={16}
+                    color={colors.action.primaryText}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={[styles.primaryActionBtnText, { color: colors.action.primaryText }]}>
+                    Guardar Cambio
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -520,9 +522,7 @@ export const AdminSlotDetailModal: React.FC<AdminSlotDetailModalProps> = ({
               </>
             )}
           </View>
-        </View>
-      </View>
-    </Modal>
+    </AppModalSheet>
   );
 };
 
@@ -561,6 +561,14 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  closeCircleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusBadge: {
     flexDirection: 'row',

@@ -1,7 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import type { CalendarViewMode } from '@/shared/types';
+import React, { useEffect, useState, type ComponentProps } from 'react';
+import { I18nManager, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import type { CalendarViewMode } from '@/shared/types';
 import { useAppTheme } from '@/shared/theme';
 
 interface ViewModeSelectorProps {
@@ -9,17 +16,66 @@ interface ViewModeSelectorProps {
   onSelectMode: (mode: CalendarViewMode) => void;
 }
 
-const MODES: { id: CalendarViewMode; label: string; icon: string }[] = [
+type ModeIcon = ComponentProps<typeof Feather>['name'];
+
+const MODES: { id: CalendarViewMode; label: string; icon: ModeIcon }[] = [
   { id: 'day', label: 'Día', icon: 'calendar' },
   { id: 'week', label: 'Semana', icon: 'grid' },
   { id: 'month', label: 'Mes', icon: 'layout' },
 ];
 
+function ModeContent({ label, icon, color, focused }: {
+  label: string;
+  icon: ModeIcon;
+  color: string;
+  focused: boolean;
+}) {
+  return (
+    <>
+      <Feather name={icon} size={14} color={color} style={styles.icon} />
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+        style={[styles.tabText, { color, fontWeight: focused ? '700' : '500' }]}
+      >
+        {label}
+      </Text>
+    </>
+  );
+}
+
 export const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
   currentMode,
   onSelectMode,
 }) => {
-  const { colors, isDark } = useAppTheme();
+  const { isDark } = useAppTheme();
+  const activeIndex = MODES.findIndex((item) => item.id === currentMode);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const tabWidth = trackWidth / MODES.length;
+  const indicatorIndex = useSharedValue(Math.max(0, activeIndex));
+  const direction = I18nManager.isRTL ? -1 : 1;
+  const indicatorColor = isDark ? '#383838' : '#171717';
+  const inactiveColor = isDark ? '#8E8E8E' : '#737373';
+  const showIndicator = activeIndex >= 0 && tabWidth > 0;
+
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      indicatorIndex.value = withTiming(activeIndex, {
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        reduceMotion: ReduceMotion.System,
+      });
+    }
+  }, [activeIndex, indicatorIndex]);
+
+  const indicatorPosition = useAnimatedStyle(() => ({
+    transform: [{ translateX: direction * indicatorIndex.value * tabWidth }],
+  }));
+
+  const clippedLabelsPosition = useAnimatedStyle(() => ({
+    transform: [{ translateX: -direction * indicatorIndex.value * tabWidth }],
+  }));
 
   return (
     <View
@@ -35,43 +91,70 @@ export const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
         },
       ]}
     >
-      {MODES.map((item) => {
-        const isSelected = currentMode === item.id;
-        return (
-          <TouchableOpacity
-            key={item.id}
-            style={[
-              styles.tab,
-              isSelected && [
-                styles.tabActive,
-                {
-                  backgroundColor: isDark ? '#383838' : '#171717',
-                },
-              ],
-            ]}
-            onPress={() => onSelectMode(item.id)}
-            activeOpacity={0.75}
-          >
-            <Feather
-              name={item.icon as any}
-              size={14}
-              color={isSelected ? '#FFFFFF' : isDark ? '#8E8E8E' : '#737373'}
-              style={styles.icon}
-            />
-            <Text
+      <View
+        style={styles.track}
+        onLayout={({ nativeEvent }) => setTrackWidth(nativeEvent.layout.width)}
+      >
+        {MODES.map((item) => {
+          const isSelected = currentMode === item.id;
+          const fallbackHighlight = isSelected && !showIndicator;
+          return (
+            <TouchableOpacity
+              key={item.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isSelected }}
               style={[
-                styles.tabText,
-                {
-                  color: isSelected ? '#FFFFFF' : isDark ? '#8E8E8E' : '#737373',
-                  fontWeight: isSelected ? '700' : '500',
-                },
+                styles.tab,
+                fallbackHighlight && [
+                  styles.tabActive,
+                  { backgroundColor: indicatorColor },
+                ],
               ]}
+              onPress={() => onSelectMode(item.id)}
+              activeOpacity={0.75}
             >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+              <ModeContent
+                label={item.label}
+                icon={item.icon}
+                focused={isSelected}
+                color={fallbackHighlight ? '#FFFFFF' : inactiveColor}
+              />
+            </TouchableOpacity>
+          );
+        })}
+
+        {showIndicator && (
+          <Animated.View
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              styles.pill,
+              styles.tabActive,
+              { width: tabWidth, backgroundColor: indicatorColor },
+              indicatorPosition,
+            ]}
+          >
+            {/* Las etiquetas blancas quedan recortadas por la pastilla mientras se mueve. */}
+            <View style={styles.pillClip}>
+              <Animated.View
+                style={[styles.clippedLabels, { width: trackWidth }, clippedLabelsPosition]}
+              >
+                {MODES.map((item) => (
+                  <View key={item.id} style={styles.tab}>
+                    <ModeContent
+                      label={item.label}
+                      icon={item.icon}
+                      focused={item.id === currentMode}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                ))}
+              </Animated.View>
+            </View>
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 };
@@ -84,6 +167,11 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 3,
     borderWidth: 1,
+  },
+  track: {
+    flex: 1,
+    height: '100%',
+    flexDirection: 'row',
   },
   tab: {
     flex: 1,
@@ -100,6 +188,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 5,
     elevation: 3,
+  },
+  pill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    start: 0,
+    zIndex: 1,
+    borderRadius: 19,
+  },
+  pillClip: {
+    flex: 1,
+    borderRadius: 19,
+    overflow: 'hidden',
+  },
+  clippedLabels: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    start: 0,
+    flexDirection: 'row',
   },
   icon: {
     marginRight: 2,

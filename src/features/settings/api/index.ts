@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios';
-import { apiClient } from '@/shared/lib/api';
+import { apiClient, resolveApiBaseUrl } from '@/shared/lib/api';
 import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
 
@@ -32,7 +32,6 @@ export async function fetchOwnBusinessInfo(signal?: AbortSignal): Promise<Busine
 export async function saveOwnProfile(
   user: AuthUser, firstName: string, lastName: string, businessName?: string,
 ): Promise<Partial<AuthUser>> {
-  if (user.businessId?.startsWith('demo')) throw new Error('El perfil de prueba no se puede guardar.');
   if (user.businessId) {
     const { data } = await apiClient.patch<{ data: AuthUser }>('/profile', { firstName, lastName, businessName });
     const saved = data.data;
@@ -55,14 +54,52 @@ export async function saveOwnProfile(
 }
 
 export function bookingLink(slug?: string): string | undefined {
+  if (!slug) return undefined;
   const configured = process.env.EXPO_PUBLIC_BOOKING_BASE_URL?.trim();
-  if (!slug || !configured) return undefined;
+  if (configured) {
+    try {
+      const base = new URL(configured);
+      if (
+        (base.protocol === 'https:' || base.protocol === 'http:') &&
+        !base.search &&
+        !base.hash
+      ) {
+        return `${base.href.replace(/\/$/, '')}/book/${encodeURIComponent(slug)}`;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+
   try {
-    const base = new URL(configured);
-    if (base.protocol === 'https:' && !base.search && !base.hash) {
-      return `${base.href.replace(/\/$/, '')}/book/${encodeURIComponent(slug)}`;
+    const apiOrigin = new URL(resolveApiBaseUrl()).origin;
+    return `${apiOrigin}/book/${encodeURIComponent(slug)}`;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function fetchOwnBusinessLogoUrl(signal?: AbortSignal): Promise<string | null> {
+  try {
+    const info = await fetchOwnBusinessInfo(signal);
+    if (info.slug) {
+      const { data } = await apiClient.get<{ logoUrl?: string | null }>(
+        `/businesses/${encodeURIComponent(info.slug)}/booking-config`,
+        { signal }
+      );
+      if (data?.logoUrl && data.logoUrl.trim().length > 0) {
+        return data.logoUrl.trim();
+      }
     }
   } catch {
-    // El portal se publica por separado.
+    // Respaldo al caché local si la consulta falla o es cancelada
+  }
+
+  try {
+    const { loadFormSchemaLocally } = await import('@/features/dashboard/model/formBranding');
+    const local = await loadFormSchemaLocally();
+    return local?.logoUrl?.trim() || null;
+  } catch {
+    return null;
   }
 }

@@ -4,10 +4,12 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { isAxiosError } from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeInDown,
@@ -15,109 +17,140 @@ import Animated, {
   LinearTransition,
 } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
-import { useCalendarStore } from '@/features/calendar/model';
 import { useAppTheme } from '@/shared/theme';
+import { apiClient } from '@/shared/lib/api';
+import { API_ENDPOINTS } from '@/shared/lib/constants';
+import { supabase } from '@/shared/lib/supabase';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   loadConsumerAppointmentsLocally,
   ConsumerBookedAppointment,
 } from '@/features/dashboard/model/formBranding';
 
-const DEMO_CONSUMER_APPOINTMENTS = [
-  {
-    id: 'c1',
-    business: 'Barbería Capital',
-    service: 'Corte Degradado & Barba',
-    date: 'Hoy',
-    time: '04:00 PM',
-    status: 'confirmed',
-  },
-  {
-    id: 'c2',
-    business: 'Clínica Dental Sonrisas',
-    service: 'Limpieza Ultrasónica',
-    date: 'Mañana',
-    time: '11:00 AM',
-    status: 'pending',
-  },
-];
+interface ConsumerAppointmentDto {
+  id: string;
+  businessName: string;
+  businessSlug: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  agreedTotal: number;
+}
+
+function formatAppointmentSchedule(startIso: string) {
+  const dateObj = new Date(startIso);
+  if (!Number.isFinite(dateObj.getTime())) {
+    return { date: 'Próxima', time: '--:--' };
+  }
+  const now = new Date();
+  const isToday =
+    dateObj.getDate() === now.getDate() &&
+    dateObj.getMonth() === now.getMonth() &&
+    dateObj.getFullYear() === now.getFullYear();
+
+  const date = isToday
+    ? 'Hoy'
+    : dateObj.toLocaleDateString('es-MX', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      });
+
+  const time = dateObj.toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  return { date, time };
+}
 
 export function ConsumerDashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { user, toggleAppMode } = useAuthStore();
-  const { slots, loadSlots } = useCalendarStore();
-  const [localBookings, setLocalBookings] = useState<ConsumerBookedAppointment[]>(
-    []
-  );
+  const [serverAppointments, setServerAppointments] = useState<ConsumerAppointmentDto[]>([]);
+  const [localBookings, setLocalBookings] = useState<ConsumerBookedAppointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasSession, setHasSession] = useState(false);
 
-  const hydrateConsumerBookings = useCallback(async () => {
-    const saved = await loadConsumerAppointmentsLocally();
-    setLocalBookings(saved);
+  const loadConsumerAppointments = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const [{ data: sessionData }, localSaved] = await Promise.all([
+        supabase.auth.getSession(),
+        loadConsumerAppointmentsLocally(),
+      ]);
+
+      const verifiedLocal = localSaved.filter(
+        (b) => b.id && !b.id.startsWith('apt-') && !b.id.startsWith('demo')
+      );
+      setLocalBookings(verifiedLocal);
+
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setHasSession(false);
+        setServerAppointments([]);
+        return;
+      }
+
+      setHasSession(true);
+      const res = await apiClient.get<{ data: ConsumerAppointmentDto[] }>(
+        API_ENDPOINTS.CONSUMER.APPOINTMENTS,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      setServerAppointments(Array.isArray(res.data?.data) ? res.data.data : []);
+    } catch (error) {
+      const msg = isAxiosError<{ error?: string; message?: string }>(error)
+        ? error.response?.data?.error ||
+          error.response?.data?.message ||
+          'No se pudieron cargar tus citas.'
+        : 'No se pudieron cargar tus citas.';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    loadSlots();
-    hydrateConsumerBookings();
-  }, [loadSlots, hydrateConsumerBookings]);
+    void loadConsumerAppointments();
+  }, [loadConsumerAppointments]);
 
-  const isDemo =
-    user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
+  useFocusEffect(
+    useCallback(() => {
+      void loadConsumerAppointments();
+    }, [loadConsumerAppointments])
+  );
 
   const appointmentsList = useMemo(() => {
-    const mappedLocal = localBookings.map((b) => ({
+    if (hasSession) {
+      return serverAppointments.map((apt) => {
+        const { date, time } = formatAppointmentSchedule(apt.startTime);
+        return {
+          id: apt.id,
+          business: apt.businessName,
+          businessSlug: apt.businessSlug,
+          service: apt.title || 'Cita programada',
+          date,
+          time,
+          status: apt.status || 'confirmed',
+        };
+      });
+    }
+
+    return localBookings.map((b) => ({
       id: b.id,
       business: b.businessName,
+      businessSlug: b.businessSlug,
       service: b.serviceNames.join(' + '),
       date: b.dateLabel,
       time: b.timeLabel,
       status: b.status || 'confirmed',
     }));
-
-    const localIds = new Set(mappedLocal.map((m) => m.id));
-    const validSlots = slots.filter(
-      (s) =>
-        s.type === 'appointment' &&
-        s.status !== 'cancelled' &&
-        !localIds.has(s.resourceId)
-    );
-
-    const mappedSlots = validSlots.map((apt) => {
-      const d = new Date(apt.startTime);
-      const isToday =
-        d.getDate() === new Date().getDate() &&
-        d.getMonth() === new Date().getMonth() &&
-        d.getFullYear() === new Date().getFullYear();
-
-      const dateStr = isToday
-        ? 'Hoy'
-        : d.toLocaleDateString('es-MX', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-          });
-
-      const timeStr = d.toLocaleTimeString('es-MX', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      });
-
-      return {
-        id: apt.resourceId,
-        business: apt.employeeName || 'Slotify Studio',
-        service: apt.title || 'Cita programada',
-        date: dateStr,
-        time: timeStr,
-        status: apt.status || 'confirmed',
-      };
-    });
-
-    const combined = [...mappedLocal, ...mappedSlots];
-    if (combined.length > 0) return combined;
-    if (isDemo) return DEMO_CONSUMER_APPOINTMENTS;
-    return [];
-  }, [localBookings, slots, isDemo]);
+  }, [hasSession, serverAppointments, localBookings]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'CL';
@@ -266,7 +299,63 @@ export function ConsumerDashboardScreen() {
               </AnimatedPressable>
             </View>
 
-            {appointmentsList.length > 0 ? (
+            {isLoading && appointmentsList.length === 0 ? (
+              <View
+                style={[
+                  s.emptyStateCard,
+                  {
+                    backgroundColor: isDark ? '#121216' : '#FFFFFF',
+                    borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  },
+                ]}
+              >
+                <ActivityIndicator size="small" color="#10B981" style={{ marginBottom: 10 }} />
+                <Text style={[s.emptyStateSubtitle, { color: colors.text.muted }]}>
+                  Sincronizando tus citas...
+                </Text>
+              </View>
+            ) : errorMessage ? (
+              <View
+                style={[
+                  s.emptyStateCard,
+                  {
+                    backgroundColor: isDark ? '#121216' : '#FFFFFF',
+                    borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    s.emptyIconCircle,
+                    { backgroundColor: isDark ? '#27191A' : '#FEF2F2' },
+                  ]}
+                >
+                  <Feather name="alert-circle" size={20} color="#EF4444" />
+                </View>
+                <Text style={[s.emptyStateTitle, { color: colors.text.primary }]}>
+                  No pudimos cargar tus citas
+                </Text>
+                <Text style={[s.emptyStateSubtitle, { color: colors.text.muted }]}>
+                  {errorMessage}
+                </Text>
+                <AnimatedPressable
+                  onPress={() => void loadConsumerAppointments()}
+                  style={[
+                    s.retryBtn,
+                    { backgroundColor: colors.action.primary },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.retryBtnText,
+                      { color: colors.action.primaryText },
+                    ]}
+                  >
+                    Reintentar
+                  </Text>
+                </AnimatedPressable>
+              </View>
+            ) : appointmentsList.length > 0 ? (
               appointmentsList.map((apt, idx) => {
                 const isConfirmed = apt.status === 'confirmed';
                 return (
@@ -276,7 +365,12 @@ export function ConsumerDashboardScreen() {
                     entering={FadeInRight.duration(350).delay(180 + idx * 60)}
                   >
                     <AnimatedPressable
-                      onPress={() => router.push('/(main)/form-preview' as any)}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(main)/form-preview' as any,
+                          params: apt.businessSlug ? { slug: apt.businessSlug } : undefined,
+                        })
+                      }
                       style={[
                         s.appointmentCard,
                         {
@@ -642,5 +736,15 @@ const s = StyleSheet.create({
   emptyStateSubtitle: {
     fontSize: 12.5,
     textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  retryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

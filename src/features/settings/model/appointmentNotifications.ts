@@ -107,7 +107,7 @@ export function refreshAppointmentNotifications(scope: string): Promise<void> {
 
 export function useAppointmentNotifications(user: { id: string; businessId?: string } | null) {
   const scope = settingsScope(user);
-  const liveBusiness = Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+  const liveBusiness = Boolean(user?.businessId);
   const { load, scope: loadedScope, ready, notifications: enabled } = useSettingsPreferences();
   useEffect(() => { void load(scope); }, [load, scope]);
 
