@@ -58,6 +58,10 @@ export const API_ENDPOINTS = {
   CONSUMER: {
     APPOINTMENTS: '/consumer/appointments',
   },
+  /** Motor de notificaciones push */
+  NOTIFICATIONS: {
+    UPCOMING: '/notifications/upcoming',
+  },
 } as const;
 
 export const QUERY_KEYS = {

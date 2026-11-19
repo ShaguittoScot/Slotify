@@ -11,7 +11,11 @@ import { API_ENDPOINTS, STORAGE_KEYS } from './constants';
 import { storage } from './storage';
 
 function getAuthState() {
-  return (require('@/features/auth/model') as typeof import('@/features/auth/model')).useAuthStore.getState();
+  try {
+    return (require('@/features/auth/model') as typeof import('@/features/auth/model')).useAuthStore.getState();
+  } catch {
+    return { user: null, logout: async () => {} };
+  }
 }
 
 const PRIVATE_HOST_REGEX =

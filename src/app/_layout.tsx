@@ -20,7 +20,7 @@ import { ActivityIndicator, Pressable, StatusBar, StyleSheet, Text, View } from 
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/features/auth/model';
-import { useAppointmentNotifications } from '@/features/settings/model/appointmentNotifications';
+import { useNotificationEngine } from '@/features/notifications/model/engine';
 import { STORAGE_KEYS } from '@/shared/lib/constants';
 import { useAppTheme } from '@/shared/theme';
 
@@ -32,7 +32,7 @@ export default function RootLayout() {
   const router = useRouter();
 
   const { isAuthenticated, isLoading, user, businessProfileStatus, error, appMode, hydrate, logout } = useAuthStore();
-  useAppointmentNotifications(isAuthenticated ? user : null);
+  useNotificationEngine(isAuthenticated ? user : null);
 
   const [fontsLoaded] = useFonts({
     Poppins_500Medium,
@@ -58,9 +58,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (isLoading || !fontsLoaded) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inMainGroup = segments[0] === '(main)';
-    const inBusinessSetup = segments[0] === '(onboarding)' && segments[1] === 'wizard';
+    const segList = segments as unknown as string[];
+    const inAuthGroup = segList[0] === '(auth)';
+    const inMainGroup = segList[0] === '(main)';
+    const inBusinessSetup = segList[0] === '(onboarding)' && segList[1] === 'wizard';
 
     if (!isAuthenticated && (inMainGroup || inBusinessSetup)) {
       router.replace('/(auth)');
