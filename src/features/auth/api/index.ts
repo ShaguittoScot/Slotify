@@ -47,10 +47,7 @@ export const authApi = {
       const response = await apiClient.post<ExchangeTokenResponse>(
         API_ENDPOINTS.AUTH.LOGIN,
         undefined,
-        {
-          headers: { Authorization: `Bearer ${supabaseToken}` },
-          timeout: 3500,
-        },
+        { headers: { Authorization: `Bearer ${supabaseToken}` } },
       );
       tokenData = response.data?.data;
     } catch (error) {
