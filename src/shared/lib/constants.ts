@@ -50,6 +50,10 @@ export const API_ENDPOINTS = {
     ARCHIVE: '/clients/archive',
     RESTORE: (id: string) => `/clients/${id}/restore`,
   },
+  /** Motor de notificaciones push */
+  NOTIFICATIONS: {
+    UPCOMING: '/notifications/upcoming',
+  },
 } as const;
 
 export const QUERY_KEYS = {

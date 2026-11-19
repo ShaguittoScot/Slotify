@@ -1,4 +1,5 @@
 import { AppState, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { useEffect } from 'react';
 import { fetchCalendarSlots } from '@/features/calendar/api';
 import { dashboardCalendarRange } from '@/features/dashboard/model/appointments';
@@ -16,9 +17,18 @@ function notifications() {
   return notificationModule ??= Promise.resolve().then(async () => {
     const device = loadLocalNotificationDevice();
     if (Platform.OS === 'android') {
-      await device.setNotificationChannelAsync(CHANNEL, {
-        name: 'Citas de Slotify', importance: device.AndroidImportance.DEFAULT,
-      });
+      try {
+        await device.setNotificationChannelAsync(CHANNEL, {
+          name: 'Citas de Slotify',
+          importance: device.AndroidImportance?.DEFAULT ?? 5,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#818CF8',
+        });
+      } catch (channelErr) {
+        if (__DEV__ && Constants.appOwnership !== 'expo') {
+          console.debug('[Slotify] Canal de notificación Android:', channelErr);
+        }
+      }
     }
     device.setNotificationHandler({
       handleNotification: async () => ({

@@ -20,7 +20,10 @@ import { TemplateMigrationModal } from '@/features/dashboard/ui/components/Templ
 import { EditProfileModal } from '../components/EditProfileModal';
 import { BusinessInfoModal } from '../components/BusinessInfoModal';
 import { requestAppointmentNotificationPermission } from '../../model/appointmentNotifications';
-import { LocalNotificationsUnavailable } from '../../model/localNotifications';
+import {
+  LocalNotificationsUnavailable,
+  loadLocalNotificationDevice,
+} from '../../model/localNotifications';
 import {
   appointmentHaptic,
   settingsScope,
@@ -43,9 +46,11 @@ export function SettingsScreen() {
   const preferences = useSettingsPreferences();
   const scope = settingsScope(user);
   const preferencesReady = preferences.ready && preferences.scope === scope;
+  const isBusinessUser = Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+  const isClientUser = Boolean(user?.id && (user?.role === 'CLIENTE' || !isBusiness));
   const canNotify =
     Platform.OS !== 'web' &&
-    Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+    Boolean(user?.id && (isBusinessUser || isClientUser));
 
   const changeMode = () => {
     if (isBusiness) {
@@ -99,6 +104,23 @@ export function SettingsScreen() {
       );
     } finally {
       setRequestingNotifications(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      const device = loadLocalNotificationDevice();
+      await device.scheduleNotificationAsync({
+        content: {
+          title: '🔔 Slotify: Prueba exitosa',
+          body: '¡El motor de notificaciones push está activo y funcionando en tu dispositivo!',
+          data: { test: true },
+        },
+        trigger: null,
+      });
+      appointmentHaptic(true);
+    } catch (err: any) {
+      Alert.alert('Aviso', 'Asegúrate de permitir las notificaciones en el sistema.');
     }
   };
 
@@ -425,8 +447,8 @@ export function SettingsScreen() {
                   style={[styles.settingValue, { color: colors.text.muted }]}
                 >
                   {canNotify
-                    ? 'Recordatorios de agenda, nuevas reservas y cancelaciones'
-                    : 'Disponible en la app móvil con una cuenta de negocio'}
+                    ? 'Recordatorios de citas, nuevas reservas y cancelaciones'
+                    : 'Disponible en la app móvil'}
                 </Text>
               </View>
               <FluidToggleSwitch
@@ -440,6 +462,44 @@ export function SettingsScreen() {
                 activeColor={accentColor}
               />
             </View>
+
+            {canNotify && preferencesReady && preferences.notifications && (
+              <AnimatedPressable
+                accessibilityRole="button"
+                accessibilityLabel="Probar notificación inmediata"
+                onPress={handleTestNotification}
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark ? '#14141C' : '#F0FDF4',
+                    borderColor: isDark ? '#1E293B' : '#BBF7D0',
+                    borderStyle: 'dashed',
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.settingIconWrapper,
+                    { backgroundColor: isDark ? '#1E293B' : '#DCFCE7' },
+                  ]}
+                >
+                  <Feather name="send" size={15} color="#10B981" />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text
+                    style={[styles.settingLabel, { color: isDark ? '#34D399' : '#059669', fontSize: 13.5 }]}
+                  >
+                    Probar Notificación Inmediata
+                  </Text>
+                  <Text
+                    style={[styles.settingValue, { color: colors.text.muted, fontSize: 11.5 }]}
+                  >
+                    Toca para recibir una alerta push en este dispositivo
+                  </Text>
+                </View>
+                <Feather name="arrow-right" size={15} color="#10B981" />
+              </AnimatedPressable>
+            )}
 
             <View
               style={[

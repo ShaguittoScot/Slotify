@@ -57,9 +57,11 @@ export function ConsumerDashboardScreen() {
   }, []);
 
   useEffect(() => {
-    loadSlots();
+    if (user?.businessId) {
+      loadSlots();
+    }
     hydrateConsumerBookings();
-  }, [loadSlots, hydrateConsumerBookings]);
+  }, [loadSlots, hydrateConsumerBookings, user?.businessId]);
 
   const isDemo =
     user?.email === 'demo@slotify.com' || user?.email === 'admin@slotify.com';
