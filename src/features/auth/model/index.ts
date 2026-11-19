@@ -64,7 +64,7 @@ async function resolveBusinessProfile(
   supabaseToken: string
 ): Promise<Pick<AuthState, 'user' | 'businessProfileStatus' | 'error'>> {
   if (user.role === 'CLIENTE') {
-    return { user, businessProfileStatus: 'ready', error: null };
+    return { user, businessProfileStatus: 'unknown', error: null };
   }
 
   try {
@@ -90,19 +90,17 @@ async function resolveBusinessProfile(
         error: null,
       };
     }
-  } catch {
-    // Fallback resiliente cuando el backend .NET no está accesible en la red local o Azure:
-    // permite acceder de inmediato con la sesión autenticada de Supabase.
+    throw new Error('Slotify no pudo confirmar el negocio de esta cuenta.');
+  } catch (error) {
+    return {
+      user,
+      businessProfileStatus: 'unavailable',
+      error: authRequestMessage(
+        error,
+        'No se pudo verificar el negocio de esta cuenta. Inténtalo de nuevo.'
+      ),
+    };
   }
-
-  return {
-    user: {
-      ...user,
-      businessId: user.businessId || 'synced-backend',
-    },
-    businessProfileStatus: 'ready',
-    error: null,
-  };
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -290,14 +288,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         sectorTemplateId: data.sectorTemplateId,
       };
 
-      let syncedBusinessId = user.businessId || 'synced-backend';
-      try {
-        const syncResponse = await authApi.syncProfile(payload);
-        if (syncResponse?.data?.businessId) {
-          syncedBusinessId = syncResponse.data.businessId;
-        }
-      } catch {
-        // Fallback local si el backend .NET no está disponible
+      const syncResponse = await authApi.syncProfile(payload);
+      const syncedBusinessId = syncResponse?.data?.businessId;
+      if (!syncedBusinessId || get().user?.id !== user.id) {
+        throw new Error('El servidor no confirmó el registro del negocio.');
       }
 
       set({
