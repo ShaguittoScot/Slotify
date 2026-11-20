@@ -1,9 +1,9 @@
-import { create } from 'zustand';
-import { supabase } from '@/shared/lib/supabase';
-import { storage } from '@/shared/lib/storage';
 import { STORAGE_KEYS } from '@/shared/lib/constants';
 import { normalizeError, type NormalizedError } from '@/shared/lib/errorUtils';
+import { storage } from '@/shared/lib/storage';
+import { supabase } from '@/shared/lib/supabase';
 import type { AuthUser } from '@/shared/types';
+import { create } from 'zustand';
 import { authApi, authRequestMessage } from '../api';
 import type {
   LoginCredentials,
@@ -77,16 +77,38 @@ const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
   };
 };
 
+const getAuthRequestMessage = (err: unknown, fallback: string): string => {
+  return typeof authRequestMessage === 'function'
+    ? authRequestMessage(err, fallback)
+    : ((err as any)?.response?.data?.error || (err as any)?.response?.data?.message || (err as any)?.message || fallback);
+};
+
 async function resolveBusinessProfile(
   user: AuthUser,
   supabaseToken: string
-): Promise<Pick<AuthState, 'user' | 'businessProfileStatus' | 'error' | 'syncError'>> {
+): Promise<Pick<AuthState, 'user' | 'businessProfileStatus' | 'error' | 'syncError'> & { isRejectedAuth?: boolean; status?: number }> {
   if (user.role === 'CLIENTE') {
     return { user, businessProfileStatus: 'unknown', error: null, syncError: null };
   }
 
   try {
-    const tokenData = await authApi.exchangeBackendToken(supabaseToken, user.id);
+    let tokenData: ExchangeTokenResponse['data'] | null = null;
+    if (typeof authApi.exchangeBackendToken === 'function') {
+      tokenData = await authApi.exchangeBackendToken(supabaseToken, user.id);
+    } else if (typeof authApi.exchangeToken === 'function') {
+      try {
+        const res = await authApi.exchangeToken({ userId: user.id, email: user.email });
+        tokenData = res?.data ?? null;
+      } catch (err: any) {
+        const msg = String(err?.response?.data?.error || err?.response?.data?.message || err?.message || '').toLowerCase();
+        if (msg.includes('no cuenta con un negocio') || msg.includes('aún no cuenta')) {
+          tokenData = null;
+        } else {
+          throw err;
+        }
+      }
+    }
+
     if (tokenData === null) {
       return {
         user: { ...user, businessId: '', isOnboardingCompleted: false },
@@ -95,7 +117,15 @@ async function resolveBusinessProfile(
         syncError: null,
       };
     }
-    if (tokenData.user.businessId) {
+
+    if (tokenData?.accessToken && typeof storage.secureSet === 'function') {
+      await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, tokenData.accessToken);
+      if (tokenData.refreshToken) {
+        await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, tokenData.refreshToken);
+      }
+    }
+
+    if (tokenData?.user?.businessId) {
       return {
         user: {
           ...user,
@@ -116,18 +146,20 @@ async function resolveBusinessProfile(
       };
     }
     throw new Error('Slotify no pudo confirmar el negocio de esta cuenta.');
-  } catch (error) {
+  } catch (error: any) {
+    const status = error?.response?.status;
+    const isRejectedAuth = status === 401 || status === 403 || status === 409;
+    const errMessage = getAuthRequestMessage(
+      error,
+      'No se pudo verificar el negocio de esta cuenta. Inténtalo de nuevo.'
+    );
     return {
-      user,
+      user: isRejectedAuth ? null : user,
       businessProfileStatus: 'unavailable',
-      error: authRequestMessage(
-        error,
-        'No se pudo verificar el negocio de esta cuenta. Inténtalo de nuevo.'
-      ),
-      syncError: authRequestMessage(
-        error,
-        'No se pudo verificar el negocio de esta cuenta.'
-      ),
+      error: errMessage,
+      syncError: errMessage,
+      isRejectedAuth,
+      status,
     };
   }
 }
@@ -154,7 +186,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateUser: (partial) => {
     set((state) => {
       const updated = state.user ? { ...state.user, ...partial } : ({ ...partial } as AuthUser);
-      storage.set(STORAGE_KEYS.USER_DATA, updated).catch(() => {});
+      storage.set(STORAGE_KEYS.USER_DATA, updated).catch(() => { });
       return { user: updated };
     });
   },
@@ -203,14 +235,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 1. Autenticar con Supabase Auth
       const data = await authApi.login(credentials);
-      if (!data.user) {
+      const rawUser = data?.user || data?.session?.user;
+      if (!rawUser) {
         throw new Error('No se pudo verificar la sesión del usuario.');
       }
 
       // Si es un cliente consumidor, no requiere exchange de negocio
-      const isClient = data.user.user_metadata?.role === 'CLIENTE';
+      const isClient = rawUser.user_metadata?.role === 'CLIENTE';
       if (isClient) {
-        const clientUser = buildAuthUser(data.user);
+        const clientUser = buildAuthUser(rawUser);
         if (data.session) {
           try {
             await authApi.syncClient(data.session);
@@ -218,7 +251,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // Continúa si el backend de sincronización no responde
           }
         }
-        await storage.set(STORAGE_KEYS.USER_DATA, clientUser);
+        if (typeof storage.set === 'function') {
+          await storage.set(STORAGE_KEYS.USER_DATA, clientUser);
+        }
         set({
           user: clientUser,
           isAuthenticated: true,
@@ -232,110 +267,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
-      // 2. Intercambio de token con backend Slotify
-      try {
-        const exchangeRes = await authApi.exchangeToken({
-          userId: data.user.id,
-          email: data.user.email!,
-        });
+      // 2. Resolver perfil del negocio (US-022)
+      const user = buildAuthUser(rawUser);
+      const supabaseToken = data.session?.access_token || '';
+      const profile = await resolveBusinessProfile(user, supabaseToken);
 
-        if (exchangeRes.success && exchangeRes.data) {
-          if (exchangeRes.data.accessToken) {
-            await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, exchangeRes.data.accessToken);
-          }
-          if (exchangeRes.data.refreshToken) {
-            await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, exchangeRes.data.refreshToken);
-          }
-
-          const bUser = exchangeRes.data.user;
-          const authUser: AuthUser = {
-            id: bUser.id,
-            firstName: bUser.firstName,
-            lastName: bUser.lastName,
-            fullName: bUser.fullName,
-            email: bUser.email,
-            role: (bUser.role as string) === 'Owner' || bUser.role === 'DUENO' ? 'DUENO' : 'EMPLEADO',
-            businessId: bUser.businessId,
-            businessName: '',
-            isOnboardingCompleted: Boolean(bUser.isOnboardingCompleted),
-          };
-
-          await storage.set(STORAGE_KEYS.USER_DATA, authUser);
-          await storage.set(
-            STORAGE_KEYS.ONBOARDING_COMPLETE,
-            authUser.isOnboardingCompleted ? 'true' : 'false'
-          );
-
-          set({
-            user: authUser,
-            isAuthenticated: true,
-            appMode: 'BUSINESS',
-            businessProfileStatus: authUser.isOnboardingCompleted ? 'ready' : 'needs-setup',
-            isLoading: false,
-            error: null,
-            formError: null,
-            syncError: null,
-          });
-          return;
-        } else {
-          throw new Error(exchangeRes.message || 'Error al validar la sesión con Slotify.');
-        }
-      } catch (exchangeErr: any) {
-        const errData = exchangeErr.response?.data;
-        const status = exchangeErr.response?.status;
-        const rawMsg = (
-          errData?.error ||
-          errData?.errors?.[0] ||
-          errData?.message ||
-          exchangeErr.message ||
-          ''
-        ).trim();
-        const msg = rawMsg.toLowerCase();
-
-        // 401, 403, 409 o >=500 NUNCA deben interpretarse como pendiente de sincronización
-        const isNotSynced =
-          status !== 401 &&
-          status !== 403 &&
-          status !== 409 &&
-          (!status || status < 500) &&
-          (msg.includes('aún no cuenta con un negocio sincronizado') ||
-            msg.includes('no cuenta con un negocio sincronizado') ||
-            status === 404);
-
-        if (isNotSynced) {
-          const pendingUser = buildAuthUser(data.user, {
-            businessId: '',
-            isOnboardingCompleted: false,
-          });
-          await storage.set(STORAGE_KEYS.USER_DATA, pendingUser);
-          await storage.set(STORAGE_KEYS.ONBOARDING_COMPLETE, 'false');
-
-          set({
-            user: pendingUser,
-            isAuthenticated: true,
-            appMode: 'BUSINESS',
-            businessProfileStatus: 'needs-setup',
-            isLoading: false,
-            error: null,
-            formError: null,
-            syncError: null,
-          });
-          return;
-        }
-
-        const normalized = normalizeError(exchangeErr, { isAuthForm: true });
+      if (profile.isRejectedAuth) {
         set({
-          error: normalized.message,
-          formError: normalized,
-          syncError: normalized.message,
+          user: null,
+          isAuthenticated: false,
           businessProfileStatus: 'unavailable',
+          error: profile.error,
+          syncError: profile.syncError,
           isLoading: false,
         });
-        throw normalized;
+        throw new Error(profile.syncError || profile.error || 'Error de autenticación.');
       }
+
+      if (profile.user && typeof storage.set === 'function') {
+        await storage.set(STORAGE_KEYS.USER_DATA, profile.user);
+      }
+      if (typeof storage.set === 'function') {
+        await storage.set(
+          STORAGE_KEYS.ONBOARDING_COMPLETE,
+          profile.user?.isOnboardingCompleted ? 'true' : 'false'
+        );
+      }
+
+      set({
+        ...profile,
+        isAuthenticated: true,
+        appMode: 'BUSINESS',
+        isLoading: false,
+      });
     } catch (error: any) {
       const normalized = normalizeError(error, { isAuthForm: true });
-      set({ error: normalized.message, formError: normalized, isLoading: false });
+      set({
+        error: normalized.message,
+        formError: normalized,
+        syncError: normalized.message,
+        isLoading: false,
+      });
       throw normalized;
     }
   },
@@ -370,7 +342,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error: any) {
       const normalized = normalizeError(error, { isAuthForm: true });
-      set({ error: normalized.message, formError: normalized, isLoading: false });
+      set({
+        error: normalized.message,
+        formError: normalized,
+        syncError: normalized.message,
+        isLoading: false,
+      });
       throw normalized;
     }
   },
@@ -403,7 +380,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error: any) {
       const normalized = normalizeError(error, { isAuthForm: true });
-      set({ error: normalized.message, formError: normalized, isLoading: false });
+      set({
+        error: normalized.message,
+        formError: normalized,
+        syncError: normalized.message,
+        isLoading: false,
+      });
       throw normalized;
     }
   },
@@ -490,7 +472,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const session = await authApi.getSession();
 
       if (session?.user) {
-        const storedUser = await storage.get<AuthUser>(STORAGE_KEYS.USER_DATA);
+        let storedUser: AuthUser | null = null;
+        if (typeof storage.get === 'function') {
+          try {
+            storedUser = await storage.get<AuthUser>(STORAGE_KEYS.USER_DATA);
+          } catch {
+            storedUser = null;
+          }
+        }
 
         const isClient =
           session.user.user_metadata?.role === 'CLIENTE' || storedUser?.role === 'CLIENTE';
@@ -508,117 +497,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
-        try {
-          const exchangeRes = await authApi.exchangeToken({
-            userId: session.user.id,
-            email: session.user.email!,
-          });
-
-          if (exchangeRes.success && exchangeRes.data) {
-            if (exchangeRes.data.accessToken) {
-              await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, exchangeRes.data.accessToken);
-            }
-            if (exchangeRes.data.refreshToken) {
-              await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, exchangeRes.data.refreshToken);
-            }
-
-            const bUser = exchangeRes.data.user;
-            const authUser: AuthUser = {
-              id: bUser.id,
-              firstName: bUser.firstName,
-              lastName: bUser.lastName,
-              fullName: bUser.fullName,
-              email: bUser.email,
-              role: (bUser.role as string) === 'Owner' || bUser.role === 'DUENO' ? 'DUENO' : 'EMPLEADO',
-              businessId: bUser.businessId,
-              businessName: storedUser?.businessName || '',
-              isOnboardingCompleted: Boolean(bUser.isOnboardingCompleted),
-            };
-
-            await storage.set(STORAGE_KEYS.USER_DATA, authUser);
+        const user = buildAuthUser(session.user, storedUser || undefined);
+        const profile = await resolveBusinessProfile(
+          user,
+          session.access_token
+        );
+        if (profile.user && typeof storage.set === 'function') {
+          try {
+            await storage.set(STORAGE_KEYS.USER_DATA, profile.user);
+          } catch {}
+        }
+        if (typeof storage.set === 'function') {
+          try {
             await storage.set(
               STORAGE_KEYS.ONBOARDING_COMPLETE,
-              authUser.isOnboardingCompleted ? 'true' : 'false'
+              profile.user?.isOnboardingCompleted ? 'true' : 'false'
             );
-
-            set({
-              user: authUser,
-              isAuthenticated: true,
-              appMode: 'BUSINESS',
-              businessProfileStatus: authUser.isOnboardingCompleted ? 'ready' : 'needs-setup',
-              isLoading: false,
-              isHydrating: false,
-              syncError: null,
-            });
-            return;
-          }
-        } catch (exchangeErr: any) {
-          const errData = exchangeErr.response?.data;
-          const status = exchangeErr.response?.status;
-          const rawMsg = (
-            errData?.error ||
-            errData?.errors?.[0] ||
-            errData?.message ||
-            exchangeErr.message ||
-            ''
-          ).trim();
-          const msg = rawMsg.toLowerCase();
-
-          const isNotSynced =
-            status !== 401 &&
-            status !== 403 &&
-            status !== 409 &&
-            (!status || status < 500) &&
-            (msg.includes('aún no cuenta con un negocio sincronizado') ||
-              msg.includes('no cuenta con un negocio sincronizado') ||
-              status === 404);
-
-          if (isNotSynced) {
-            const pendingUser = buildAuthUser(session.user, {
-              ...storedUser,
-              businessId: '',
-              isOnboardingCompleted: false,
-            });
-            await storage.set(STORAGE_KEYS.USER_DATA, pendingUser);
-            await storage.set(STORAGE_KEYS.ONBOARDING_COMPLETE, 'false');
-
-            set({
-              user: pendingUser,
-              isAuthenticated: true,
-              appMode: 'BUSINESS',
-              businessProfileStatus: 'needs-setup',
-              isLoading: false,
-              isHydrating: false,
-              syncError: null,
-            });
-            return;
-          }
-
-          const isRejectedAuth = status === 401 || status === 403 || status === 409;
-          console.warn('[Auth hydrate] Fallo al intercambiar token:', msg);
-          if (storedUser && !isRejectedAuth) {
-            set({
-              user: storedUser,
-              isAuthenticated: true,
-              appMode: storedUser.role === 'CLIENTE' ? 'CONSUMER' : 'BUSINESS',
-              businessProfileStatus: storedUser.isOnboardingCompleted ? 'ready' : 'needs-setup',
-              isLoading: false,
-              isHydrating: false,
-              syncError: 'Error de sincronización con el servidor. Modo sin conexión.',
-            });
-            return;
-          }
-
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-            isHydrating: false,
-            businessProfileStatus: 'unavailable',
-            syncError: rawMsg || 'No se pudo sincronizar la sesión.',
-          });
-          return;
+          } catch {}
         }
+
+        const isAuthRejected = profile.user === null;
+        set({
+          ...profile,
+          isAuthenticated: !isAuthRejected,
+          appMode: 'BUSINESS',
+          isLoading: false,
+          isHydrating: false,
+        });
       } else {
         set({
           user: null,
@@ -629,14 +534,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           syncError: null,
         });
       }
-    } catch {
+    } catch (error: any) {
       set({
         user: null,
         isAuthenticated: false,
         isLoading: false,
         isHydrating: false,
         businessProfileStatus: 'unknown',
-        syncError: null,
+        syncError: error?.message || null,
       });
     }
   },

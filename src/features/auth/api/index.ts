@@ -1,16 +1,16 @@
-import { supabase } from '@/shared/lib/supabase';
-import { isAxiosError } from 'axios';
-import type { Session } from '@supabase/supabase-js';
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS, STORAGE_KEYS } from '@/shared/lib/constants';
 import { storage } from '@/shared/lib/storage';
+import { supabase } from '@/shared/lib/supabase';
 import type { ApiResponse, AuthResponse } from '@/shared/types';
+import type { Session } from '@supabase/supabase-js';
+import { isAxiosError } from 'axios';
 import type {
+  ExchangeTokenRequest,
   ExchangeTokenResponse,
   LoginCredentials,
   RegisterAdminRequest,
   RegisterClientRequest,
-  ExchangeTokenRequest,
   SyncProfileRequest,
   SyncProfileResponse,
 } from '../types';
@@ -60,14 +60,14 @@ export const authApi = {
       tokenData = response.data?.data;
     } catch (error) {
       if (isAxiosError<{ code?: string }>(error) && error.response?.status === 404 &&
-          error.response.data?.code === 'business_profile_missing') {
+        error.response.data?.code === 'business_profile_missing') {
         return null;
       }
       throw error;
     }
 
     if (tokenData?.accessToken && tokenData.user?.id === userId &&
-        (await authApi.getSession())?.user.id === userId) {
+      (await authApi.getSession())?.user.id === userId) {
       await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, tokenData.accessToken);
       if (tokenData.refreshToken) {
         await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, tokenData.refreshToken);
@@ -195,7 +195,7 @@ export const authApi = {
 
     const syncedData = response.data?.data;
     if (response.data?.success !== true || !syncedData?.accessToken || !syncedData.businessId ||
-        syncedData.id !== syncPayload.id || (await authApi.getSession())?.user.id !== syncPayload.id) {
+      syncedData.id !== syncPayload.id || (await authApi.getSession())?.user.id !== syncPayload.id) {
       throw new Error('Slotify no pudo confirmar el registro del negocio para esta sesión.');
     }
 

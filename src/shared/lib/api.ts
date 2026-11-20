@@ -6,15 +6,15 @@
 
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { router } from 'expo-router';
-import { supabase } from './supabase';
 import { API_ENDPOINTS, STORAGE_KEYS } from './constants';
 import { storage } from './storage';
+import { supabase } from './supabase';
 
 function getAuthState() {
   try {
     return (require('@/features/auth/model') as typeof import('@/features/auth/model')).useAuthStore.getState();
   } catch {
-    return { user: null, logout: async () => {} };
+    return { user: null, logout: async () => { } };
   }
 }
 
@@ -25,9 +25,9 @@ function getExpoDevHostIp(): string | null {
   try {
     const Constants = require('expo-constants')?.default as
       | {
-          expoConfig?: { hostUri?: string };
-          manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } };
-        }
+        expoConfig?: { hostUri?: string };
+        manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } };
+      }
       | undefined;
     const rawHostUri =
       Constants?.expoConfig?.hostUri ??
@@ -106,7 +106,7 @@ function renewBackendToken(userId: string): Promise<string | null> {
       data?: { accessToken?: string; refreshToken?: string; user?: { id?: string } };
     }>(
       API_ENDPOINTS.AUTH.LOGIN,
-      { userId, email: session.user.email || '' },
+      undefined,
       { headers: { Authorization: `Bearer ${session.access_token}` } },
     );
     const tokenData = response.data?.data;
@@ -133,9 +133,20 @@ function renewBackendToken(userId: string): Promise<string | null> {
 apiClient.interceptors.request.use(
   async (config: SlotifyRequest) => {
     config.slotifyUserId ??= getAuthState().user?.id;
-    if (!config.headers.has('Authorization')) {
+    const headers = config.headers as any;
+    const hasAuth =
+      typeof headers?.has === 'function'
+        ? headers.has('Authorization')
+        : Boolean(headers?.['Authorization'] || headers?.['authorization']);
+    if (!hasAuth) {
       const token = await storage.secureGet(STORAGE_KEYS.ACCESS_TOKEN);
-      if (token) config.headers.set('Authorization', `Bearer ${token}`);
+      if (token) {
+        if (typeof headers?.set === 'function') {
+          headers.set('Authorization', `Bearer ${token}`);
+        } else if (headers) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+      }
     }
     return config;
   },

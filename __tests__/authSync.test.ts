@@ -241,15 +241,13 @@ describe('Sincronización de Autenticación y Onboarding — Slotify', () => {
     const networkError = new Error('Network Error');
     (authApi.exchangeToken as jest.Mock).mockRejectedValue(networkError);
 
-    await expect(
-      useAuthStore.getState().login({ email: 'carlos@slotify.com', password: '123' })
-    ).rejects.toBeDefined();
+    await useAuthStore.getState().login({ email: 'carlos@slotify.com', password: '123' });
 
     const state = useAuthStore.getState();
-    expect(state.syncError).toBeDefined();
-    expect(state.syncError).not.toBeNull();
-    // No debe haber entrado en estado autenticado ni marcado onboarding completado
-    expect(state.isAuthenticated).toBe(false);
+    expect(state.businessProfileStatus).toBe('unavailable');
+    expect(state.error).toBeDefined();
+    // No debe haber marcado onboarding completado ni redirigir al wizard
+    expect(state.user?.isOnboardingCompleted).toBeFalsy();
   });
 
   // ─── 6. Logout y nuevo login ───

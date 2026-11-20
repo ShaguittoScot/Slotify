@@ -2,10 +2,10 @@
  * Explore Feature — Model & State Management (Zustand)
  */
 
-import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { exploreApi } from '../api';
 import { loadFormSchemaLocally } from '@/features/dashboard/model/formBranding';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { exploreApi } from '../api';
 import type { BusinessDto, Category } from '../types';
 
 export const isValidHexColor = (color?: string | null): boolean => {
@@ -37,8 +37,8 @@ const enrichWithLocalBranding = (biz: BusinessDto, localBranding: LocalBranding)
     brandColor: hasBackendColor
       ? biz.brandColor
       : isValidHexColor(localBranding.accentColor)
-      ? localBranding.accentColor
-      : biz.brandColor,
+        ? localBranding.accentColor
+        : biz.brandColor,
   };
 };
 
