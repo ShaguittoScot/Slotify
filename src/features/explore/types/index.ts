@@ -7,6 +7,9 @@ export interface BusinessServiceDto {
   name: string;
   price: number;
   durationMinutes: number;
+  description?: string | null;
+  bufferTimeMinutes?: number;
+  isActive?: boolean;
 }
 
 export type BusinessServiceItem = BusinessServiceDto;

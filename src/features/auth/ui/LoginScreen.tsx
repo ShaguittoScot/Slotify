@@ -15,6 +15,11 @@ import { useRouter } from 'expo-router';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner';
+import { FormFieldError } from '@/components/ui/FormFieldError';
+import type { NormalizedError } from '@/shared/lib/errorUtils';
+
+type FormStatus = 'idle' | 'submitting' | 'error' | 'success';
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -22,21 +27,95 @@ export const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
 
+  // Estados de control de formulario
+  const [formStatus, setFormStatus] = useState<FormStatus>('idle');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [localError, setLocalError] = useState<NormalizedError | string | null>(null);
+
   const { colors, isDark, themeMode } = useAppTheme();
   const login = useAuthStore((state) => state.login);
   const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
   const isLoading = useAuthStore((state) => state.isLoading);
-  const error = useAuthStore((state) => state.error);
+  const storeError = useAuthStore((state) => state.error);
+  const storeFormError = useAuthStore((state) => state.formError);
   const clearError = useAuthStore((state) => state.clearError);
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email || !password) return;
-    try {
+  const clearFieldError = (fieldName: string) => {
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    }
+    if (localError || storeError) {
+      setLocalError(null);
       clearError();
-      await login({ email, password });
-    } catch {
-      // Error is handled in the Zustand store
+      setFormStatus('idle');
+    }
+  };
+
+  const validateFields = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      errors.email = 'El correo electrónico es obligatorio.';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        errors.email = 'Ingresa un formato de correo electrónico válido.';
+      }
+    }
+
+    if (!password) {
+      errors.password = 'La contraseña es obligatoria.';
+    }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setLocalError({
+        title: 'Datos requeridos incompletos',
+        message: 'Por favor ingresa tu correo y contraseña para continuar.',
+        category: 'VALIDATION',
+        fieldErrors: errors,
+      });
+      setFormStatus('error');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleLogin = async () => {
+    if (formStatus === 'submitting' || isLoading) return;
+
+    if (!validateFields()) return;
+
+    try {
+      setFormStatus('submitting');
+      clearError();
+      setLocalError(null);
+
+      await login({ email: email.trim().toLowerCase(), password });
+      setFormStatus('success');
+    } catch (err: any) {
+      setFormStatus('error');
+      const errObj: NormalizedError =
+        err && typeof err === 'object' && 'message' in err
+          ? err
+          : {
+              title: 'No se pudo iniciar sesión',
+              message: err?.message || 'Error al verificar tus credenciales.',
+              category: 'UNKNOWN',
+            };
+
+      setLocalError(errObj);
+      if (errObj.fieldErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errObj.fieldErrors }));
+      }
     }
   };
 
@@ -92,19 +171,15 @@ export const LoginScreen = () => {
               },
             ]}
           >
-            {error ? (
-              <View
-                style={[
-                  styles.errorBox,
-                  {
-                    backgroundColor: colors.status.errorBg,
-                    borderColor: colors.status.error,
-                  },
-                ]}
-              >
-                <Text style={[styles.errorText, { color: colors.status.error }]}>{error}</Text>
-              </View>
-            ) : null}
+            <FormErrorBanner
+              error={localError || storeFormError || storeError}
+              onDismiss={() => {
+                setLocalError(null);
+                clearError();
+                setFormStatus('idle');
+              }}
+              onRetry={handleLogin}
+            />
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text.primary }]}>Correo electrónico</Text>
@@ -114,7 +189,7 @@ export const LoginScreen = () => {
                   {
                     backgroundColor: colors.background.tertiary,
                     color: colors.text.primary,
-                    borderColor: colors.border.main,
+                    borderColor: fieldErrors.email ? colors.status.error : colors.border.main,
                   },
                 ]}
                 placeholder="tu@correo.com"
@@ -123,9 +198,13 @@ export const LoginScreen = () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={email}
-                onChangeText={setEmail}
-                editable={!isLoading}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  clearFieldError('email');
+                }}
+                editable={formStatus !== 'submitting' && !isLoading}
               />
+              <FormFieldError error={fieldErrors.email} />
             </View>
 
             <View style={styles.inputGroup}>
@@ -135,7 +214,7 @@ export const LoginScreen = () => {
                   styles.passwordContainer,
                   {
                     backgroundColor: colors.background.tertiary,
-                    borderColor: colors.border.main,
+                    borderColor: fieldErrors.password ? colors.status.error : colors.border.main,
                   },
                 ]}
               >
@@ -145,8 +224,11 @@ export const LoginScreen = () => {
                   placeholderTextColor={colors.text.muted}
                   secureTextEntry={!showPassword}
                   value={password}
-                  onChangeText={setPassword}
-                  editable={!isLoading}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    clearFieldError('password');
+                  }}
+                  editable={formStatus !== 'submitting' && !isLoading}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
@@ -157,16 +239,17 @@ export const LoginScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
+              <FormFieldError error={fieldErrors.password} />
             </View>
 
             <TouchableOpacity
               style={[
                 styles.button,
                 { backgroundColor: colors.action.primary },
-                (!isFormValid || isLoading) && { backgroundColor: colors.action.disabled },
+                (formStatus === 'submitting' || isLoading) && { backgroundColor: colors.action.disabled },
               ]}
               onPress={handleLogin}
-              disabled={!isFormValid || isLoading}
+              disabled={formStatus === 'submitting' || isLoading}
               activeOpacity={0.8}
             >
               {isLoading ? (

@@ -1,0 +1,237 @@
+{
+  "main": {
+    "id": "f7dcb6e9aad976b3",
+    "type": "split",
+    "children": [
+      {
+        "id": "13f330412c53133a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "293a69da52ad8bcd",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "06 - Capa de Integracion y API Client/Slotify API Client.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Slotify API Client"
+            }
+          },
+          {
+            "id": "00f1032223573b4c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "03 - Modulos Funcionales (Features)/Feature Calendar.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Feature Calendar"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9e440c8ef13d94f2",
+    "type": "split",
+    "children": [
+      {
+        "id": "c15bdee51db20eef",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9c3e45646ac23bd5",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "5e1fc63b3e6cc82f",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "f36bebf84e79d86f",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "cd5e02bc7bafd3d4",
+    "type": "split",
+    "children": [
+      {
+        "id": "ca7d17b3dbaafc2a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1f18e2f4af3574a3",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Base de Datos/Modelo de Datos.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes"
+            }
+          },
+          {
+            "id": "ada85c512a54fb5f",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Base de Datos/Modelo de Datos.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes"
+            }
+          },
+          {
+            "id": "bb0392571ff7cbc1",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "bb3c52dfc79fc912",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "a30b697fc6c1f643",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Base de Datos/Modelo de Datos.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false
+    }
+  },
+  "active": "293a69da52ad8bcd",
+  "lastOpenFiles": [
+    "06 - Capa de Integracion y API Client/Gestion Centralizada de Errores (errorUtils).md",
+    "05 - Componentes Compartidos y UI Kit/FormViewer.md",
+    "05 - Componentes Compartidos y UI Kit/FloatingTabBar.md",
+    "05 - Componentes Compartidos y UI Kit/EmptyStateCard.md",
+    "04 - Modulos y Features (FDD)/Feature Clients.md",
+    "04 - Modulos y Features (FDD)/Feature Business Dashboard.md",
+    "03 - Flujos de Usuario e Interaccion/Flujo de Normalizacion de Errores y Feedback Visual.md",
+    "03 - Flujos de Usuario e Interaccion/Flujo de Agendamiento y Formularios Dinamicos.md",
+    "02 - Arquitectura Frontend/Sistema de Diseno y Tokens.md",
+    "02 - Arquitectura Frontend/Enrutamiento y Navegacion.md",
+    "02 - Arquitectura Frontend/Estado Global y Stores.md",
+    "02 - Arquitectura Frontend/Arquitectura y FDD.md",
+    "01 - Requerimientos y UX/US-023 - Gestion de Bloqueos de Agenda y Citas.md",
+    "01 - Requerimientos y UX/US-020 - Creador Dinamico de Formularios (Form Builder).md",
+    "01 - Requerimientos y UX/US-001 - Experiencia de Registro B2C y B2B.md",
+    "07 - Guias y Compilacion/Compilacion con EAS y Despliegue.md",
+    "00 - Inicio/Indice General.md",
+    "03 - Flujos de Usuario e Interaccion/Flujo de Registro y Sync con Supabase Auth.md",
+    "01 - Requerimientos y UX/Indice de Historias de Usuario UI.md",
+    "01 - Requerimientos y UX/US-005 - Micro-Onboarding Interactivo del Consumidor.md",
+    "01 - Requerimientos y UX/US-004 - Dashboard y Manejo de Estados Vacios (Empty States).md",
+    "01 - Requerimientos y UX/US-003 - Calendario Tactil y Seleccion de Turnos.md",
+    "03 - Flujos de Usuario e Interaccion/Flujo de Micro-Onboarding y Feed Inicial.md",
+    "03 - Flujos de Usuario e Interaccion/Flujo de Exploracion y Filtros de Negocio.md",
+    "01 - Arquitectura y Modulos/Capa de Red y Servicios API.md",
+    "05 - Estado e Integracion de Red/Cliente Axios e Interceptores.md",
+    "Historias de Usuario",
+    "05 - Acceso a Datos y Persistencia",
+    "04 - Entidades y Dominio"
+  ]
+}

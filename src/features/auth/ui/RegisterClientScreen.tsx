@@ -15,6 +15,11 @@ import { useRouter } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner';
+import { FormFieldError } from '@/components/ui/FormFieldError';
+import type { NormalizedError } from '@/shared/lib/errorUtils';
+
+type FormStatus = 'idle' | 'submitting' | 'error' | 'success';
 
 export const RegisterClientScreen = () => {
   const [firstName, setFirstName] = useState('');
@@ -24,37 +29,115 @@ export const RegisterClientScreen = () => {
   const [password, setPassword] = useState('');
   const [showThemeModal, setShowThemeModal] = useState(false);
 
+  // Estados de control de formulario
+  const [formStatus, setFormStatus] = useState<FormStatus>('idle');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [localError, setLocalError] = useState<NormalizedError | string | null>(null);
+
   const { colors, isDark, themeMode } = useAppTheme();
   const registerClient = useAuthStore((state) => state.registerClient);
   const isLoading = useAuthStore((state) => state.isLoading);
-  const error = useAuthStore((state) => state.error);
+  const storeError = useAuthStore((state) => state.error);
+  const storeFormError = useAuthStore((state) => state.formError);
   const clearError = useAuthStore((state) => state.clearError);
   const router = useRouter();
 
-  const isFormValid =
-    firstName.trim().length > 0 &&
-    email.trim().length > 0 &&
-    password.length >= 6;
+  const clearFieldError = (fieldName: string) => {
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    }
+    if (localError || storeError) {
+      setLocalError(null);
+      clearError();
+      setFormStatus('idle');
+    }
+  };
+
+  const validateFields = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const cleanFirstName = firstName.trim();
+    if (!cleanFirstName) {
+      errors.firstName = 'El nombre es obligatorio.';
+    }
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      errors.email = 'El correo electrónico es obligatorio.';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        errors.email = 'Ingresa un correo electrónico con formato válido.';
+      }
+    }
+
+    if (!password) {
+      errors.password = 'La contraseña es obligatoria.';
+    } else if (password.length < 6) {
+      errors.password = 'La contraseña debe tener al menos 6 caracteres.';
+    }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setLocalError({
+        title: 'Verifica los datos requeridos',
+        message: 'Por favor completa o corrige los campos señalados antes de continuar.',
+        category: 'VALIDATION',
+        fieldErrors: errors,
+      });
+      setFormStatus('error');
+      return false;
+    }
+
+    return true;
+  };
 
   const handleRegister = async () => {
-    if (!isFormValid) return;
+    if (formStatus === 'submitting' || isLoading) return;
+
+    if (!validateFields()) return;
+
     try {
+      setFormStatus('submitting');
       clearError();
+      setLocalError(null);
+
       const sanitizedPhone = phone.trim() ? phone.trim() : undefined;
       const cleanFirstName = firstName.trim();
       const cleanLastName = lastName.trim();
+      const cleanEmail = email.trim().toLowerCase();
 
       await registerClient({
         firstName: cleanFirstName,
         lastName: cleanLastName,
         fullName: `${cleanFirstName} ${cleanLastName}`.trim(),
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         password,
         phone: sanitizedPhone,
       });
+
+      setFormStatus('success');
       router.replace('/(onboarding)/consumer' as any);
-    } catch (err) {
-      console.error('Error durante el registro de cliente:', err);
+    } catch (err: any) {
+      setFormStatus('error');
+      const errObj: NormalizedError =
+        err && typeof err === 'object' && 'message' in err
+          ? err
+          : {
+              title: 'No se pudo guardar la información',
+              message: err?.message || 'Error durante el registro de cliente.',
+              category: 'UNKNOWN',
+            };
+
+      setLocalError(errObj);
+      if (errObj.fieldErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errObj.fieldErrors }));
+      }
     }
   };
 
@@ -129,19 +212,15 @@ export const RegisterClientScreen = () => {
               },
             ]}
           >
-            {error ? (
-              <View
-                style={[
-                  styles.errorBox,
-                  {
-                    backgroundColor: colors.status.errorBg,
-                    borderColor: colors.status.error,
-                  },
-                ]}
-              >
-                <Text style={[styles.errorText, { color: colors.status.error }]}>{error}</Text>
-              </View>
-            ) : null}
+            <FormErrorBanner
+              error={localError || storeFormError || storeError}
+              onDismiss={() => {
+                setLocalError(null);
+                clearError();
+                setFormStatus('idle');
+              }}
+              onRetry={handleRegister}
+            />
 
             {/* Nombre y Apellido (Campos Separados) */}
             <View style={styles.nameRow}>
@@ -153,15 +232,19 @@ export const RegisterClientScreen = () => {
                     {
                       backgroundColor: colors.background.tertiary,
                       color: colors.text.primary,
-                      borderColor: colors.border.main,
+                      borderColor: fieldErrors.firstName ? colors.status.error : colors.border.main,
                     },
                   ]}
                   placeholder="Ej. Carlos"
                   placeholderTextColor={colors.text.muted}
                   value={firstName}
-                  onChangeText={setFirstName}
-                  editable={!isLoading}
+                  onChangeText={(val) => {
+                    setFirstName(val);
+                    clearFieldError('firstName');
+                  }}
+                  editable={formStatus !== 'submitting' && !isLoading}
                 />
+                <FormFieldError error={fieldErrors.firstName} />
               </View>
 
               <View style={[styles.inputGroup, { flex: 1, marginLeft: 6 }]}>
@@ -179,7 +262,7 @@ export const RegisterClientScreen = () => {
                   placeholderTextColor={colors.text.muted}
                   value={lastName}
                   onChangeText={setLastName}
-                  editable={!isLoading}
+                  editable={formStatus !== 'submitting' && !isLoading}
                 />
               </View>
             </View>
@@ -192,7 +275,7 @@ export const RegisterClientScreen = () => {
                   {
                     backgroundColor: colors.background.tertiary,
                     color: colors.text.primary,
-                    borderColor: colors.border.main,
+                    borderColor: fieldErrors.email ? colors.status.error : colors.border.main,
                   },
                 ]}
                 placeholder="carlos@correo.com"
@@ -201,9 +284,13 @@ export const RegisterClientScreen = () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={email}
-                onChangeText={setEmail}
-                editable={!isLoading}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  clearFieldError('email');
+                }}
+                editable={formStatus !== 'submitting' && !isLoading}
               />
+              <FormFieldError error={fieldErrors.email} />
             </View>
 
             <View style={styles.inputGroup}>
@@ -229,7 +316,7 @@ export const RegisterClientScreen = () => {
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
-                editable={!isLoading}
+                editable={formStatus !== 'submitting' && !isLoading}
               />
             </View>
 
@@ -241,29 +328,33 @@ export const RegisterClientScreen = () => {
                   {
                     backgroundColor: colors.background.tertiary,
                     color: colors.text.primary,
-                    borderColor: colors.border.main,
+                    borderColor: fieldErrors.password ? colors.status.error : colors.border.main,
                   },
                 ]}
                 placeholder="Mínimo 6 caracteres"
                 placeholderTextColor={colors.text.muted}
                 secureTextEntry
                 value={password}
-                onChangeText={setPassword}
-                editable={!isLoading}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  clearFieldError('password');
+                }}
+                editable={formStatus !== 'submitting' && !isLoading}
               />
+              <FormFieldError error={fieldErrors.password} />
             </View>
 
             <TouchableOpacity
               style={[
                 styles.button,
                 { backgroundColor: '#10B981' },
-                (!isFormValid || isLoading) && { opacity: 0.6 },
+                (formStatus === 'submitting' || isLoading) && { opacity: 0.6 },
               ]}
               onPress={handleRegister}
-              disabled={!isFormValid || isLoading}
+              disabled={formStatus === 'submitting' || isLoading}
               activeOpacity={0.8}
             >
-              {isLoading ? (
+              {formStatus === 'submitting' || isLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.buttonText}>Crear Cuenta</Text>

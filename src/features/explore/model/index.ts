@@ -70,14 +70,12 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
 
   initInterests: async () => {
     try {
-      const val = await AsyncStorage.getItem('consumerInterests');
-      if (!val) return;
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        set({ selectedCategoryKey: parsed[0].toLowerCase() });
-      }
+      // Los intereses del usuario quedan guardados en storage para preferencias,
+      // pero por defecto el catálogo siempre inicia en 'all' (Todos) para evitar vistas vacías sin resultados.
+      await AsyncStorage.getItem('consumerInterests');
+      set({ selectedCategoryKey: 'all' });
     } catch {
-      // Silently ignore storage parsing errors
+      set({ selectedCategoryKey: 'all' });
     }
   },
 }));
@@ -107,12 +105,16 @@ export const selectFilteredBusinesses = (
   debouncedQuery: string,
   selectedCategoryKey: string
 ): BusinessDto[] => {
-  const query = debouncedQuery.toLowerCase();
-  const activeKey = selectedCategoryKey.toLowerCase();
+  const query = debouncedQuery.toLowerCase().trim();
+  const activeKey = (selectedCategoryKey || 'all').toLowerCase().trim();
 
   return businesses.filter((b) => {
-    const bKey = (b.categoryKey || b.category || '').toLowerCase();
-    if (activeKey !== 'all' && !bKey.includes(activeKey)) return false;
+    if (activeKey !== 'all') {
+      const bKey = (b.categoryKey || b.category || '').toLowerCase().trim();
+      const matches = bKey === activeKey || bKey.includes(activeKey) || activeKey.includes(bKey);
+      if (!matches) return false;
+    }
+
     if (!query) return true;
 
     return (

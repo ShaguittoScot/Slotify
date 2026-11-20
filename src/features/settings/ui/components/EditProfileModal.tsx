@@ -14,6 +14,9 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner';
+import { FormFieldError } from '@/components/ui/FormFieldError';
+import type { NormalizedError } from '@/shared/lib/errorUtils';
 
 interface Props {
   visible: boolean;
@@ -26,16 +29,27 @@ export function EditProfileModal({ visible, onClose }: Props) {
 
   const [fullName, setFullName] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [formError, setFormError] = useState<NormalizedError | null>(null);
 
   useEffect(() => {
     if (visible && user) {
       setFullName(user.fullName || '');
       setBusinessName(user.businessName || '');
+      setFormError(null);
     }
   }, [visible, user]);
 
   const handleSave = () => {
-    if (!fullName.trim()) return;
+    if (!fullName.trim()) {
+      setFormError({
+        title: 'Nombre requerido',
+        message: 'Por favor ingresa tu nombre completo para guardar los cambios.',
+        category: 'VALIDATION',
+        fieldErrors: { fullName: 'El nombre completo es obligatorio.' },
+      });
+      return;
+    }
+    setFormError(null);
     updateUser({
       fullName: fullName.trim(),
       businessName: businessName.trim() || undefined,
@@ -77,6 +91,11 @@ export function EditProfileModal({ visible, onClose }: Props) {
                 </TouchableOpacity>
               </View>
 
+              <FormErrorBanner
+                error={formError}
+                onDismiss={() => setFormError(null)}
+              />
+
               <View style={styles.formGroup}>
                 <Text style={[styles.inputLabel, { color: colors.text.secondary }]}>
                   Nombre Completo
@@ -86,7 +105,11 @@ export function EditProfileModal({ visible, onClose }: Props) {
                     styles.inputWrapper,
                     {
                       backgroundColor: isDark ? '#262628' : '#F4F4F6',
-                      borderColor: isDark ? '#38383A' : '#E5E5EA',
+                      borderColor: formError?.fieldErrors?.fullName
+                        ? colors.status.error
+                        : isDark
+                        ? '#38383A'
+                        : '#E5E5EA',
                     },
                   ]}
                 >
@@ -94,11 +117,15 @@ export function EditProfileModal({ visible, onClose }: Props) {
                   <TextInput
                     style={[styles.input, { color: colors.text.primary }]}
                     value={fullName}
-                    onChangeText={setFullName}
+                    onChangeText={(val) => {
+                      setFullName(val);
+                      if (formError) setFormError(null);
+                    }}
                     placeholder="Tu nombre completo"
                     placeholderTextColor={colors.text.muted}
                   />
                 </View>
+                <FormFieldError error={formError?.fieldErrors?.fullName} />
               </View>
 
               <View style={styles.formGroup}>

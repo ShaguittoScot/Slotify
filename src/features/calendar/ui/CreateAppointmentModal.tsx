@@ -13,6 +13,9 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner';
+import { FormFieldError } from '@/components/ui/FormFieldError';
+import type { NormalizedError } from '@/shared/lib/errorUtils';
 
 interface CreateAppointmentModalProps {
   visible: boolean;
@@ -109,11 +112,13 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
   const [customPrice, setCustomPrice] = useState('');
   const [startHour, setStartHour] = useState('10:00');
   const [baseDurationMinutes, setBaseDurationMinutes] = useState(30);
+  const [formError, setFormError] = useState<NormalizedError | null>(null);
 
   useEffect(() => {
     if (visible) {
       setClientName('');
       setClientPhone('');
+      setFormError(null);
       const firstSvc = activeServices[0] || PRESET_SERVICES[0];
       setSelectedService(firstSvc);
       setSelectedAddonIds([]);
@@ -168,9 +173,16 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
 
   const handleSave = () => {
     if (!clientName.trim()) {
-      Alert.alert('Datos requeridos', 'Por favor ingresa el nombre del cliente.');
+      setFormError({
+        title: 'Nombre requerido',
+        message: 'Por favor ingresa el nombre del cliente para agendar la cita.',
+        category: 'VALIDATION',
+        fieldErrors: { clientName: 'El nombre del cliente es obligatorio.' },
+      });
       return;
     }
+
+    setFormError(null);
 
     const d = new Date(initialDate);
     const [hours, minutes] = startHour.split(':').map(Number);
@@ -235,6 +247,11 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <FormErrorBanner
+              error={formError}
+              onDismiss={() => setFormError(null)}
+            />
+
             {/* Cliente Info Inputs */}
             <Text style={[styles.sectionLabel, { color: colors.text.secondary }]}>
               Datos del Cliente
@@ -245,19 +262,27 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                   styles.inputRow,
                   {
                     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                    borderColor: formError?.fieldErrors?.clientName
+                      ? colors.status.error
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.08)'
+                      : 'rgba(0, 0, 0, 0.08)',
                   },
                 ]}
               >
                 <Feather name="user" size={16} color={colors.text.muted} style={{ marginRight: 10 }} />
                 <TextInput
                   value={clientName}
-                  onChangeText={setClientName}
+                  onChangeText={(val) => {
+                    setClientName(val);
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="Nombre completo *"
                   placeholderTextColor={colors.text.muted}
                   style={[styles.input, { color: colors.text.primary }]}
                 />
               </View>
+              <FormFieldError error={formError?.fieldErrors?.clientName} />
 
               <View
                 style={[

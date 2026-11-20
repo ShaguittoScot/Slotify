@@ -21,6 +21,7 @@ import { ActivityIndicator, StatusBar, View } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/features/auth/model';
 import { STORAGE_KEYS } from '@/shared/lib/constants';
+import { storage } from '@/shared/lib/storage';
 import { useAppTheme } from '@/shared/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -30,7 +31,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  const { isAuthenticated, isLoading, user, appMode, hydrate } = useAuthStore();
+  const { isAuthenticated, isHydrating, user, appMode, syncError, hydrate } = useAuthStore();
 
   const [fontsLoaded] = useFonts({
     Poppins_500Medium,
@@ -54,17 +55,22 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
-    if (isLoading || !fontsLoaded) return;
+    if (isHydrating || !fontsLoaded) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inMainGroup = segments[0] === '(main)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
 
-    if (!isAuthenticated && inMainGroup) {
-      // @ts-ignore
-      router.replace('/(auth)');
-    } else if (isAuthenticated && inAuthGroup) {
-      if (segments[1] === 'register-client' || appMode === 'CONSUMER') {
+    if (!isAuthenticated) {
+      if (inMainGroup || inOnboardingGroup) {
+        // @ts-ignore
+        router.replace('/(auth)');
+      }
+      return;
+    }
+
+    if (segments[1] === 'register-client' || appMode === 'CONSUMER') {
+      if (inAuthGroup) {
         AsyncStorage.getItem(STORAGE_KEYS.CONSUMER_ONBOARDING_COMPLETE).then((completed) => {
           if (completed === 'true') {
             router.replace('/(main)/explore' as any);
@@ -72,15 +78,39 @@ export default function RootLayout() {
             router.replace('/(onboarding)/consumer' as any);
           }
         });
-      } else if (!user?.businessId) {
-        router.replace('/(onboarding)/wizard');
-      } else {
+      }
+      return;
+    }
+
+    // Modo Business (DUENO / EMPLEADO)
+    const isOnboardingComplete = Boolean(user?.isOnboardingCompleted);
+
+    if (isOnboardingComplete) {
+      if (inAuthGroup || (inOnboardingGroup && segments[1] === 'wizard')) {
         router.replace('/(main)');
       }
+    } else {
+      // Si existe un error de sincronización de red o servidor, no forzar al wizard
+      if (syncError) {
+        return;
+      }
+      // Onboarding pendiente confirmado
+      if (inMainGroup || inAuthGroup) {
+        router.replace('/(onboarding)/wizard');
+      }
     }
-  }, [isAuthenticated, isLoading, user?.businessId, appMode, segments, fontsLoaded]);
+  }, [
+    isAuthenticated,
+    isHydrating,
+    user?.isOnboardingCompleted,
+    user?.businessId,
+    appMode,
+    syncError,
+    segments,
+    fontsLoaded,
+  ]);
 
-  if (isLoading || !fontsLoaded) {
+  if (isHydrating || !fontsLoaded) {
     return (
       <View
         style={{

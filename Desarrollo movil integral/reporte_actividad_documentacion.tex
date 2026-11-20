@@ -1,0 +1,324 @@
+\documentclass[11pt,letterpaper]{article}
+
+% --- PAQUETES DE FORMATO Y ESTILO ---
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{hyperref}
+
+% --- COLORES PARA CÓDIGO Y ENLACES EXCLUSIVAMENTE ---
+\definecolor{linkblue}{RGB}{0, 75, 160}       % Color para enlaces
+\definecolor{codekeyword}{RGB}{0, 50, 180}    % Palabras clave en código
+\definecolor{codestring}{RGB}{30, 125, 45}    % Strings en código
+\definecolor{codecomment}{RGB}{110, 115, 125} % Comentarios en código
+\definecolor{codebg}{RGB}{250, 250, 252}      % Fondo claro de código
+\definecolor{codeframe}{RGB}{220, 222, 228}   % Marco de código
+
+% --- AJUSTE DE COLUMNAS PARA TABLAS SIN DESBORDAMIENTO ---
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+
+% --- FORMATO DE TÍTULOS (ESTRICTAMENTE NEGRO) ---
+\titleformat{\section}{\color{black}\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\color{black}\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\color{black}\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+% --- CONFIGURACIÓN DE HIPERVÍNCULOS ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=linkblue,
+    filecolor=linkblue,      
+    urlcolor=linkblue,
+    citecolor=linkblue,
+    pdfauthor={Ariel Dionicio Santos},
+    pdftitle={Reporte de Actividad en Git y Documentacion Fullstack - Slotify}
+}
+
+% --- ENCABEZADOS Y PIE DE PÁGINA ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small \textbf{Slotify} — Reporte Integral de Git y Documentación Fullstack}
+\fancyhead[R]{\small \thepage}
+\fancyfoot[C]{\small UTSJR — Desarrollo Móvil Integral (DSM1SV-25) — Prof. Othon Guzmán Docurro}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- FORMATO DE LISTINGS (CÓDIGO FUENTE) ---
+\lstset{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize\color{black},
+    keywordstyle=\color{codekeyword}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    stringstyle=\color{codestring},
+    numbers=left,
+    numberstyle=\tiny\color{codecomment},
+    stepnumber=1,
+    numbersep=8pt,
+    frame=single,
+    rulecolor=\color{codeframe},
+    breaklines=true,
+    breakatwhitespace=true,
+    tabsize=2,
+    showstringspaces=false
+}
+
+\begin{document}
+
+% =========================================================================
+% PORTADA EN PÁGINA INDEPENDIENTE (DISTRIBUCIÓN AMPLIA Y SIN CUADRO)
+% =========================================================================
+\begin{titlepage}
+    \centering
+    \vspace*{0.5cm}
+    
+    {\Large \textbf{UNIVERSIDAD TECNOLÓGICA DE SAN JUAN DEL RÍO}}\\[0.25cm]
+    {\normalsize DIVISIÓN DE TECNOLOGÍAS DE LA INFORMACIÓN Y COMUNICACIÓN}\\[0.15cm]
+    {\normalsize INGENIERÍA EN DESARROLLO Y GESTIÓN DE SOFTWARE}
+    
+    \vspace{2.2cm}
+    
+    {\Huge \textbf{SLOTIFY}}\\[0.4cm]
+    {\large \textbf{Plataforma Multiplataforma para la Gestión y Reserva de Citas}}\\[0.8cm]
+    
+    \rule{0.75\textwidth}{1pt}\\[0.8cm]
+    
+    {\Large \textbf{Reporte de Actividad en Control de Versiones,\\Diseño de Base de Datos y Documentación Técnica}}\\[0.35cm]
+    {\normalsize Auditoría de Sprints (1, 2 y 3) y Análisis de Responsabilidad Técnica (\textit{Ownership})}
+    
+    \vspace{2.2cm}
+    
+    \renewcommand{\arraystretch}{1.6}
+    \begin{tabular}{L{4.4cm} L{11.5cm}}
+        \textbf{Institución:} & Universidad Tecnológica de San Juan del Río \\[0.05cm]
+        \textbf{Asignatura:} & Desarrollo Móvil Integral \\[0.05cm]
+        \textbf{Grupo:} & DSM1SV-25 \\[0.05cm]
+        \textbf{Docente:} & Prof. Othon Guzmán Docurro \\[0.05cm]
+        \textbf{Alumno / Desarrollador:} & Ariel Dionicio Santos (\texttt{ShaguittoScot}) \\[0.05cm]
+        \textbf{Repositorio Frontend:} & \url{https://github.com/ShaguittoScot/Slotify} \\[0.05cm]
+        \textbf{Repositorio Backend:} & \url{https://github.com/ShaguittoScot/Slotify_back} \\[0.05cm]
+        \textbf{Ecosistema Tecnológico:} & React Native, Expo Router, ASP.NET Core 9, PostgreSQL \\
+    \end{tabular}
+    \renewcommand{\arraystretch}{1.0}
+    
+    \vfill
+    
+    {\normalsize Septiembre 2026}
+    \vspace*{0.4cm}
+\end{titlepage}
+
+\newpage
+\setcounter{page}{1}
+
+% =========================================================================
+% SECCIÓN 1: REPORTE DE ACTIVIDAD EN GIT (FRONTEND Y BACKEND)
+% =========================================================================
+\section{Reporte de Actividad en el Sistema de Control de Versiones (Git)}
+
+\subsection{1.1. Arquitectura de Repositorios y Flujo de Trabajo}
+El desarrollo del ecosistema \textbf{Slotify} se gestionó mediante una estrategia desacoplada en dos repositorios complementarios:
+\begin{itemize}[leftmargin=0.8cm]
+    \item \textbf{\texttt{Slotify} (Frontend):} Aplicación móvil multiplataforma desarrollada en React Native y Expo Router.
+    \item \textbf{\texttt{Slotify\_back} (Backend):} API RESTful empresarial implementada en C\# y .NET 9 bajo los principios de \textbf{Clean Architecture} y Domain-Driven Design (DDD).
+\end{itemize}
+
+\subsection{1.2. Registro Histórico del Frontend (\texttt{Slotify})}
+\begin{longtable}{L{1.5cm} L{3.2cm} C{2.1cm} L{9.0cm}}
+\toprule
+\textbf{Hash} & \textbf{Autor} & \textbf{Fecha} & \textbf{Descripción Técnica del Cambio} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Hash} & \textbf{Autor} & \textbf{Fecha} & \textbf{Descripción Técnica del Cambio} \\
+\midrule
+\endhead
+
+\texttt{a8c4af3} & Ariel Dionicio & 2026-09-13 & refactor: aislar proyecto frontend en la raíz del repositorio y extraer backend. \\
+\texttt{8d19201} & Ariel Dionicio & 2026-09-13 & docs(backend): configurar .gitignore y documentación inicial para el repositorio backend. \\
+\texttt{ca1f72f} & RicardoAlcantar25 & 2026-09-15 & feat(onboarding): US-006 selector inicial de giro comercial y catálogo modular de plantillas. \\
+\texttt{43257ba} & KezzyDieu & 2026-09-16 & feat(onboarding): wizard unificado de 5 pasos con editor de disponibilidad en BottomSheet. \\
+\texttt{c9d42da} & Ariel Dionicio & 2026-09-17 & feat(calendar): US-003 calendario táctil interactivo, tema neutro oscuro y barra flotante. \\
+\texttt{fb88ddf} & Ariel Dionicio & 2026-09-17 & feat(auth): implementar split entry dual B2B y B2C, registro de clientes y Explorer Hub. \\
+\texttt{87f11cf} & Ariel Dionicio & 2026-09-17 & fix(auth): sincronización dinámica de IP del backend y modo offline en onboarding. \\
+\texttt{e33b01d} & Ariel Dionicio & 2026-09-17 & feat(navigation): separar vistas B2B y B2C, barra de navegación y panel de inicio. \\
+\texttt{1fd8a77} & Ariel Dionicio & 2026-09-17 & feat(auth): integrar selector dual tipo pill en registro y suprimir pasos redundantes. \\
+\texttt{4b79387} & Ariel Dionicio & 2026-09-17 & feat(onboarding): estructurar flujo secuencial sin pantallas prematuras y paleta terracota. \\
+\texttt{8ddbd8d} & RicardoAlcantar25 & 2026-09-20 & feat(calendar): agenda táctil multiformato con buscador, filtros y selector de fecha. \\
+\texttt{d894f88} & Ariel Dionicio & 2026-09-21 & fix(security): desasociar .env de Git y configurar plantilla segura .env.example. \\
+\texttt{0d8d0c5} & RicardoAlcantar25 & 2026-09-21 & feat(calendar): adaptar módulos US-003, US-008 y US-006 a arquitectura FBA. \\
+\texttt{5ce9320} & KezzyDieu & 2026-09-21 & Merge pull request \#11 (feature/US-003-US-008-calendario-agenda). \\
+\texttt{30be62f} & RicardoAlcantar25 & 2026-09-22 & feat(templates): rediseñar plantilla de barbería adaptativa (US-002 / SCRUM-105). \\
+\bottomrule
+\end{longtable}
+
+\subsection{1.3. Registro Histórico del Backend (\texttt{Slotify\_back})}
+\begin{longtable}{L{1.5cm} L{3.2cm} C{2.1cm} L{9.0cm}}
+\toprule
+\textbf{Hash} & \textbf{Autor} & \textbf{Fecha} & \textbf{Descripción Técnica del Cambio en Backend} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Hash} & \textbf{Autor} & \textbf{Fecha} & \textbf{Descripción Técnica del Cambio en Backend} \\
+\midrule
+\endhead
+
+\texttt{1fa0fa8} & KezzyDieu & 2026-09-14 & Initial commit para separación de backend y estructuración de Clean Architecture. \\
+\texttt{ce70e5d} & LordAtticEye & 2026-09-14 & feat(US-008): implementar bloqueo manual de horarios no disponibles y pausas operativas. \\
+\texttt{05931e6} & KezzyDieu & 2026-09-15 & chore: remover UserSession legacy e integrar esquema JWT para autorización. \\
+\texttt{719cce2} & KezzyDieu & 2026-09-17 & Actualización de controladores del backend para soporte del flujo de autenticación. \\
+\texttt{de65a01} & KezzyDieu & 2026-09-18 & Configuración base del repositorio backend, plantillas y workflows de integración continua. \\
+\texttt{e894462} & KezzyDieu & 2026-09-20 & Merge pull request \#3 from ShaguittoScot/sprint-2. \\
+\texttt{285ba47} & KezzyDieu & 2026-09-21 & chore: depuración de binarios compilados en tracking de Git e inicio de Sprint 3. \\
+\texttt{9d85805} & KezzyDieu & 2026-09-22 & feat(booking): configuración dinámica de formularios y form builder (US-013/016/017). \\
+\texttt{d1a19bc} & Ariel Dionicio & 2026-09-22 & feat(config): implementación de EnvLoader para variables seguras y ajuste de gitignore. \\
+\bottomrule
+\end{longtable}
+
+% =========================================================================
+% SECCIÓN 2: DOCUMENTACIÓN TÉCNICA DE CÓDIGO Y ARQUITECTURA
+% =========================================================================
+\section{Documentación Técnica de Código y Arquitectura del Sistema}
+
+\subsection{2.1. Arquitectura del Backend (.NET 9 Clean Architecture)}
+El servidor backend está modularizado en 4 proyectos que garantizan la regla de dependencia concéntrica:
+
+\begin{itemize}[leftmargin=0.8cm]
+    \item \textbf{\texttt{Slotify.Domain}:} Núcleo agnóstico con entidades de dominio puro (\texttt{Business}, \texttt{User}, \texttt{Appointment}, \texttt{AvailabilitySchedule}, \texttt{ScheduleBlock}), Value Objects y eventos de dominio.
+    \item \textbf{\texttt{Slotify.Application}:} Lógica de negocio orquestada bajo el patrón CQRS y MediatR (Features de \texttt{Calendar}, \texttt{ScheduleBlocks}, \texttt{SectorTemplates}, \texttt{Booking}).
+    \item \textbf{\texttt{Slotify.Infrastructure}:} Adaptadores hacia PostgreSQL con Entity Framework Core, repositorios de persistencia y configuración de base de datos.
+    \item \textbf{\texttt{Slotify.API}:} Capa de presentación RESTful, controladores HTTP, middleware de autorización JWT, Serilog y Swagger UI en \texttt{http://localhost:5272}.
+\end{itemize}
+
+---
+
+\subsection{2.2. Integración End-to-End: Calendario y Agenda (US-003 / US-008)}
+El consumo entre la app móvil y el backend se desacopló mediante contratos fuertemente tipados:
+
+\begin{lstlisting}[language=Java, caption={Capa API con tipado estricto y degradación elegante}]
+export async function fetchCalendarSlots(
+  startDate: string,
+  endDate: string,
+  employeeId?: string
+): Promise<CalendarResponse> {
+  try {
+    const params: Record<string, string> = { startDate, endDate };
+    if (employeeId) params.employeeId = employeeId;
+
+    const response = await apiClient.get<CalendarResponse | ApiResponse<CalendarResponse>>(
+      API_ENDPOINTS.CALENDAR.GET_SLOTS,
+      { params }
+    );
+
+    // Guardas de tipo (Type Guards)
+    if (response.data && 'data' in response.data && response.data.data) {
+      return response.data.data;
+    }
+    if (response.data && 'slots' in response.data) {
+      return response.data as CalendarResponse;
+    }
+
+    throw new Error('Estructura de respuesta no conforme con el contrato DTO');
+  } catch (error) {
+    // Tolerancia a fallos: Activacion de contingencia local (Graceful Degradation)
+    const mockSlots = generateMockCalendarSlots(new Date(startDate), new Date(endDate));
+    return { rangeStart: startDate, rangeEnd: endDate, slots: mockSlots };
+  }
+}
+\end{lstlisting}
+
+\subsubsection{Tratamiento de Excepciones y Resiliencia}
+\begin{enumerate}[leftmargin=0.8cm]
+    \item \textbf{Degeneración Gradual (\textit{Graceful Degradation}):} La caída del backend no bloquea la experiencia de usuario; la interfaz conmuta a datos simulados consistentes y emite una alerta no intrusiva.
+    \item \textbf{Type Guards en Tiempo de Ejecución:} Se neutralizan fallos por referencias nulas (\texttt{TypeError}) al evaluar la estructura del payload antes de acceder a las propiedades.
+    \item \textbf{Sanitización y Validación Defensiva:} Los formularios de captura validan longitudes no vacías, límites de horas y conversiones de husos horarios en formato UTC (ISO 8601).
+\end{enumerate}
+
+---
+
+\subsection{2.3. Persistencia de Sesiones Criptográficas Multiplataforma}
+En conformidad con el principio de responsabilidad única (SRP), el módulo \texttt{storage.ts} gestiona la persistencia de credenciales mediante aislamiento criptográfico:
+
+\begin{lstlisting}[language=Java, caption={Adaptador de persistencia segura con cifrado en hardware nativo}]
+export const storage = {
+  async secureSet(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value, {
+        keychainAccessible: SecureStore.WHEN_UNLOCKED
+      });
+    }
+  },
+  async secureGet(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    }
+    return await SecureStore.getItemAsync(key);
+  }
+};
+\end{lstlisting}
+
+---
+
+\subsection{2.4. Diseño y Modelado Relacional de la Base de Datos}
+\textbf{Documento de diseño arquitectónico:}.
+
+El modelo de datos fue diseñado para soportar aislamiento multi-tenant estricto, modularidad por giro comercial y auditoría de transacciones en PostgreSQL:
+
+\subsubsection{A. Principios de Aislamiento y Particionamiento Lógico}
+Cada registro operativo (\texttt{citas}, \texttt{servicios}, \texttt{horarios\_disponibilidad}, \texttt{bloqueos\_agenda}) contiene como clave foránea el identificador único del negocio (\texttt{id\_negocio}), garantizando la privacidad e inviolabilidad de los datos entre diferentes comercios arrendatarios.
+
+\subsubsection{B. Diccionario Estructurado de Entidades Clave}
+\begin{longtable}{L{4.8cm} L{2.4cm} L{8.6cm}}
+\toprule
+\textbf{Entidad} & \textbf{Clave Primaria} & \textbf{Descripción y Responsabilidad Arquitectónica} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Entidad} & \textbf{Clave Primaria} & \textbf{Descripción y Responsabilidad Arquitectónica} \\
+\midrule
+\endhead
+
+\texttt{negocios} & \texttt{UUID id} & Registro central de empresas arrendatarias, zona horaria, slug de URL y umbrales de anticipación para citas. \\
+\texttt{plantillas\_sector} & \texttt{INT id} & Preconfiguración modular de giros (Barberías, Salones, Spas) con esquemas JSON de módulos y servicios sugeridos (US-006). \\
+\texttt{marca\_negocio} & \texttt{UUID id} & Identidad visual personalizada por negocio (colores primarios, logotipo y banners). \\
+\texttt{usuarios} & \texttt{UUID id} & Directorio de cuentas autenticadas, roles de acceso (Admin Negocio / Cliente), credenciales hash y estado de verificación. \\
+\texttt{sesiones\_usuario} & \texttt{UUID id} & Gestión segura de sesiones activas, almacenamiento de hashes de tokens de refresco, marcas de tiempo y control de revocación. \\
+\texttt{empleados} & \texttt{UUID id} & Perfil laboral asociado a usuarios del negocio, especialidades y vinculación con catálogo de servicios. \\
+\texttt{servicios} & \texttt{UUID id} & Catálogo de prestaciones ofrecidas, duración estimada en minutos y precios base. \\
+\texttt{servicios\_empleados} & \texttt{Compuesta} & Relación N:M que asocia qué miembros del personal están facultados para atender cada servicio específico. \\
+\texttt{horarios\_\allowbreak disponibilidad} & \texttt{UUID id} & Ventanas horarias regulares y turnos divididos por día de la semana para el negocio y sus empleados. \\
+\texttt{bloqueos\_agenda} & \texttt{UUID id} & Excepciones de calendario, pausas operativas y horarios no disponibles (US-008). \\
+\texttt{citas} & \texttt{UUID id} & Registro transaccional de reservas agendadas, cliente, empleado asignado, rango horario, estado y precio total. \\
+\texttt{citas\_servicios} & \texttt{Compuesta} & Detalle de servicios individuales incluidos en una cita específica con congelación de precio histórico. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{C. Modularidad Dinámica y Rendimiento}
+\begin{itemize}[leftmargin=0.8cm]
+    \item \textbf{Campos JSON para Flexibilidad:} Se integraron columnas de tipo \texttt{JSON} en \texttt{plantillas\_sector} y \texttt{modulos\_negocio} para permitir la activación/desactivación de características sin alterar el esquema relacional de la base de datos.
+    \item \textbf{Correspondencia con el Dominio en .NET 9:} Cada entidad SQL mapea directamente a clases de entidad en \texttt{Slotify.Domain}, garantizando consistencia a través de Entity Framework Core.
+\end{itemize}
+
+% =========================================================================
+% SECCIÓN 3: AUDITORÍA DE RESPONSABILIDAD TÉCNICA (OWNERSHIP)
+% =========================================================================
+\section{Evaluación de Responsabilidad Técnica (\textit{Technical Ownership})}
+\begin{itemize}[leftmargin=0.8cm]
+    \item \textbf{Principio de Responsabilidad Única (SRP):} Eliminación del anti-patrón God Object en componentes de frontend, controladores backend y entidades de base de datos.
+    \item \textbf{Seguridad de Cero Confianza (\textit{Zero Trust}):} Cifrado de credenciales en reposo, desacoplamiento de tokens y validación previa de datos en cliente y servidor.
+    \item \textbf{Diseño de Persistencia Integral:} Creación y validación del modelo relacional multi-tenant que da sustento a todo el ciclo de vida de la aplicación.
+    \item \textbf{Trazabilidad Git Fullstack:} Control de cambios ordenado en frontend y backend con convencional commits y flujos de PR aprobados.
+\end{itemize}
+
+\end{document}

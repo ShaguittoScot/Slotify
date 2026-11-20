@@ -84,7 +84,8 @@ export function ExploreHeader({
         contentContainerStyle={styles.categoryScroll}
       >
         {categories.map((cat) => {
-          const isSelected = selectedCategoryKey === cat.key;
+          const isSelected =
+            (selectedCategoryKey || 'all').toLowerCase() === cat.key.toLowerCase();
           return (
             <TouchableOpacity
               key={cat.id}

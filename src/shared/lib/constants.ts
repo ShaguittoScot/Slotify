@@ -24,6 +24,10 @@ export const API_ENDPOINTS = {
     LOGOUT: '/auth/logout',
     ME: '/auth/me',
   },
+  /** Onboarding de negocio */
+  ONBOARDING: {
+    COMPLETE_BUSINESS: '/onboarding/complete-business-onboarding',
+  },
   /** US-006: Selector de Giro Comercial / US-002: Plantillas por Sector */
   SECTOR_TEMPLATES: {
     GET_ALL: '/sector-templates',

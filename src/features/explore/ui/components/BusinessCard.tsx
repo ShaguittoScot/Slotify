@@ -1,19 +1,22 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
-import type { BusinessDto } from '../../types';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMemo, useState } from 'react';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 import { isValidHexColor } from '../../model';
+import type { BusinessDto } from '../../types';
 import { createBusinessCardStyles } from '../styles/businessCard.styles';
 
 interface BusinessCardProps {
   business: BusinessDto;
-  onBook: (slug: string) => void;
+  onSelect?: (slug: string) => void;
+  onBook?: (slug: string) => void;
 }
 
-export function BusinessCard({ business, onBook }: BusinessCardProps) {
+export function BusinessCard({ business, onSelect, onBook }: BusinessCardProps) {
   const { colors } = useAppTheme();
   const [imageError, setImageError] = useState(false);
+
+  const handleAction = onSelect || onBook || (() => { });
 
   const initial = business.name ? business.name.charAt(0).toUpperCase() : 'S';
   const category = business.category || 'Servicios Generales';
@@ -35,11 +38,11 @@ export function BusinessCard({ business, onBook }: BusinessCardProps) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => onBook(business.slug)}
+      onPress={() => handleAction(business.slug)}
       activeOpacity={0.88}
       accessible={true}
       accessibilityRole="button"
-      accessibilityLabel={`Negocio ${business.name}, categoría ${category}. Toca para reservar`}
+      accessibilityLabel={`Negocio ${business.name}, categoría ${category}. Toca para ver detalles`}
     >
       <View style={styles.cardHeader}>
         {hasValidLogo ? (
@@ -136,16 +139,15 @@ export function BusinessCard({ business, onBook }: BusinessCardProps) {
             slotify.app/{business.slug}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.bookBtn}
-          onPress={() => onBook(business.slug)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`Reservar cita en ${business.name}`}
-        >
-          <Feather name="calendar" size={12} color="#FFFFFF" />
-          <Text style={styles.bookBtnText}>Reservar</Text>
-        </TouchableOpacity>
+        {/*
+          NOTA DE ACCESIBILIDAD Y ARQUITECTURA:
+          El botón es un View estilizado dentro de la tarjeta táctil principal.
+          Esto evita touchables anidados que causan advertencias y comportamientos erráticos.
+        */}
+        <View style={styles.bookBtn}>
+          <Feather name="arrow-right" size={12} color="#FFFFFF" />
+          <Text style={styles.bookBtnText}>Ver detalles</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );

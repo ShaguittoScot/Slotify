@@ -1,17 +1,29 @@
 import { supabase } from '@/shared/lib/supabase';
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
+import type { ApiResponse, AuthResponse } from '@/shared/types';
 import type {
   LoginCredentials,
   RegisterAdminRequest,
   RegisterClientRequest,
-  SyncProfileRequest,
-  SyncProfileResponse,
+  ExchangeTokenRequest,
 } from '../types';
 
 export const authApi = {
   /**
-   * Sign in with Supabase Auth using email/password.
+   * Intercambiar identidad autenticada de Supabase (userId + email) por JWT propio de Slotify
+   * con claim businessId e información actualizada del negocio (OnboardingCompletedAt).
+   */
+  exchangeToken: async (request: ExchangeTokenRequest): Promise<ApiResponse<AuthResponse>> => {
+    const response = await apiClient.post<ApiResponse<AuthResponse>>(
+      API_ENDPOINTS.AUTH.LOGIN,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Iniciar sesión con Supabase Auth usando email/password.
    */
   login: async (credentials: LoginCredentials) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -24,7 +36,7 @@ export const authApi = {
   },
 
   /**
-   * Sign in with Google using Supabase OAuth.
+   * Iniciar sesión con Google usando Supabase OAuth.
    */
   loginWithGoogle: async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -35,11 +47,12 @@ export const authApi = {
   },
 
   /**
-   * Register with Supabase Auth.
-   * Syncing with .NET backend is done separately in onboarding.
+   * Registrar identidad en Supabase Auth.
+   * La creación y configuración del negocio se realiza exclusivamente en business-onboarding.
    */
   register: async (request: RegisterAdminRequest) => {
-    const calculatedFullName = request.fullName || `${request.firstName} ${request.lastName}`.trim();
+    const calculatedFullName =
+      request.fullName || `${request.firstName} ${request.lastName}`.trim();
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
       password: request.password || '',
@@ -48,6 +61,7 @@ export const authApi = {
           first_name: request.firstName,
           last_name: request.lastName,
           full_name: calculatedFullName,
+          role: 'DUENO',
         },
       },
     });
@@ -58,10 +72,11 @@ export const authApi = {
   },
 
   /**
-   * Register a consumer client with Supabase Auth and synchronize with PostgreSQL clientes table.
+   * Registrar un cliente consumidor con Supabase Auth y sincronizar con la tabla clientes.
    */
   registerClient: async (request: RegisterClientRequest) => {
-    const calculatedFullName = request.fullName || `${request.firstName} ${request.lastName}`.trim();
+    const calculatedFullName =
+      request.fullName || `${request.firstName} ${request.lastName}`.trim();
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
       password: request.password,
@@ -97,23 +112,7 @@ export const authApi = {
   },
 
   /**
-   * Sync profile with .NET backend to create Business + User row.
-   * Called at the end of onboarding.
-   */
-  syncProfile: async (syncPayload: SyncProfileRequest) => {
-    const calculatedFullName = syncPayload.fullName || `${syncPayload.firstName || ''} ${syncPayload.lastName || ''}`.trim();
-    const response = await apiClient.post<SyncProfileResponse>(
-      API_ENDPOINTS.AUTH.SYNC,
-      {
-        ...syncPayload,
-        fullName: calculatedFullName,
-      }
-    );
-    return response.data;
-  },
-
-  /**
-   * Sign out from Supabase Auth.
+   * Cerrar sesión en Supabase Auth.
    */
   logout: async () => {
     const { error } = await supabase.auth.signOut();
@@ -121,7 +120,7 @@ export const authApi = {
   },
 
   /**
-   * Get the current session from Supabase.
+   * Obtener la sesión activa actual de Supabase.
    */
   getSession: async () => {
     const { data, error } = await supabase.auth.getSession();
