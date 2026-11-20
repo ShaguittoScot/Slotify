@@ -1,13 +1,17 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
+import { useReducedMotion } from 'react-native-reanimated';
 import { FloatingTabBar } from './FloatingTabBar';
 
 export default function AppTabs() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        animation: reduceMotion ? 'none' : 'fade',
       }}
     >
       <Tabs.Screen
@@ -40,24 +44,23 @@ export default function AppTabs() {
           title: 'Ajustes',
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          href: null,
-        }}
-      />
+      {/*
+        Pantallas sin botón en la barra.
+        NOTA (expo-router 58+): NO usar `href: null`. Ahora se traduce a `hidden: true`
+        y el router redirige automáticamente a la pestaña inicial al intentar abrirlas.
+        La visibilidad de botones la controla FloatingTabBar mediante `allowedRouteNames`.
+      */}
+      <Tabs.Screen name="profile" />
       <Tabs.Screen
         name="form-builder"
         options={{
-          href: null,
-          tabBarStyle: { display: 'none' }
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tabs.Screen
         name="form-preview"
         options={{
-          href: null,
-          tabBarStyle: { display: 'none' }
+          title: 'Formulario',
         }}
       />
     </Tabs>

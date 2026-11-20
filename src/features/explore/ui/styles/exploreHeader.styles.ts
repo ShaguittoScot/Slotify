@@ -4,43 +4,58 @@ import type { ThemeColors } from '@/shared/theme';
 export function createExploreHeaderStyles(colors: ThemeColors) {
   return StyleSheet.create({
     header: {
-      paddingHorizontal: 16,
-      paddingTop: 8,
-      paddingBottom: 10,
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 12,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border.main,
-      backgroundColor: colors.isDark
-        ? 'rgba(18, 18, 24, 0.96)'
-        : 'rgba(255, 255, 255, 0.96)',
-      gap: 10,
+      borderBottomColor: colors.isDark ? '#1E1E24' : colors.border.main,
+      backgroundColor: colors.background.primary,
+      gap: 12,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    tagRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginBottom: 2,
+    },
+    tagDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#6366F1',
+    },
+    tagLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      color: colors.text.muted,
     },
     headerTitle: {
-      fontSize: 21,
+      fontSize: 22,
       fontWeight: '800',
-      letterSpacing: -0.4,
+      letterSpacing: -0.5,
       color: colors.text.primary,
-    },
-    headerSubtitle: {
-      fontSize: 13,
-      lineHeight: 17,
-      color: colors.text.secondary,
     },
     searchRow: {
       flexDirection: 'row',
-      gap: 8,
       alignItems: 'center',
     },
     searchBox: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      height: 42,
-      borderRadius: 12,
+      height: 44,
+      borderRadius: 14,
       borderWidth: 1,
-      borderColor: colors.border.main,
-      backgroundColor: colors.background.secondary,
-      paddingHorizontal: 12,
-      gap: 8,
+      borderColor: colors.isDark ? '#24242C' : colors.border.main,
+      backgroundColor: colors.isDark ? '#121216' : colors.background.secondary,
+      paddingHorizontal: 14,
+      gap: 10,
     },
     searchInput: {
       flex: 1,
@@ -48,43 +63,34 @@ export function createExploreHeaderStyles(colors: ThemeColors) {
       height: '100%',
       color: colors.text.primary,
     },
-    searchBtn: {
-      width: 42,
-      height: 42,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.action.primary,
-    },
     categoryScroll: {
       gap: 8,
       paddingVertical: 2,
     },
     categoryChip: {
       paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 18,
+      paddingVertical: 7,
+      borderRadius: 12,
       borderWidth: 1,
     },
     categoryChipActive: {
-      backgroundColor: colors.action.primary,
-      borderColor: colors.action.primary,
+      backgroundColor: colors.isDark ? '#FAFAFA' : '#18181B',
+      borderColor: colors.isDark ? '#FAFAFA' : '#18181B',
     },
     categoryChipInactive: {
-      backgroundColor: colors.background.secondary,
-      borderColor: colors.border.main,
+      backgroundColor: colors.isDark ? '#121216' : colors.background.secondary,
+      borderColor: colors.isDark ? '#24242C' : colors.border.main,
     },
     categoryChipText: {
-      fontSize: 13,
+      fontSize: 12.5,
     },
     categoryChipTextActive: {
-      color: colors.action.primaryText,
+      color: colors.isDark ? '#09090B' : '#FFFFFF',
       fontWeight: '700',
     },
     categoryChipTextInactive: {
-      color: colors.text.secondary,
-      fontWeight: '500',
+      color: colors.text.muted,
+      fontWeight: '600',
     },
   });
 }
-

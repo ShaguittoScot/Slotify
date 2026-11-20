@@ -1,13 +1,19 @@
+import { create } from 'zustand';
 import { supabase } from '@/shared/lib/supabase';
 import { storage } from '@/shared/lib/storage';
 import { STORAGE_KEYS } from '@/shared/lib/constants';
 import { normalizeError, type NormalizedError } from '@/shared/lib/errorUtils';
 import type { AuthUser } from '@/shared/types';
-import { create } from 'zustand';
-import { authApi } from '../api';
-import type { LoginCredentials, RegisterAdminRequest, RegisterClientRequest } from '../types';
+import { authApi, authRequestMessage } from '../api';
+import type {
+  LoginCredentials,
+  RegisterAdminRequest,
+  RegisterClientRequest,
+  SyncProfileRequest,
+} from '../types';
 
 export type AppMode = 'BUSINESS' | 'CONSUMER';
+export type BusinessProfileStatus = 'unknown' | 'needs-setup' | 'ready' | 'unavailable';
 
 interface AuthState {
   user: AuthUser | null;
@@ -21,6 +27,7 @@ interface AuthState {
   syncError: string | null;
   appMode: AppMode;
   isJustRegistered: boolean;
+  businessProfileStatus: BusinessProfileStatus;
 
   // Actions
   setAppMode: (mode: AppMode) => void;
@@ -32,6 +39,7 @@ interface AuthState {
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterAdminRequest) => Promise<void>;
   registerClient: (data: RegisterClientRequest) => Promise<void>;
+  completeOnboarding: (data: SyncProfileRequest) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
@@ -45,7 +53,7 @@ const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
     fallback?.fullName ||
     meta.full_name ||
     (firstName ? `${firstName} ${lastName}`.trim() : user.email || 'Usuario');
-  
+
   let role: 'DUENO' | 'EMPLEADO' | 'CLIENTE' = 'DUENO';
   const rawRole = fallback?.role || meta.role;
   if (rawRole === 'Owner' || rawRole === 'DUENO') role = 'DUENO';
@@ -54,7 +62,7 @@ const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
 
   const businessId = fallback?.businessId || meta.business_id || '';
   const businessName = fallback?.businessName || meta.business_name || '';
-  const isOnboardingCompleted = fallback?.isOnboardingCompleted ?? false;
+  const isOnboardingCompleted = fallback?.isOnboardingCompleted ?? Boolean(meta.is_onboarding_completed || fallback?.businessId);
 
   return {
     id: user.id,
@@ -69,6 +77,61 @@ const buildAuthUser = (user: any, fallback?: Partial<AuthUser>): AuthUser => {
   };
 };
 
+async function resolveBusinessProfile(
+  user: AuthUser,
+  supabaseToken: string
+): Promise<Pick<AuthState, 'user' | 'businessProfileStatus' | 'error' | 'syncError'>> {
+  if (user.role === 'CLIENTE') {
+    return { user, businessProfileStatus: 'unknown', error: null, syncError: null };
+  }
+
+  try {
+    const tokenData = await authApi.exchangeBackendToken(supabaseToken, user.id);
+    if (tokenData === null) {
+      return {
+        user: { ...user, businessId: '', isOnboardingCompleted: false },
+        businessProfileStatus: 'needs-setup',
+        error: null,
+        syncError: null,
+      };
+    }
+    if (tokenData.user.businessId) {
+      return {
+        user: {
+          ...user,
+          firstName: tokenData.user.firstName || user.firstName,
+          lastName: tokenData.user.lastName ?? user.lastName,
+          fullName: tokenData.user.fullName || user.fullName,
+          businessId: tokenData.user.businessId,
+          isOnboardingCompleted: Boolean(tokenData.user.isOnboardingCompleted),
+          role: ['employee', 'empleado'].includes(
+            String(tokenData.user.role).toLowerCase()
+          )
+            ? 'EMPLEADO'
+            : user.role,
+        },
+        businessProfileStatus: 'ready',
+        error: null,
+        syncError: null,
+      };
+    }
+    throw new Error('Slotify no pudo confirmar el negocio de esta cuenta.');
+  } catch (error) {
+    return {
+      user,
+      businessProfileStatus: 'unavailable',
+      error: authRequestMessage(
+        error,
+        'No se pudo verificar el negocio de esta cuenta. Inténtalo de nuevo.'
+      ),
+      syncError: authRequestMessage(
+        error,
+        'No se pudo verificar el negocio de esta cuenta.'
+      ),
+    };
+  }
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -79,6 +142,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   syncError: null,
   appMode: 'BUSINESS',
   isJustRegistered: false,
+  businessProfileStatus: 'unknown',
 
   setAppMode: (mode) => set({ appMode: mode }),
   toggleAppMode: () =>
@@ -101,7 +165,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await authApi.loginWithGoogle();
     } catch (error: any) {
       const normalized = normalizeError(error, { isAuthForm: true });
-      set({ error: normalized.message, formError: normalized, isLoading: false });
+      set({ error: normalized.message, formError: normalized });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
@@ -123,7 +189,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
       await storage.set(STORAGE_KEYS.USER_DATA, demoUser);
       await storage.set(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true');
-      set({ user: demoUser, isAuthenticated: true, isLoading: false, formError: null, syncError: null });
+      set({
+        user: demoUser,
+        isAuthenticated: true,
+        businessProfileStatus: 'ready',
+        isLoading: false,
+        formError: null,
+        syncError: null,
+      });
       return;
     }
 
@@ -138,11 +211,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const isClient = data.user.user_metadata?.role === 'CLIENTE';
       if (isClient) {
         const clientUser = buildAuthUser(data.user);
+        if (data.session) {
+          try {
+            await authApi.syncClient(data.session);
+          } catch {
+            // Continúa si el backend de sincronización no responde
+          }
+        }
         await storage.set(STORAGE_KEYS.USER_DATA, clientUser);
         set({
           user: clientUser,
           isAuthenticated: true,
           appMode: 'CONSUMER',
+          businessProfileStatus: 'unknown',
           isLoading: false,
           error: null,
           formError: null,
@@ -159,7 +240,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
 
         if (exchangeRes.success && exchangeRes.data) {
-          // Guardar exclusivamente el JWT interno de Slotify y el refresh token
           if (exchangeRes.data.accessToken) {
             await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, exchangeRes.data.accessToken);
           }
@@ -190,6 +270,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             user: authUser,
             isAuthenticated: true,
             appMode: 'BUSINESS',
+            businessProfileStatus: authUser.isOnboardingCompleted ? 'ready' : 'needs-setup',
             isLoading: false,
             error: null,
             formError: null,
@@ -211,18 +292,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ).trim();
         const msg = rawMsg.toLowerCase();
 
-        // 401, 403, 409 (discrepancia) o >=500 NUNCA deben interpretarse como pendiente de sincronización
+        // 401, 403, 409 o >=500 NUNCA deben interpretarse como pendiente de sincronización
         const isNotSynced =
           status !== 401 &&
           status !== 403 &&
           status !== 409 &&
           (!status || status < 500) &&
           (msg.includes('aún no cuenta con un negocio sincronizado') ||
-            msg.includes('no cuenta con un negocio sincronizado'));
+            msg.includes('no cuenta con un negocio sincronizado') ||
+            status === 404);
 
         if (isNotSynced) {
-          // El usuario está autenticado en Supabase pero aún no tiene negocio en backend.
-          // Conservar estado de usuario autenticado con onboarding pendiente para permitir el wizard.
           const pendingUser = buildAuthUser(data.user, {
             businessId: '',
             isOnboardingCompleted: false,
@@ -234,6 +314,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             user: pendingUser,
             isAuthenticated: true,
             appMode: 'BUSINESS',
+            businessProfileStatus: 'needs-setup',
             isLoading: false,
             error: null,
             formError: null,
@@ -242,12 +323,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
-        // Si fue un error de red o servidor real, mostrar el error sin confundir con onboarding pendiente
         const normalized = normalizeError(exchangeErr, { isAuthForm: true });
         set({
           error: normalized.message,
           formError: normalized,
           syncError: normalized.message,
+          businessProfileStatus: 'unavailable',
           isLoading: false,
         });
         throw normalized;
@@ -279,6 +360,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: authUser,
           isAuthenticated: true,
           appMode: 'BUSINESS',
+          businessProfileStatus: 'needs-setup',
           isLoading: false,
           isJustRegistered: false,
           error: null,
@@ -311,6 +393,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: authUser,
           isAuthenticated: true,
           appMode: 'CONSUMER',
+          businessProfileStatus: 'unknown',
           isLoading: false,
           isJustRegistered: false,
           error: null,
@@ -325,6 +408,59 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  completeOnboarding: async (data) => {
+    set({ error: null });
+    try {
+      const { user } = get();
+      if (!user) {
+        throw new Error('No hay usuario autenticado.');
+      }
+
+      const payload: SyncProfileRequest = {
+        id: user.id,
+        email: user.email,
+        firstName:
+          data.firstName ||
+          user.firstName ||
+          user.fullName.split(' ')[0] ||
+          'Usuario',
+        lastName:
+          data.lastName ||
+          user.lastName ||
+          user.fullName.split(' ').slice(1).join(' '),
+        fullName: data.fullName || user.fullName,
+        businessName: data.businessName,
+        businessPhone: data.businessPhone,
+        sectorTemplateId: data.sectorTemplateId,
+      };
+
+      const syncResponse = await authApi.syncProfile(payload);
+      const syncedBusinessId = syncResponse?.data?.businessId;
+      if (!syncedBusinessId || get().user?.id !== user.id) {
+        throw new Error('El servidor no confirmó el registro del negocio.');
+      }
+
+      set({
+        user: {
+          ...user,
+          businessId: syncedBusinessId,
+          businessName: data.businessName || user.businessName,
+          isOnboardingCompleted: true,
+        },
+        businessProfileStatus: 'ready',
+        isJustRegistered: false,
+      });
+    } catch (error) {
+      set({
+        error: authRequestMessage(
+          error,
+          'No se pudo guardar la configuración del negocio. Inténtalo de nuevo.'
+        ),
+      });
+      throw error;
+    }
+  },
+
   logout: async () => {
     set({ isLoading: true });
     try {
@@ -336,17 +472,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Error during logout:', error);
     }
-    set({ user: null, isAuthenticated: false, isLoading: false, error: null, formError: null, syncError: null });
+    set({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      isHydrating: false,
+      error: null,
+      formError: null,
+      syncError: null,
+      businessProfileStatus: 'unknown',
+    });
   },
 
   hydrate: async () => {
+    set({ isLoading: true, isHydrating: true, error: null, syncError: null });
     try {
       const session = await authApi.getSession();
 
       if (session?.user) {
         const storedUser = await storage.get<AuthUser>(STORAGE_KEYS.USER_DATA);
 
-        // Si es CLIENTE, no intercambia token con backend de negocio
         const isClient =
           session.user.user_metadata?.role === 'CLIENTE' || storedUser?.role === 'CLIENTE';
         if (isClient) {
@@ -355,6 +500,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             user: authUser,
             isAuthenticated: true,
             appMode: 'CONSUMER',
+            businessProfileStatus: 'unknown',
             isLoading: false,
             isHydrating: false,
             syncError: null,
@@ -362,7 +508,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
-        // Para dueños / negocio: ejecutar intercambio con backend para refrescar token y estado real
         try {
           const exchangeRes = await authApi.exchangeToken({
             userId: session.user.id,
@@ -400,6 +545,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               user: authUser,
               isAuthenticated: true,
               appMode: 'BUSINESS',
+              businessProfileStatus: authUser.isOnboardingCompleted ? 'ready' : 'needs-setup',
               isLoading: false,
               isHydrating: false,
               syncError: null,
@@ -418,14 +564,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           ).trim();
           const msg = rawMsg.toLowerCase();
 
-          // 401, 403, 409 o >=500 NUNCA deben interpretarse como pendiente de sincronización
           const isNotSynced =
             status !== 401 &&
             status !== 403 &&
             status !== 409 &&
             (!status || status < 500) &&
             (msg.includes('aún no cuenta con un negocio sincronizado') ||
-              msg.includes('no cuenta con un negocio sincronizado'));
+              msg.includes('no cuenta con un negocio sincronizado') ||
+              status === 404);
 
           if (isNotSynced) {
             const pendingUser = buildAuthUser(session.user, {
@@ -440,6 +586,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               user: pendingUser,
               isAuthenticated: true,
               appMode: 'BUSINESS',
+              businessProfileStatus: 'needs-setup',
               isLoading: false,
               isHydrating: false,
               syncError: null,
@@ -447,16 +594,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
           }
 
-          // Si es un error explícito de autenticación o discrepancia (401, 403, 409),
-          // NO se mantiene la sesión offline porque las credenciales/identidad fueron rechazadas por el servidor.
           const isRejectedAuth = status === 401 || status === 403 || status === 409;
-
           console.warn('[Auth hydrate] Fallo al intercambiar token:', msg);
           if (storedUser && !isRejectedAuth) {
             set({
               user: storedUser,
               isAuthenticated: true,
               appMode: storedUser.role === 'CLIENTE' ? 'CONSUMER' : 'BUSINESS',
+              businessProfileStatus: storedUser.isOnboardingCompleted ? 'ready' : 'needs-setup',
               isLoading: false,
               isHydrating: false,
               syncError: 'Error de sincronización con el servidor. Modo sin conexión.',
@@ -469,15 +614,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isAuthenticated: false,
             isLoading: false,
             isHydrating: false,
+            businessProfileStatus: 'unavailable',
             syncError: rawMsg || 'No se pudo sincronizar la sesión.',
           });
           return;
         }
       } else {
-        set({ user: null, isAuthenticated: false, isLoading: false, isHydrating: false, syncError: null });
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          isHydrating: false,
+          businessProfileStatus: 'unknown',
+          syncError: null,
+        });
       }
-    } catch (error) {
-      set({ user: null, isAuthenticated: false, isLoading: false, isHydrating: false, syncError: null });
+    } catch {
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isHydrating: false,
+        businessProfileStatus: 'unknown',
+        syncError: null,
+      });
     }
   },
 
@@ -487,11 +647,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // Escuchar cambios de estado en Supabase Auth
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') {
-    useAuthStore.setState({ user: null, isAuthenticated: false, syncError: null });
+    useAuthStore.setState({
+      user: null,
+      isAuthenticated: false,
+      syncError: null,
+      businessProfileStatus: 'unknown',
+    });
     await storage.secureRemove(STORAGE_KEYS.ACCESS_TOKEN);
     await storage.secureRemove(STORAGE_KEYS.REFRESH_TOKEN);
+  } else if (event === 'SIGNED_IN' && session?.user) {
+    setTimeout(() => {
+      const { isAuthenticated, isLoading, isHydrating, hydrate } = useAuthStore.getState();
+      if (!isAuthenticated && !isLoading && !isHydrating) void hydrate();
+    }, 0);
   }
-  // NOTA: En evento SIGNED_IN no se sobreescribe el token interno de Slotify
-  // con el token de Supabase. El intercambio de token en login/hydrate se encarga
-  // de almacenar exclusivamente el JWT interno.
 });

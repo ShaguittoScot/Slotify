@@ -1,9 +1,11 @@
+import React, { useState, useMemo } from 'react';
+import { View, Text, Image } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAppTheme } from '@/shared/theme';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
-import { isValidHexColor } from '../../model';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import type { BusinessDto } from '../../types';
+import { isValidHexColor } from '../../model';
 import { createBusinessCardStyles } from '../styles/businessCard.styles';
 
 interface BusinessCardProps {
@@ -16,16 +18,15 @@ export function BusinessCard({ business, onSelect, onBook }: BusinessCardProps) 
   const { colors } = useAppTheme();
   const [imageError, setImageError] = useState(false);
 
-  const handleAction = onSelect || onBook || (() => { });
+  const handleAction = onSelect || onBook || (() => {});
+  const isDetailMode = Boolean(onSelect);
 
   const initial = business.name ? business.name.charAt(0).toUpperCase() : 'S';
-  const category = business.category || 'Servicios Generales';
-  const hasPhone = Boolean(business.phone && business.phone.trim().length > 0);
-  const hasAdvance = typeof business.minAdvanceHours === 'number' && business.minAdvanceHours > 0;
+  const category = business.category || 'Servicios';
   const services = business.services || [];
   const accentColor = isValidHexColor(business.brandColor)
     ? business.brandColor!
-    : colors.action.primary;
+    : '#6366F1';
   const hasValidLogo = Boolean(
     business.logoUrl && business.logoUrl.trim().length > 0 && !imageError
   );
@@ -36,119 +37,75 @@ export function BusinessCard({ business, onSelect, onBook }: BusinessCardProps) 
   );
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => handleAction(business.slug)}
-      activeOpacity={0.88}
-      accessible={true}
-      accessibilityRole="button"
-      accessibilityLabel={`Negocio ${business.name}, categoría ${category}. Toca para ver detalles`}
-    >
-      <View style={styles.cardHeader}>
-        {hasValidLogo ? (
-          <Image
-            source={{ uri: business.logoUrl! }}
-            style={styles.avatarImage}
-            resizeMode="cover"
-            onError={() => setImageError(true)}
-            accessibilityLabel={`Logotipo de ${business.name}`}
-          />
-        ) : (
-          <View style={styles.avatarBox}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
-        )}
-        <View style={styles.businessInfo}>
-          <Text style={styles.businessName} numberOfLines={1}>
-            {business.name}
-          </Text>
-          <View style={styles.badgeContainer}>
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryBadgeText}>{category}</Text>
+    <Animated.View entering={FadeInDown.duration(380).springify()}>
+      <AnimatedPressable
+        style={styles.card}
+        onPress={() => handleAction(business.slug)}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`Negocio ${business.name}, categoría ${category}. Toca para ${isDetailMode ? 'ver detalles' : 'reservar'}`}
+      >
+        {/* Cabecera limpia: Avatar + Nombre/Categoría + Acción */}
+        <View style={styles.cardHeader}>
+          {hasValidLogo ? (
+            <Image
+              source={{ uri: business.logoUrl! }}
+              style={styles.avatarImage}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+              accessibilityLabel={`Logotipo de ${business.name}`}
+            />
+          ) : (
+            <View style={styles.avatarBox}>
+              <Text style={styles.avatarText}>{initial}</Text>
+            </View>
+          )}
+
+          <View style={styles.businessInfo}>
+            <Text style={styles.businessName} numberOfLines={1}>
+              {business.name}
+            </Text>
+            <View style={styles.metaRow}>
+              <View style={styles.categoryDot} />
+              <Text style={styles.categoryText}>{category}</Text>
             </View>
           </View>
-        </View>
-      </View>
 
-      {services.length > 0 && (
-        <View style={styles.servicesContainer}>
-          <View style={styles.servicesHeaderRow}>
-            <Text style={styles.servicesLabel}>Servicios destacados</Text>
-            <Text style={styles.servicesNote}>Más al agendar</Text>
+          <View style={styles.bookBtn}>
+            <Text style={styles.bookBtnText}>
+              {isDetailMode ? 'Ver detalles' : 'Reservar'}
+            </Text>
+            <Feather
+              name={isDetailMode ? 'arrow-right' : 'arrow-up-right'}
+              size={13}
+              color="#FFFFFF"
+            />
           </View>
+        </View>
+
+        {/* Píldoras minimalistas de servicios (máx. 2 para evitar saturación) */}
+        {services.length > 0 && (
           <View style={styles.servicesList}>
             {services.slice(0, 2).map((svc) => (
-              <View
-                key={svc.id}
-                style={styles.serviceBadge}
-                accessible={true}
-                accessibilityLabel={`${svc.name}, precio ${Number(svc.price).toFixed(2)} pesos, duración ${svc.durationMinutes} minutos`}
-              >
+              <View key={svc.id} style={styles.serviceBadge}>
                 <Text style={styles.serviceBadgeName} numberOfLines={1}>
                   {svc.name}
                 </Text>
-                <View style={styles.serviceBadgeMeta}>
-                  <Text style={styles.serviceBadgePrice}>
-                    ${Number(svc.price).toFixed(2)}
-                  </Text>
-                  <Text style={styles.serviceBadgeDuration}>
-                    • {svc.durationMinutes} min
-                  </Text>
-                </View>
+                <Text style={styles.serviceBadgePrice}>
+                  ${Number(svc.price).toFixed(0)}
+                </Text>
               </View>
             ))}
+            {services.length > 2 && (
+              <View style={styles.moreServicesBadge}>
+                <Text style={styles.moreServicesText}>
+                  +{services.length - 2}
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
-      )}
-
-      {(hasPhone || hasAdvance) && (
-        <View style={styles.metaContainer}>
-          {hasPhone && (
-            <View
-              style={styles.metaItem}
-              accessible={true}
-              accessibilityLabel={`Teléfono: ${business.phone}`}
-            >
-              <Feather name="phone" size={12} color={colors.text.muted} />
-              <Text style={styles.metaText}>{business.phone}</Text>
-            </View>
-          )}
-          {hasAdvance && (
-            <View
-              style={styles.metaItem}
-              accessible={true}
-              accessibilityLabel={`Anticipación mínima: ${business.minAdvanceHours} horas`}
-            >
-              <Feather name="clock" size={12} color={colors.text.muted} />
-              <Text style={styles.metaText}>
-                Anticipación mín.: {business.minAdvanceHours}h
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      <View style={styles.cardFooter}>
-        <View style={styles.slugContainer}>
-          <MaterialCommunityIcons
-            name="web"
-            size={13}
-            color={colors.text.muted}
-          />
-          <Text style={styles.slugText} numberOfLines={1}>
-            slotify.app/{business.slug}
-          </Text>
-        </View>
-        {/*
-          NOTA DE ACCESIBILIDAD Y ARQUITECTURA:
-          El botón es un View estilizado dentro de la tarjeta táctil principal.
-          Esto evita touchables anidados que causan advertencias y comportamientos erráticos.
-        */}
-        <View style={styles.bookBtn}>
-          <Feather name="arrow-right" size={12} color="#FFFFFF" />
-          <Text style={styles.bookBtnText}>Ver detalles</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+        )}
+      </AnimatedPressable>
+    </Animated.View>
   );
 }

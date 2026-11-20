@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,18 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCalendarStore } from '../model';
+import { useCalendarStore, resolveSessionScopeKey, type AppointmentClient } from '../model';
+import { DEFAULT_BUSINESS_TIME_ZONE, formatBusinessHour, sameCalendarDay, toBusinessClock } from '../model/businessTime';
+import { calendarError, createCalendarAppointment, fetchCalendarEmployees, updateCalendarAppointment, type CalendarEmployee } from '../api';
+import { createScheduleBlock, deleteScheduleBlock } from '@/features/schedule-blocks/api';
 import { CalendarHeader } from './CalendarHeader';
 import { DayView } from './DayView';
 import { WeekView } from './WeekView';
 import { MonthView } from './MonthView';
 import { AdminSlotDetailModal } from './AdminSlotDetailModal';
-import { CreateAppointmentModal } from './CreateAppointmentModal';
+import { CreateAppointmentModal, type ManualAppointment } from './CreateAppointmentModal';
 import { QuickSearchModal } from './QuickSearchModal';
 import { JumpToDateModal } from './JumpToDateModal';
 import { BlockSlotModal } from '@/features/schedule-blocks';
@@ -24,17 +28,25 @@ import { ToastNotification, type ToastType } from '@/components/ui/ToastNotifica
 import type { CalendarSlot } from '@/shared/types';
 import { useAppTheme } from '@/shared/theme';
 import { useAuthStore } from '@/features/auth/model';
+import { useClientsStore } from '@/features/clients/model';
+import { appointmentHaptic, settingsScope } from '@/features/settings/model/preferences';
+import { refreshAppointmentNotifications } from '@/features/settings/model/appointmentNotifications';
 
 export const CalendarView: React.FC = () => {
   const { colors, isDark } = useAppTheme();
-  const { appMode } = useAuthStore();
+  const { user, appMode } = useAuthStore();
   const isBusiness = appMode === 'BUSINESS';
+  const scopeKey = useMemo(() => resolveSessionScopeKey(user), [user?.id, user?.businessId, user?.email]);
 
   const {
     viewMode,
     selectedDate,
+    timeZone: loadedTimeZone,
+    appointmentDraft,
+    prepareAppointment,
     slots,
     isLoading,
+    error,
     setViewMode,
     setSelectedDate,
     goToToday,
@@ -46,12 +58,15 @@ export const CalendarView: React.FC = () => {
     removeSlot,
     rescheduleSlot,
   } = useCalendarStore();
+  const timeZone = loadedTimeZone ?? DEFAULT_BUSINESS_TIME_ZONE;
 
   // Estados de modales administrativos
   const [selectedSlotForDetail, setSelectedSlotForDetail] = useState<CalendarSlot | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [initialClient, setInitialClient] = useState<AppointmentClient>();
+  const [employees, setEmployees] = useState<CalendarEmployee[]>([]);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [selectedHourForCreate, setSelectedHourForCreate] = useState<string | undefined>(undefined);
 
@@ -70,18 +85,40 @@ export const CalendarView: React.FC = () => {
     setToastVisible(true);
   };
 
+  useFocusEffect(useCallback(() => {
+    if (isBusiness) void loadSlots(scopeKey);
+  }, [isBusiness, loadSlots, scopeKey]));
+
   useEffect(() => {
-    loadSlots();
-  }, []);
+    setInitialClient(undefined);
+    setShowCreateModal(false);
+    setShowBlockModal(false);
+    setShowDetailModal(false);
+    setShowActionSheet(false);
+    setSelectedHourForCreate(undefined);
+  }, [scopeKey]);
+
+  useFocusEffect(useCallback(() => {
+    if (!isBusiness || error || !loadedTimeZone || !appointmentDraft || appointmentDraft.scopeKey !== scopeKey) return;
+    setInitialClient(appointmentDraft.client);
+    setSelectedHourForCreate(undefined);
+    setShowCreateModal(true);
+    prepareAppointment(null);
+  }, [appointmentDraft, error, isBusiness, loadedTimeZone, scopeKey, prepareAppointment]));
+
+  useEffect(() => {
+    setEmployees([]);
+    if (!showCreateModal) return;
+    let active = true;
+    fetchCalendarEmployees()
+      .then((result) => { if (active) setEmployees(result); })
+      .catch(() => { if (active) triggerToast('No se pudo cargar el personal. Puedes agendar sin asignar.', 'warning'); });
+    return () => { active = false; };
+  }, [showCreateModal, scopeKey]);
 
   // Cálculo reactivo de métricas del día seleccionado
   const { appointmentCount, blockCount, completedCount } = useMemo(() => {
-    const isSameDay = (d1: Date, d2: Date) =>
-      d1.getFullYear() === d2.getFullYear() &&
-      d1.getMonth() === d2.getMonth() &&
-      d1.getDate() === d2.getDate();
-
-    const daySlots = slots.filter((s) => isSameDay(new Date(s.startTime), selectedDate));
+    const daySlots = slots.filter((s) => sameCalendarDay(toBusinessClock(s.startTime, timeZone), selectedDate));
 
     const appointments = daySlots.filter((s) => s.type === 'appointment' && s.status !== 'cancelled').length;
     const completed = daySlots.filter((s) => s.type === 'appointment' && s.status === 'completed').length;
@@ -92,10 +129,11 @@ export const CalendarView: React.FC = () => {
       completedCount: completed,
       blockCount: blocks,
     };
-  }, [slots, selectedDate]);
+  }, [slots, selectedDate, timeZone]);
 
   // Manejo al pulsar un slot del calendario
   const handleSlotPress = (slot: CalendarSlot) => {
+    appointmentHaptic();
     setSelectedSlotForDetail(slot);
     setShowDetailModal(true);
   };
@@ -107,25 +145,41 @@ export const CalendarView: React.FC = () => {
     setShowActionSheet(true);
   };
 
-  // Cambio de estado de cita con feedback Toast (Recomendación C)
-  const handleStatusChange = (resourceId: string, status: 'confirmed' | 'cancelled' | 'completed') => {
+  const isCurrentScope = () => resolveSessionScopeKey(useAuthStore.getState().user) === scopeKey;
+  const onAppointmentChanged = () => {
+    useClientsStore.getState().invalidateClients();
+    appointmentHaptic(true);
+    const notificationScope = settingsScope(user);
+    if (notificationScope) void refreshAppointmentNotifications(notificationScope).catch(() => {});
+  };
+
+  const handleStatusChange = async (resourceId: string, status: 'cancelled' | 'completed') => {
+    await updateCalendarAppointment(resourceId, { status });
+    if (!isCurrentScope()) return;
     updateSlotStatus(resourceId, status);
+    onAppointmentChanged();
     if (status === 'completed') {
-      triggerToast('¡Cita cobrada con éxito! 💰', 'success');
+      triggerToast('Cita completada', 'success');
     } else if (status === 'cancelled') {
       triggerToast('Cita cancelada y espacio liberado', 'info');
     }
   };
 
   // Eliminación / desbloqueo de horario con feedback Toast
-  const handleDeleteBlock = (resourceId: string) => {
+  const handleDeleteBlock = async (resourceId: string) => {
+    try {
+      await deleteScheduleBlock(resourceId);
+    } catch (error) {
+      throw new Error(calendarError(error, 'No se pudo desbloquear el horario.'));
+    }
+    if (!isCurrentScope()) return;
     removeSlot(resourceId);
     triggerToast('Horario desbloqueado y disponible 🔓', 'success');
   };
 
   // Manejo de Selección de Cita desde Búsqueda Rápida (Recomendación 1)
   const handleSelectSlotFromSearch = (slot: CalendarSlot) => {
-    const slotDate = new Date(slot.startTime);
+    const slotDate = toBusinessClock(slot.startTime, timeZone);
     setSelectedDate(slotDate);
     setSelectedSlotForDetail(slot);
     setShowDetailModal(true);
@@ -135,55 +189,86 @@ export const CalendarView: React.FC = () => {
   // Manejo de Selección de Fecha desde Modal Saltar a Fecha (Recomendación 3)
   const handleSelectDateFromJump = (date: Date) => {
     setSelectedDate(date);
-    const day = date.getDate();
-    const month = date.toLocaleDateString('es-ES', { month: 'short' });
+    const day = date.getUTCDate();
+    const month = date.toLocaleDateString('es-ES', { timeZone: 'UTC', month: 'short' });
     triggerToast(`Navegando al ${day} de ${month} 📅`, 'info');
   };
 
   // Reprogramación de Cita (Recomendación B)
-  const handleReschedule = (resourceId: string, newStartTime: string, newEndTime: string) => {
+  const handleReschedule = async (resourceId: string, newStartTime: string, newEndTime: string) => {
+    await updateCalendarAppointment(resourceId, { startTime: newStartTime, endTime: newEndTime });
+    if (!isCurrentScope()) return;
     rescheduleSlot(resourceId, newStartTime, newEndTime);
-    const startHourStr = new Date(newStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    onAppointmentChanged();
+    const startHourStr = formatBusinessHour(newStartTime, timeZone);
     triggerToast(`Cita reprogramada a las ${startHourStr} ⏰`, 'info');
   };
 
-  // Guardado de Cita Manual (Walk-in)
-  const handleSaveAppointment = (data: {
-    title: string;
-    clientName: string;
-    clientPhone?: string;
-    servicePrice?: string;
-    startTime: string;
-    endTime: string;
-    employeeName?: string;
-  }) => {
-    const newSlot: CalendarSlot = {
-      type: 'appointment',
-      resourceId: `apt-walkin-${Date.now()}`,
-      title: data.title,
-      status: 'confirmed',
-      clientName: data.clientName,
-      clientPhone: data.clientPhone,
-      servicePrice: data.servicePrice,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      employeeName: data.employeeName,
-    };
-    addSlot(newSlot);
-    setSelectedHourForCreate(undefined);
-    triggerToast(`Cita agendada para ${data.clientName} 📅`, 'success');
+  // Guardado de Cita Manual (Walk-in): confirma primero con el servidor y conserva el ID real devuelto por la API
+  const handleSaveAppointment = async (data: ManualAppointment) => {
+    try {
+      const createdId = await createCalendarAppointment({
+        startTime: data.startTime,
+        endTime: data.endTime,
+        clientName: data.clientName.trim(),
+        clientPhone: data.clientPhone?.trim() || undefined,
+        clientEmail: data.clientEmail,
+        businessClientId: data.businessClientId,
+        agreedTotal: data.agreedTotal,
+        employeeId: data.employeeId,
+      });
+
+      // Ignorar si cambió la sesión o negocio mientras la petición estaba en vuelo
+      if (!isCurrentScope()) return;
+
+      const newSlot: CalendarSlot = {
+        type: 'appointment',
+        resourceId: createdId,
+        title: data.title,
+        status: 'confirmed',
+        clientName: data.clientName.trim(),
+        clientPhone: data.clientPhone?.trim() || undefined,
+        servicePrice: data.agreedTotal.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }),
+        businessClientId: data.businessClientId,
+        agreedTotal: data.agreedTotal,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        employeeName: data.employeeName,
+        employeeId: data.employeeId,
+      };
+
+      addSlot(newSlot);
+      onAppointmentChanged();
+      setSelectedHourForCreate(undefined);
+      triggerToast(`Cita agendada para ${data.clientName} 📅`, 'success');
+    } catch (err: any) {
+      const errorMessage =
+        err?.message || 'El servidor rechazó el registro de la cita.';
+      throw new Error(errorMessage);
+    }
   };
 
   // Guardado de Bloqueo de Horario (US-008)
-  const handleSaveBlock = (data: {
+  const handleSaveBlock = async (data: {
     title: string;
     reason: string;
     startTime: string;
     endTime: string;
   }) => {
+    let blockId: string;
+    try {
+      blockId = await createScheduleBlock({
+        reason: data.reason,
+        startDateTime: data.startTime,
+        endDateTime: data.endTime,
+      });
+    } catch (error) {
+      throw new Error(calendarError(error, 'No se pudo bloquear el horario.'));
+    }
+    if (!isCurrentScope()) return;
     const newBlockSlot: CalendarSlot = {
       type: 'block',
-      resourceId: `blk-manual-${Date.now()}`,
+      resourceId: blockId,
       title: data.title,
       status: 'blocked',
       blockReason: data.reason,
@@ -210,7 +295,7 @@ export const CalendarView: React.FC = () => {
           onNext={navigateForward}
           onToday={goToToday}
           onSelectMode={setViewMode}
-          onAddPress={isBusiness ? () => setShowActionSheet(true) : undefined}
+          onAddPress={isBusiness && loadedTimeZone && !error ? () => setShowActionSheet(true) : undefined}
           onSearchPress={() => setShowSearchModal(true)}
           onTitleDatePress={() => setShowJumpDateModal(true)}
           appointmentCount={isBusiness ? appointmentCount : undefined}
@@ -223,19 +308,30 @@ export const CalendarView: React.FC = () => {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.action.primary} />
           </View>
+        ) : error ? (
+          <View style={styles.loadingContainer}>
+            <Text style={{ color: colors.text.secondary, textAlign: 'center', marginBottom: 12 }}>
+              No se pudo cargar la agenda del negocio.
+            </Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void loadSlots(scopeKey)}>
+              <Text style={{ color: colors.text.accent, fontWeight: '700' }}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={styles.viewContainer}>
             {viewMode === 'day' && (
               <DayView
+                timeZone={timeZone}
                 selectedDate={selectedDate}
                 slots={slots}
                 onSelectSlot={handleSlotPress}
-                onEmptySlotPress={isBusiness ? handleEmptyHourPress : undefined}
+                onEmptySlotPress={isBusiness && loadedTimeZone ? handleEmptyHourPress : undefined}
               />
             )}
 
             {viewMode === 'week' && (
               <WeekView
+                timeZone={timeZone}
                 selectedDate={selectedDate}
                 slots={slots}
                 onSelectDate={setSelectedDate}
@@ -245,6 +341,7 @@ export const CalendarView: React.FC = () => {
 
             {viewMode === 'month' && (
               <MonthView
+                timeZone={timeZone}
                 selectedDate={selectedDate}
                 slots={slots}
                 onSelectDate={setSelectedDate}
@@ -256,6 +353,7 @@ export const CalendarView: React.FC = () => {
 
         {/* Modal de Detalle y Acciones Administrativas */}
         <AdminSlotDetailModal
+          timeZone={timeZone}
           slot={selectedSlotForDetail}
           visible={showDetailModal}
           onClose={() => {
@@ -316,6 +414,7 @@ export const CalendarView: React.FC = () => {
                   ]}
                   onPress={() => {
                     setShowActionSheet(false);
+                    setInitialClient(undefined);
                     setTimeout(() => setShowCreateModal(true), 250);
                   }}
                 >
@@ -371,11 +470,16 @@ export const CalendarView: React.FC = () => {
 
         {/* Modal para Crear Cita Manual */}
         <CreateAppointmentModal
+          employees={employees}
+          scopeKey={scopeKey}
+          timeZone={timeZone}
+          initialClient={initialClient}
           visible={showCreateModal}
           initialDate={selectedDate}
           initialHour={selectedHourForCreate}
           onClose={() => {
             setShowCreateModal(false);
+            setInitialClient(undefined);
             setSelectedHourForCreate(undefined);
           }}
           onSave={handleSaveAppointment}
@@ -383,6 +487,7 @@ export const CalendarView: React.FC = () => {
 
         {/* Modal para Bloquear Horario (US-008) */}
         <BlockSlotModal
+          timeZone={timeZone}
           visible={showBlockModal}
           initialDate={selectedDate}
           initialHour={selectedHourForCreate}
@@ -395,6 +500,7 @@ export const CalendarView: React.FC = () => {
 
         {/* Modal de Búsqueda Rápida de Clientes (Recomendación 1) */}
         <QuickSearchModal
+          timeZone={timeZone}
           visible={showSearchModal}
           onClose={() => setShowSearchModal(false)}
           slots={slots}
@@ -403,6 +509,7 @@ export const CalendarView: React.FC = () => {
 
         {/* Modal para Saltar Directamente a una Fecha (Recomendación 3) */}
         <JumpToDateModal
+          timeZone={timeZone}
           visible={showJumpDateModal}
           selectedDate={selectedDate}
           onSelectDate={handleSelectDateFromJump}

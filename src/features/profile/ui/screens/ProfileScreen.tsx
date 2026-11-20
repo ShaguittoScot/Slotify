@@ -1,11 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
+import { useAppTheme } from '@/shared/theme';
 
 export function ProfileScreen() {
+  const router = useRouter();
+  const { colors, isDark } = useAppTheme();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
@@ -16,25 +20,54 @@ export function ProfileScreen() {
   };
 
   return (
-    <View style={s.screen}>
+    <View style={[s.screen, { backgroundColor: colors.background.primary }]}>
       <SafeAreaView style={s.safeArea} edges={['top']}>
         <Animated.View entering={FadeIn.duration(500)} style={s.container}>
-          <View style={s.avatarLarge}>
-            <Text style={s.avatarText}>{getInitials(user?.fullName || 'US')}</Text>
+          <View
+            style={[
+              s.avatarLarge,
+              { backgroundColor: colors.action.primary },
+            ]}
+          >
+            <Text style={[s.avatarText, { color: colors.action.primaryText }]}>
+              {getInitials(user?.fullName || 'US')}
+            </Text>
           </View>
-          <Text style={s.name}>{user?.fullName || 'Usuario'}</Text>
-          <Text style={s.email}>{user?.email || 'email@ejemplo.com'}</Text>
+          <Text style={[s.name, { color: colors.text.primary }]}>
+            {user?.fullName || 'Usuario'}
+          </Text>
+          <Text style={[s.email, { color: colors.text.muted }]}>
+            {user?.email || 'Sin correo registrado'}
+          </Text>
 
-          <View style={s.badge}>
-            <Text style={s.badgeText}>Configuración completa próximamente</Text>
-          </View>
+          <TouchableOpacity
+            style={[
+              s.settingsBtn,
+              {
+                backgroundColor: colors.action.primary,
+              },
+            ]}
+            onPress={() => router.replace('/(main)/settings' as any)}
+            activeOpacity={0.8}
+          >
+            <Feather name="settings" size={17} color={colors.action.primaryText} />
+            <Text style={[s.settingsBtnText, { color: colors.action.primaryText }]}>
+              Ir a Ajustes
+            </Text>
+          </TouchableOpacity>
 
-          <TouchableOpacity style={s.logoutBtn} onPress={logout} activeOpacity={0.7}>
-            <SymbolView
-              name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }}
-              size={18}
-              tintColor="#EF4444"
-            />
+          <TouchableOpacity
+            style={[
+              s.logoutBtn,
+              {
+                backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#FEF2F2',
+                borderColor: isDark ? 'rgba(239,68,68,0.28)' : '#FECACA',
+              },
+            ]}
+            onPress={logout}
+            activeOpacity={0.75}
+          >
+            <Feather name="log-out" size={17} color="#EF4444" />
             <Text style={s.logoutText}>Cerrar Sesión</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -46,7 +79,6 @@ export function ProfileScreen() {
 const s = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#FAFAF8',
   },
   safeArea: {
     flex: 1,
@@ -55,56 +87,59 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
   },
   avatarLarge: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   avatarText: {
-    color: '#FFFFFF',
     fontSize: 28,
     fontWeight: '700',
   },
   name: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
     marginBottom: 4,
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   email: {
     fontSize: 15,
-    color: '#9CA3AF',
-    marginBottom: 24,
+    marginBottom: 28,
+    textAlign: 'center',
   },
-  badge: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 32,
-  },
-  badgeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  logoutBtn: {
+  settingsBtn: {
+    width: '100%',
+    maxWidth: 280,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: '#FEF2F2',
+    marginBottom: 12,
+  },
+  settingsBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  logoutBtn: {
+    width: '100%',
+    maxWidth: 280,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#FECACA',
   },
   logoutText: {
     fontSize: 15,

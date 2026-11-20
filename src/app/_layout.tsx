@@ -16,12 +16,12 @@ import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { ActivityIndicator, StatusBar, View } from 'react-native';
+import { ActivityIndicator, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/features/auth/model';
+import { useNotificationEngine } from '@/features/notifications/model/engine';
 import { STORAGE_KEYS } from '@/shared/lib/constants';
-import { storage } from '@/shared/lib/storage';
 import { useAppTheme } from '@/shared/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -31,7 +31,8 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  const { isAuthenticated, isHydrating, user, appMode, syncError, hydrate } = useAuthStore();
+  const { isAuthenticated, isLoading, isHydrating, user, businessProfileStatus, error, syncError, appMode, hydrate, logout } = useAuthStore();
+  useNotificationEngine(isAuthenticated ? user : null);
 
   const [fontsLoaded] = useFonts({
     Poppins_500Medium,
@@ -55,62 +56,64 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
-    if (isHydrating || !fontsLoaded) return;
+    const loading = isLoading || isHydrating;
+    if (loading || !fontsLoaded) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inMainGroup = segments[0] === '(main)';
-    const inOnboardingGroup = segments[0] === '(onboarding)';
+    const segList = segments as unknown as string[];
+    const inAuthGroup = segList[0] === '(auth)';
+    const inMainGroup = segList[0] === '(main)';
+    const inBusinessSetup = segList[0] === '(onboarding)' && segList[1] === 'wizard';
 
-    if (!isAuthenticated) {
-      if (inMainGroup || inOnboardingGroup) {
-        // @ts-ignore
-        router.replace('/(auth)');
-      }
+    if (!isAuthenticated && (inMainGroup || inBusinessSetup)) {
+      router.replace('/(auth)');
       return;
     }
 
-    if (segments[1] === 'register-client' || appMode === 'CONSUMER') {
-      if (inAuthGroup) {
-        AsyncStorage.getItem(STORAGE_KEYS.CONSUMER_ONBOARDING_COMPLETE).then((completed) => {
-          if (completed === 'true') {
-            router.replace('/(main)/explore' as any);
-          } else {
-            router.replace('/(onboarding)/consumer' as any);
-          }
-        });
-      }
-      return;
+    if (!isAuthenticated) return;
+
+    if (segList[1] === 'register-client' || appMode === 'CONSUMER') {
+      if (!inAuthGroup && !inBusinessSetup) return;
+      let active = true;
+      const routeToConsumer = (completed: string | null) => {
+        if (active) router.replace(completed === 'true' ? '/(main)/explore' : '/(onboarding)/consumer');
+      };
+      AsyncStorage.getItem(STORAGE_KEYS.CONSUMER_ONBOARDING_COMPLETE)
+        .then(routeToConsumer, () => routeToConsumer(null));
+      return () => { active = false; };
     }
 
     // Modo Business (DUENO / EMPLEADO)
-    const isOnboardingComplete = Boolean(user?.isOnboardingCompleted);
+    const isCompleted = businessProfileStatus === 'ready' || Boolean(user?.isOnboardingCompleted);
+    const needsSetup = businessProfileStatus === 'needs-setup' || (!isCompleted && !user?.businessId);
 
-    if (isOnboardingComplete) {
-      if (inAuthGroup || (inOnboardingGroup && segments[1] === 'wizard')) {
+    if (isCompleted) {
+      if (inAuthGroup || inBusinessSetup) {
         router.replace('/(main)');
       }
-    } else {
-      // Si existe un error de sincronización de red o servidor, no forzar al wizard
+    } else if (needsSetup) {
       if (syncError) {
         return;
       }
-      // Onboarding pendiente confirmado
       if (inMainGroup || inAuthGroup) {
         router.replace('/(onboarding)/wizard');
       }
     }
   }, [
     isAuthenticated,
+    isLoading,
     isHydrating,
+    businessProfileStatus,
     user?.isOnboardingCompleted,
     user?.businessId,
     appMode,
     syncError,
     segments,
     fontsLoaded,
+    router,
   ]);
 
-  if (isHydrating || !fontsLoaded) {
+  const loading = isLoading || isHydrating;
+  if (loading || !fontsLoaded) {
     return (
       <View
         style={{
@@ -125,6 +128,26 @@ export default function RootLayout() {
     );
   }
 
+  if (isAuthenticated && businessProfileStatus === 'unavailable') {
+    return (
+      <View style={[styles.recovery, { backgroundColor: colors.background.primary }]}>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.text.primary }]}>
+          No pudimos verificar tu negocio
+        </Text>
+        <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.text.secondary }]}>
+          {error || syncError || 'Intenta consultar tu cuenta de nuevo.'}
+        </Text>
+        <Pressable accessibilityRole="button" onPress={hydrate}
+          style={[styles.retry, { backgroundColor: colors.action.primary }]}>
+          <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>Reintentar</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={logout} style={styles.retry}>
+          <Text style={[styles.buttonText, { color: colors.text.primary }]}>Cerrar sesión</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -133,3 +156,11 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  recovery: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 28 },
+  title: { fontSize: 23, fontWeight: '700', textAlign: 'center' },
+  message: { fontSize: 16, textAlign: 'center', maxWidth: 420 },
+  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 24, borderRadius: 14 },
+  buttonText: { fontSize: 16, fontWeight: '700' },
+});

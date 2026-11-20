@@ -1,3 +1,5 @@
+import type { AuthUser } from '@/shared/types';
+
 export interface LoginCredentials {
   email: string;
   password?: string;
@@ -29,4 +31,42 @@ export interface ExchangeTokenRequest {
 export interface AuthResponse {
   user: any;
   session: any;
+}
+
+export interface BackendAuthUserDto extends AuthUser {
+  accessToken?: string;
+  refreshToken?: string;
+}
+
+export interface ExchangeTokenResponse {
+  success: boolean;
+  data?: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
+    user: AuthUser;
+  };
+  message?: string;
+}
+
+/**
+ * Payload sent to the .NET backend after Supabase signup
+ * to sync the user profile and create a business.
+ */
+export interface SyncProfileRequest {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email: string;
+  businessName: string;
+  businessPhone?: string;
+  sectorTemplateId?: number;
+}
+
+export interface SyncProfileResponse {
+  success: boolean;
+  data?: BackendAuthUserDto;
+  message?: string;
+  sectorTemplateId?: number;
 }

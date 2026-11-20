@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 import { lightColors, darkColors, ThemeColors, palette } from './colors';
-import { storage } from '@/shared/lib/storage';
+
+function getStorage() {
+  return (require('@/shared/lib/storage') as typeof import('@/shared/lib/storage')).storage;
+}
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -16,12 +19,12 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  mode: 'system', // Por defecto sigue el tema del dispositivo
+  mode: 'dark', // Estilo oscuro elegante (Obsidian Black) por defecto
   isHydrated: false,
 
   setMode: async (mode: ThemeMode) => {
     set({ mode });
-    await storage.set(THEME_STORAGE_KEY, mode);
+    await getStorage().set(THEME_STORAGE_KEY, mode);
   },
 
   toggleTheme: async () => {
@@ -33,23 +36,23 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     } else if (currentMode === 'dark') {
       nextMode = 'light';
     } else {
-      nextMode = 'system';
+      nextMode = 'dark';
     }
 
     set({ mode: nextMode });
-    await storage.set(THEME_STORAGE_KEY, nextMode);
+    await getStorage().set(THEME_STORAGE_KEY, nextMode);
   },
 
   hydrateTheme: async () => {
     try {
-      const savedMode = await storage.get<ThemeMode>(THEME_STORAGE_KEY);
-      if (savedMode && (savedMode === 'system' || savedMode === 'light' || savedMode === 'dark')) {
+      const savedMode = await getStorage().get<ThemeMode>(THEME_STORAGE_KEY);
+      if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
         set({ mode: savedMode, isHydrated: true });
       } else {
-        set({ mode: 'system', isHydrated: true });
+        set({ mode: 'dark', isHydrated: true });
       }
     } catch {
-      set({ isHydrated: true });
+      set({ mode: 'dark', isHydrated: true });
     }
   },
 }));

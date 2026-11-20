@@ -156,7 +156,7 @@ export function ExploreScreen() {
                       : 'establecimientos'}
                   </Text>
                 </View>
-              ) : null
+              ) : undefined
             }
             ListEmptyComponent={
               <EmptyState

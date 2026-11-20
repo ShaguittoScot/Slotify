@@ -5,11 +5,53 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { exploreApi } from '../api';
+import { loadFormSchemaLocally } from '@/features/dashboard/model/formBranding';
 import type { BusinessDto, Category } from '../types';
 
 export const isValidHexColor = (color?: string | null): boolean => {
   if (!color || typeof color !== 'string') return false;
   return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(color.trim());
+};
+
+type LocalBranding = Awaited<ReturnType<typeof loadFormSchemaLocally>>;
+
+/** Carga la identidad de marca local sin romper el explorador si el almacenamiento falla. */
+const loadLocalBrandingSafely = async (): Promise<LocalBranding> => {
+  try {
+    return await loadFormSchemaLocally();
+  } catch {
+    return null;
+  }
+};
+
+/** Completa logo/color del negocio con la identidad guardada localmente cuando el backend no la tiene. */
+const enrichWithLocalBranding = (biz: BusinessDto, localBranding: LocalBranding): BusinessDto => {
+  const localName = localBranding?.businessName?.trim().toLowerCase();
+  const matchesName = Boolean(localName) && (biz.name ?? '').trim().toLowerCase() === localName;
+  if (!localBranding || !matchesName) return biz;
+
+  const hasBackendColor = isValidHexColor(biz.brandColor) && biz.brandColor !== '#000000';
+  return {
+    ...biz,
+    logoUrl: biz.logoUrl || localBranding.logoUrl || null,
+    brandColor: hasBackendColor
+      ? biz.brandColor
+      : isValidHexColor(localBranding.accentColor)
+      ? localBranding.accentColor
+      : biz.brandColor,
+  };
+};
+
+const mergeBusinessCatalog = (backendList: BusinessDto[]): BusinessDto[] => {
+  const map = new Map<string, BusinessDto>();
+
+  backendList.forEach((b) => {
+    if (b && b.slug) {
+      map.set(b.slug.toLowerCase(), b);
+    }
+  });
+
+  return Array.from(map.values());
 };
 
 interface ExploreState {
@@ -30,9 +72,9 @@ interface ExploreState {
   initInterests: () => Promise<void>;
 }
 
-export const useExploreStore = create<ExploreState>((set, get) => ({
+export const useExploreStore = create<ExploreState>((set) => ({
   businesses: [],
-  isLoading: true,
+  isLoading: false,
   isRefreshing: false,
   errorMessage: null,
   searchInput: '',
@@ -47,14 +89,21 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
         set({ isLoading: true, errorMessage: null });
       }
 
-      const data = await exploreApi.getBusinesses();
-      set({ businesses: data, errorMessage: null });
-    } catch (err: any) {
-      const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        'No se pudieron cargar los negocios. Intenta de nuevo.';
-      set({ errorMessage: message });
+      const backendData = await exploreApi.getBusinesses();
+      const localBranding = await loadLocalBrandingSafely();
+      const validBackendList = Array.isArray(backendData)
+        ? backendData.filter((biz) => Boolean(biz && biz.id && biz.slug))
+        : [];
+
+      const merged = mergeBusinessCatalog(validBackendList);
+      const enriched = merged.map((biz) => enrichWithLocalBranding(biz, localBranding));
+
+      set({ businesses: enriched, errorMessage: null });
+    } catch {
+      set((state) => ({
+        businesses: state.businesses,
+        errorMessage: 'No se pudo cargar el catálogo de negocios. Revisa tu conexión e inténtalo de nuevo.',
+      }));
     } finally {
       set({ isLoading: false, isRefreshing: false });
     }
@@ -70,10 +119,24 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
 
   initInterests: async () => {
     try {
-      // Los intereses del usuario quedan guardados en storage para preferencias,
-      // pero por defecto el catálogo siempre inicia en 'all' (Todos) para evitar vistas vacías sin resultados.
-      await AsyncStorage.getItem('consumerInterests');
-      set({ selectedCategoryKey: 'all' });
+      const val = await AsyncStorage.getItem('consumerInterests');
+      if (!val) {
+        set({ selectedCategoryKey: 'all' });
+        return;
+      }
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const rawKey = String(parsed[0]).toLowerCase();
+        let normalized = rawKey;
+        if (rawKey.includes('barber')) normalized = 'barberia';
+        else if (rawKey.includes('spa') || rawKey.includes('masaj')) normalized = 'spa';
+        else if (rawKey.includes('salud') || rawKey.includes('dent')) normalized = 'salud';
+        else if (rawKey.includes('estet') || rawKey.includes('belleza')) normalized = 'belleza';
+
+        set({ selectedCategoryKey: normalized });
+      } else {
+        set({ selectedCategoryKey: 'all' });
+      }
     } catch {
       set({ selectedCategoryKey: 'all' });
     }
@@ -87,7 +150,7 @@ export const selectExploreCategories = (businesses: BusinessDto[]): Category[] =
   const map = new Map<string, string>();
   businesses.forEach((b) => {
     if (b.category && b.category.trim()) {
-      const key = b.categoryKey?.toLowerCase() || b.category.toLowerCase().trim();
+      const key = (b.categoryKey || b.category).toLowerCase().trim();
       if (!map.has(key)) map.set(key, b.category.trim());
     }
   });
@@ -114,15 +177,15 @@ export const selectFilteredBusinesses = (
       const matches = bKey === activeKey || bKey.includes(activeKey) || activeKey.includes(bKey);
       if (!matches) return false;
     }
-
     if (!query) return true;
 
     return (
       (b.name && b.name.toLowerCase().includes(query)) ||
       (b.slug && b.slug.toLowerCase().includes(query)) ||
       (b.category && b.category.toLowerCase().includes(query)) ||
-      (b.phone && b.phone.toLowerCase().includes(query))
+      (b.phone && b.phone.toLowerCase().includes(query)) ||
+      (b.address && b.address.toLowerCase().includes(query)) ||
+      (b.services && b.services.some((s) => s.name.toLowerCase().includes(query)))
     );
   });
 };
-

@@ -1,0 +1,261 @@
+\documentclass[11pt,a4paper]{article}
+
+% ─── Paquetes Base y Codificación ───────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+% ─── Tipografía y Diseño Visual ─────────────────────────────────────────────
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+% ─── Paleta de Colores Corporativos Slotify ─────────────────────────────────
+\definecolor{SlotifyIndigo}{HTML}{6366F1}
+\definecolor{SlotifyViolet}{HTML}{8B5CF6}
+\definecolor{SlotifyDark}{HTML}{171717}
+\definecolor{SlotifyGray}{HTML}{525252}
+\definecolor{SlotifyLightBg}{HTML}{F8FAFC}
+\definecolor{CodeBorder}{HTML}{E2E8F0}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=SlotifyIndigo,
+    urlcolor=SlotifyViolet,
+    pdftitle={Justificación Arquitectónica SOLID - Identidad de Marca en Formularios (Slotify)},
+    pdfauthor={Equipo de Desarrollo Slotify}
+}
+
+% ─── Configuración de Bloques de Código ─────────────────────────────────────
+\lstdefinestyle{slotifystyle}{
+    backgroundcolor=\color{SlotifyLightBg},
+    commentstyle=\color{SlotifyGray}\itshape,
+    keywordstyle=\color{SlotifyIndigo}\bfseries,
+    stringstyle=\color{SlotifyViolet},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=8pt,
+    numberstyle=\tiny\color{SlotifyGray},
+    frame=single,
+    rulecolor=\color{CodeBorder},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=slotifystyle}
+
+% ─── Encabezado y Pie de Página ─────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textbf{Slotify} $\cdot$ Arquitectura de Software y Principios SOLID}
+\rhead{Identidad Corporativa en Formularios}
+\cfoot{\thepage}
+
+% ─── Formato de Títulos ─────────────────────────────────────────────────────
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{SlotifyIndigo}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{SlotifyDark}}{\thesubsection}{0.5em}{}
+
+% ─── Documento ──────────────────────────────────────────────────────────────
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\scshape\LARGE Plataforma Slotify / Slotly \par}
+    \vspace{0.8cm}
+    {\huge\bfseries Fundamentación Arquitectónica y Cumplimiento de Principios SOLID\par}
+    \vspace{0.6cm}
+    {\Large Historia de Usuario: Carga de Logotipo y Colores Corporativos Principales sobre Formularios Públicos de Reserva\par}
+    \vspace{1.5cm}
+
+    \begin{tabular}{rl}
+        \toprule
+        \textbf{Rol:} & Administrador de un negocio en Slotly \\
+        \textbf{Objetivo:} & Cargar logotipo y definir colores corporativos principales \\
+        \textbf{Propósito:} & Mantener la identidad de marca en la interfaz pública de reservas \\
+        \textbf{Arquitectura Frontend:} & Feature-Based Architecture (FBA) + MVVM Reactivo (Expo / React Native) \\
+        \textbf{Arquitectura Backend:} & Clean Architecture + CQRS con MediatR y FluentValidation (.NET 9) \\
+        \bottomrule
+    \end{tabular}
+
+    \vfill
+    {\large Fecha de generación: \today\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================================
+\section{Introducción y Regla de Dependencia Concéntrica}
+% ============================================================================
+
+La funcionalidad de personalización de identidad de marca (logotipo institucional, color corporativo primario \texttt{accentColor} y color corporativo secundario \texttt{secondaryColor}) sobre los formularios públicos de reserva fue diseñada siguiendo la \textbf{Regla de Dependencia Concéntrica} de \textit{Clean Architecture} en el backend (\texttt{Slotify\_back}) y \textit{Feature-Based Architecture (FBA)} con el patrón \textbf{MVVM} en el frontend (\texttt{Slotify}).
+
+Formalmente, el flujo de dependencias entre capas apunta estrictamente hacia el núcleo del dominio:
+
+\[
+\text{Frameworks / UI / API REST} \longrightarrow \text{Casos de Uso / Application (CQRS)} \longrightarrow \text{Dominio / Entidades}
+\]
+
+En el backend (.NET 9), esto se expresa como:
+\[
+\underbrace{\texttt{Slotify.API} \cup \texttt{Slotify.Infrastructure}}_{\text{Capas Externas (Detalles)}}
+\longrightarrow
+\underbrace{\texttt{Slotify.Application}}_{\text{Orquestación CQRS}}
+\longrightarrow
+\underbrace{\texttt{Slotify.Domain}}_{\text{Núcleo Invariante}}
+\]
+
+A continuación, se demuestra técnicamente cómo cada componente satisface los cinco principios \textbf{SOLID}.
+
+% ============================================================================
+\section{S --- Single Responsibility Principle (Responsabilidad Única)}
+% ============================================================================
+
+\begin{quote}
+\textit{``Todo módulo, clase o función debe tener una única responsabilidad y una sola razón para cambiar.''}
+\end{quote}
+
+La solución evita el anti-patrón \textit{God Object} dividiendo las responsabilidades en unidades cohesivas tanto en el cliente móvil/web como en el servidor:
+
+\subsection{Aplicación en el Backend (.NET 9)}
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Entidad de Dominio (\texttt{Business.cs}):} Concentra únicamente el estado del negocio y las reglas invariantes de validación de identidad corporativa (\texttt{IsValidCorporateHexColor} e \texttt{IsValidLogoSource}), sin acoplarse a serializadores JSON ni a bases de datos.
+    \item \textbf{Validadores de Entrada (\texttt{UpdateBusinessBrandIdentityValidator} y \texttt{UpdateBusinessFormConfigValidator}):} Su única razón de cambio es la modificación de las reglas sintácticas de entrada mediante \texttt{FluentValidation}.
+    \item \textbf{Manejadores de Comandos (\texttt{UpdateBusinessBrandIdentityCommandHandler} y \texttt{UpdateBusinessFormConfigCommandHandler}):} Orquestan exclusivamente la persistencia transaccional de la identidad de marca y estructura del formulario.
+    \item \textbf{Manejador de Consultas (\texttt{GetBusinessBookingConfigQueryHandler}):} Se encarga únicamente de recuperar y proyectar el esquema público del formulario (\texttt{BookingFormConfigDto}) a partir del \texttt{slug} del negocio.
+\end{enumerate}
+
+\subsection{Aplicación en el Frontend (React Native / TypeScript)}
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Modelo y Persistencia (\texttt{formBranding.ts}):} Aísla las paletas corporativas predefinidas (\texttt{CORPORATE\_COLOR\_PRESETS}), la validación hexadecimal (\texttt{isValidHexColor}, \texttt{normalizeHexColor}) y la persistencia local (\texttt{saveFormSchemaLocally}).
+    \item \textbf{Componente de Edición de Marca (\texttt{FormBrandIdentityCard.tsx}):} Vista pasiva encargada exclusivamente de capturar el logotipo y los colores corporativos, notificando cambios mediante la propiedad \texttt{onChangeBranding}.
+    \item \textbf{Renderizador Público (\texttt{FormViewer.tsx}):} Se dedica únicamente a proyectar el formulario de reserva con el logotipo y los colores corporativos del establecimiento en los modos \texttt{classic\_scroll} e \texttt{interactive\_slides}.
+\end{enumerate}
+
+% ============================================================================
+\section{O --- Open/Closed Principle (Principio de Abierto/Cerrado)}
+% ============================================================================
+
+\begin{quote}
+\textit{``Las entidades de software deben estar abiertas para su extensión, pero cerradas para su modificación.''}
+\end{quote}
+
+\begin{itemize}
+    \item \textbf{Extensibilidad del Pipeline de Validación (Backend):} Gracias al comportamiento transversal \texttt{ValidationBehavior<TRequest, TResponse>} registrado en MediatR, la incorporación de \texttt{UpdateBusinessBrandIdentityValidator} extiende automáticamente las validaciones del sistema sin modificar una sola línea del pipeline ni de los controladores existentes:
+\begin{lstlisting}[language={[Sharp]C}]
+public class ValidationBehavior<TRequest, TResponse>(
+    IEnumerable<IValidator<TRequest>> validators)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
+\end{lstlisting}
+    \item \textbf{Extensibilidad de Paletas Corporativas y Bloques de Formulario (Frontend):} La incorporación de nuevas combinaciones corporativas en \texttt{CORPORATE\_COLOR\_PRESETS} o nuevos tipos de preguntas en \texttt{FIELD\_TYPE\_META} extiende las capacidades visuales del constructor sin alterar la lógica interna de \texttt{FormBrandIdentityCard.tsx} ni el estado de \texttt{FormBuilderScreen.tsx}.
+\end{itemize}
+
+% ============================================================================
+\section{L --- Liskov Substitution Principle (Sustitución de Liskov)}
+% ============================================================================
+
+\begin{quote}
+\textit{``Si $S$ es un subtipo de $T$, entonces los objetos de tipo $T$ pueden ser sustituidos por objetos de tipo $S$ sin alterar las propiedades deseables del programa.''}
+\end{quote}
+
+Sea $T = \texttt{IBusinessRepository}$ el contrato abstracto definido en \texttt{Slotify.Domain} y sean $S_1 = \texttt{BusinessRepository}$ (implementación PostgreSQL con EF Core) y $S_2 = \texttt{Mock<IBusinessRepository>}$ (doble de prueba en \texttt{Slotify.Tests}). Para todo comando $c \in \texttt{UpdateBusinessBrandIdentityCommand}$:
+
+\[
+\forall r \in \{S_1, S_2\} \subseteq \texttt{IBusinessRepository}, \quad \texttt{Handler}(r).\texttt{Handle}(c) \implies \text{Contrato Postcondicional Invariante}
+\]
+
+\begin{itemize}
+    \item \textbf{Sustitución Polimórfica de Repositorios:} Los manejadores CQRS operan de manera idéntica tanto con la persistencia real en Supabase/PostgreSQL (\texttt{BusinessRepository}) como con implementaciones en memoria durante la ejecución de pruebas unitarias (\texttt{BusinessBrandingTests.cs}), sin lanzar excepciones no contempladas en el contrato.
+    \item \textbf{Compatibilidad de Contratos DTO (\texttt{BookingFormConfigDto}):} Los esquemas personalizados con logotipo y colores corporativos sustituyen de forma transparente a las configuraciones predeterminadas de plantillas (\texttt{SectorTemplate.FormConfig}), preservando valores por defecto seguros (\texttt{\#6366F1} y \texttt{\#8B5CF6}) cuando un negocio aún no ha cargado su logotipo.
+\end{itemize}
+
+% ============================================================================
+\section{I --- Interface Segregation Principle (Segregación de Interfaces)}
+% ============================================================================
+
+\begin{quote}
+\textit{``Ningún cliente debe verse forzado a depender de métodos o propiedades que no utiliza.''}
+\end{quote}
+
+En lugar de utilizar una interfaz monolítica de datos o propiedades globales acopladas, los contratos se segregaron por responsabilidad específica:
+
+\begin{table}[h!]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Capa} & \textbf{Contrato / Interfaz} & \textbf{Segregación Aplicada} \\
+\midrule
+Dominio (.NET) & \texttt{IBusinessRepository} & Expone exclusivamente operaciones de negocio (\texttt{GetBySlugAsync}, \texttt{SlugExistsAsync}, \texttt{GetByIdAsync}, \texttt{UpdateAsync}) sin mezclar consultas de citas o usuarios. \\
+Dominio (.NET) & \texttt{IUnitOfWork} & Expone únicamente el compromiso transaccional (\texttt{SaveChangesAsync}), separando la persistencia de las consultas de lectura (\texttt{IReadRepository<T>}). \\
+UI (React Native) & \texttt{FormBrandIdentityCardProps} & Recibe únicamente \texttt{businessName}, \texttt{logoUrl}, \texttt{accentColor}, \texttt{secondaryColor} y \texttt{onChangeBranding}, sin depender del arreglo de preguntas \texttt{fields}. \\
+\bottomrule
+\end{tabularx}
+\caption{Segregación de contratos e interfaces en el módulo de identidad de marca.}
+\end{table}
+
+% ============================================================================
+\section{D --- Dependency Inversion Principle (Inversión de Dependencias)}
+% ============================================================================
+
+\begin{quote}
+\textit{``Los módulos de alto nivel no deben depender de módulos de bajo nivel. Ambos deben depender de abstracciones.''}
+\end{quote}
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Desacoplamiento en Controladores REST (\texttt{BusinessesController.cs}):} El controlador de la capa \texttt{Slotify.API} no depende de \texttt{AppDbContext} ni de repositorios concretos de \texttt{Slotify.Infrastructure}; depende exclusivamente de la abstracción \texttt{IMediator}:
+\begin{lstlisting}[language={[Sharp]C}]
+[ApiController]
+[Route("api/businesses")]
+public class BusinessesController(IMediator mediator) : ControllerBase
+{
+    private readonly IMediator _mediator = mediator;
+    // Envía comandos y consultas a través de la abstracción IMediator
+}
+\end{lstlisting}
+    \item \textbf{Inyección de Abstracciones en Casos de Uso (\texttt{Slotify.Application}):} \texttt{UpdateBusinessBrandIdentityCommandHandler} recibe por constructor las interfaces \texttt{IBusinessRepository} e \texttt{IUnitOfWork} definidas en \texttt{Slotify.Domain}. La capa de aplicación desconoce por completo si el almacenamiento subyacente es PostgreSQL, Supabase o memoria volátil.
+    \item \textbf{Abstracción de Almacenamiento Local en Frontend (\texttt{storage.ts} y \texttt{formBranding.ts}):} Los componentes visuales invocan las funciones de alto nivel \texttt{saveFormSchemaLocally} y \texttt{loadFormSchemaLocally}, las cuales delegan en el adaptador abstracto \texttt{storage} (que gestiona internamente \texttt{AsyncStorage}, \texttt{SecureStore} o memoria en caché sin exponer detalles nativos a la vista).
+\end{enumerate}
+
+% ============================================================================
+\section{Matriz de Trazabilidad SOLID}
+% ============================================================================
+
+\begin{table}[h!]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{c l X}
+\toprule
+\textbf{Principio} & \textbf{Artefactos Clave} & \textbf{Garantía de Calidad Obtenida} \\
+\midrule
+\textbf{S} & \texttt{Business.cs}, \texttt{FormBrandIdentityCard.tsx}, \texttt{formBranding.ts} & Alta cohesión; separación estricta entre reglas de dominio, validación hexadecimal, UI de edición y visor público. \\
+\textbf{O} & \texttt{ValidationBehavior.cs}, \texttt{CORPORATE\_COLOR\_PRESETS} & Nuevas paletas corporativas, logotipos y validadores se agregan sin modificar el código existente probado. \\
+\textbf{L} & \texttt{IBusinessRepository}, \texttt{BookingFormConfigDto} & Sustitución transparente por \textit{Mocks} en pruebas unitarias y retrocompatibilidad con plantillas de sector. \\
+\textbf{I} & \texttt{FormBrandIdentityCardProps}, \texttt{IReadRepository<T>} & Contratos reducidos y específicos; los componentes no dependen de propiedades que no consumen. \\
+\textbf{D} & \texttt{IMediator}, \texttt{IBusinessRepository}, \texttt{IUnitOfWork} & Inyección de dependencias (DI) en todas las capas; cero acoplamiento directo a EF Core o detalles de infraestructura. \\
+\bottomrule
+\end{tabularx}
+\caption{Resumen de cumplimiento de los principios SOLID en la historia de usuario.}
+\end{table}
+
+\end{document}
+
