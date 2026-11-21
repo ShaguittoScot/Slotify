@@ -1,26 +1,24 @@
-import React, { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Alert,
-  Linking,
-  Platform,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
+import { useAuthStore } from '@/features/auth/model';
+import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
+import { ThemeSettingsModal, useAppTheme } from '@/shared/theme';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useAuthStore } from '@/features/auth/model';
-import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchOwnBusinessLogoUrl } from '../../api';
-import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
-import { EditProfileModal } from '../components/EditProfileModal';
-import { BusinessInfoModal } from '../components/BusinessInfoModal';
 import { requestAppointmentNotificationPermission } from '../../model/appointmentNotifications';
 import {
   LocalNotificationsUnavailable,
@@ -31,10 +29,12 @@ import {
   settingsScope,
   useSettingsPreferences,
 } from '../../model/preferences';
+import { BusinessInfoModal } from '../components/BusinessInfoModal';
+import { EditProfileModal } from '../components/EditProfileModal';
 
 export function SettingsScreen() {
   const router = useRouter();
-  const { colors, isDark, themeMode } = useAppTheme();
+  const { colors, isDark, themeMode, visualTheme } = useAppTheme();
   const { user, logout, appMode, setAppMode, toggleAppMode } = useAuthStore();
 
   const isBusiness = appMode === 'BUSINESS';
@@ -62,7 +62,7 @@ export function SettingsScreen() {
             setLogoError(false);
           }
         },
-        () => {}
+        () => { }
       );
       return () => {
         active = false;
@@ -112,7 +112,7 @@ export function SettingsScreen() {
             {
               text: 'Abrir ajustes',
               onPress: () => {
-                void Linking.openSettings().catch(() => {});
+                void Linking.openSettings().catch(() => { });
               },
             },
           ]
@@ -176,9 +176,9 @@ export function SettingsScreen() {
   };
 
   const getThemeModeLabel = () => {
-    if (themeMode === 'light') return 'Modo Claro';
-    if (themeMode === 'system') return 'Automático';
-    return 'Obsidian Black';
+  };
+
+  const getVisualThemeLabel = () => {
   };
 
   const displayName = isBusiness
@@ -186,8 +186,8 @@ export function SettingsScreen() {
       ? user.fullName
       : user?.businessName || 'Administrador'
     : user?.fullName && user.fullName !== 'Pendiente'
-    ? user.fullName
-    : 'Cliente Slotify';
+      ? user.fullName
+      : 'Cliente Slotify';
 
   const getInitials = (name: string) => {
     const parts = name.trim().split(/\s+/);
@@ -210,8 +210,8 @@ export function SettingsScreen() {
       style={[
         styles.settingItem,
         {
-          backgroundColor: isDark ? '#121216' : '#FFFFFF',
-          borderColor: isDark ? '#22222A' : '#E4E4E7',
+          backgroundColor: colors.background.secondary,
+          borderColor: colors.border.main,
         },
       ]}
       onPress={onPress}
@@ -219,7 +219,11 @@ export function SettingsScreen() {
       <View
         style={[
           styles.settingIconWrapper,
-          { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+          {
+            backgroundColor: isDark
+              ? colors.background.tertiary
+              : colors.background.primary,
+          },
         ]}
       >
         <Feather name={icon} size={16} color={iconTint} />
@@ -308,8 +312,8 @@ export function SettingsScreen() {
               style={[
                 styles.profileCard,
                 {
-                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
-                  borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.main,
                 },
               ]}
             >
@@ -439,6 +443,24 @@ export function SettingsScreen() {
             )}
           </Animated.View>
 
+          {/* ─── APARIENCIA ─── */}
+          <Animated.View
+            entering={FadeInDown.duration(480).delay(140).springify()}
+            style={styles.section}
+          >
+            <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
+              APARIENCIA
+            </Text>
+
+            {renderSettingRow(
+              'layers',
+              'Apariencia',
+              `${getVisualThemeLabel()} • ${getThemeModeLabel()}`,
+              () => setShowThemeModal(true),
+              visualTheme === 'obsidian' ? '#818CF8' : colors.text.primary
+            )}
+          </Animated.View>
+
           {/* ─── PREFERENCIAS Y SISTEMA ─── */}
           <Animated.View
             entering={FadeInDown.duration(500).delay(170).springify()}
@@ -448,27 +470,23 @@ export function SettingsScreen() {
               SISTEMA
             </Text>
 
-            {renderSettingRow(
-              isDark ? 'moon' : 'sun',
-              'Apariencia',
-              getThemeModeLabel(),
-              () => setShowThemeModal(true),
-              colors.text.primary
-            )}
-
             <View
               style={[
                 styles.settingItem,
                 {
-                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
-                  borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.main,
                 },
               ]}
             >
               <View
                 style={[
                   styles.settingIconWrapper,
-                  { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+                  {
+                    backgroundColor: isDark
+                      ? colors.background.tertiary
+                      : colors.background.primary,
+                  },
                 ]}
               >
                 <Feather name="bell" size={16} color={colors.text.primary} />

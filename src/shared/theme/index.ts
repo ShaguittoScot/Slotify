@@ -3,8 +3,18 @@
  * Single entry point for the entire design system
  */
 
-export { palette, lightColors, darkColors, colors } from './colors';
-export type { ThemeColors, Palette } from './colors';
+export {
+  palette,
+  lightColors,
+  darkColors,
+  colors,
+  slotifyLightColors,
+  slotifyDarkColors,
+  obsidianLightColors,
+  obsidianDarkColors,
+  getThemeColors,
+} from './colors';
+export type { ThemeColors, Palette, VisualTheme } from './colors';
 
 export { useAppTheme, useThemeStore } from './useTheme';
 export type { ThemeMode } from './useTheme';

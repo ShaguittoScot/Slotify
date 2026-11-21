@@ -4,8 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAppTheme } from '@/shared/theme';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { useBusinessBrand } from '@/features/business-brand';
 import type { BusinessDto } from '../../types';
-import { isValidHexColor } from '../../model';
 import { createBusinessCardStyles } from '../styles/businessCard.styles';
 
 interface BusinessCardProps {
@@ -24,16 +24,17 @@ export function BusinessCard({ business, onSelect, onBook }: BusinessCardProps) 
   const initial = business.name ? business.name.charAt(0).toUpperCase() : 'S';
   const category = business.category || 'Servicios';
   const services = business.services || [];
-  const accentColor = isValidHexColor(business.brandColor)
-    ? business.brandColor!
-    : '#6366F1';
-  const hasValidLogo = Boolean(
-    business.logoUrl && business.logoUrl.trim().length > 0 && !imageError
-  );
+  const brand = useBusinessBrand(business);
+  const hasValidLogo = Boolean(brand.logoUrl && !imageError);
 
   const styles = useMemo(
-    () => createBusinessCardStyles(colors, accentColor),
-    [colors, accentColor]
+    () =>
+      createBusinessCardStyles(colors, brand.primaryColor, {
+        onPrimaryText: brand.onPrimaryText,
+        primarySoftBg: brand.primarySoftBg,
+        primaryBorder: brand.primaryBorder,
+      }),
+    [colors, brand.primaryColor, brand.onPrimaryText, brand.primarySoftBg, brand.primaryBorder]
   );
 
   return (
@@ -78,7 +79,7 @@ export function BusinessCard({ business, onSelect, onBook }: BusinessCardProps) 
             <Feather
               name={isDetailMode ? 'arrow-right' : 'arrow-up-right'}
               size={13}
-              color="#FFFFFF"
+              color={brand.onPrimaryText}
             />
           </View>
         </View>

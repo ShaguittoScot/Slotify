@@ -4,11 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { useBusinessBrand } from '@/features/business-brand';
 
-import { useBusinessDetail, isValidHexColor } from '../../model';
-import { BusinessDetailHeader } from '../components/BusinessDetailHeader';
-import { BusinessInfoSection } from '../components/BusinessInfoSection';
+import { useBusinessDetail, detectSector } from '../../model';
+import { BusinessCoverHero } from '../components/BusinessCoverHero';
+import { BusinessAboutSection } from '../components/BusinessAboutSection';
 import { BusinessServicesSection } from '../components/BusinessServicesSection';
+import { BusinessStaffSection } from '../components/BusinessStaffSection';
+import { BusinessGallerySection } from '../components/BusinessGallerySection';
+import { BusinessLocationHoursSection } from '../components/BusinessLocationHoursSection';
+import { BusinessBookingBottomBar } from '../components/BusinessBookingBottomBar';
 import { createBusinessDetailStyles } from '../styles/businessDetail.styles';
 
 export function BusinessDetailScreen() {
@@ -19,12 +24,12 @@ export function BusinessDetailScreen() {
   const { business, isLoading, isNotFound, errorMessage, refetch } =
     useBusinessDetail(slug);
 
-  const accentColor = useMemo(() => {
-    if (business && isValidHexColor(business.brandColor)) {
-      return business.brandColor!;
-    }
-    return colors.action.primary;
-  }, [business, colors]);
+  const brand = useBusinessBrand(business);
+  const accentColor = brand.primaryColor;
+
+  const sector = useMemo(() => {
+    return detectSector(business ?? undefined);
+  }, [business]);
 
   const styles = useMemo(
     () => createBusinessDetailStyles(colors, accentColor),
@@ -49,38 +54,29 @@ export function BusinessDetailScreen() {
   if (isLoading) {
     return (
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.navBar}>
+        <View style={styles.floatingNavBar}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.floatingCircleBtn}
             onPress={handleBack}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Regresar"
           >
-            <Feather name="arrow-left" size={20} color={colors.text.primary} />
+            <Feather name="arrow-left" size={19} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.navTitle}>Cargando negocio...</Text>
-          <View style={styles.navSpacer} />
         </View>
 
         <View style={styles.skeletonContainer}>
-          <View style={styles.skeletonHeaderCard}>
-            <View style={styles.skeletonAvatar} />
-            <View style={styles.skeletonHeaderLines}>
-              <View style={styles.skeletonLineTitle} />
-              <View style={styles.skeletonLinePill} />
-              <View style={styles.skeletonLineSlug} />
-            </View>
+          <View style={styles.skeletonCover} />
+
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonLineLong} />
+            <View style={styles.skeletonLineShort} />
           </View>
 
-          <View style={styles.skeletonInfoBox}>
-            <View style={styles.skeletonBarLong} />
-            <View style={styles.skeletonBarShort} />
-          </View>
-
-          <View style={styles.skeletonInfoBox}>
-            <View style={styles.skeletonBarLong} />
-            <View style={styles.skeletonBarShort} />
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonLineLong} />
+            <View style={styles.skeletonLineShort} />
           </View>
         </View>
       </SafeAreaView>
@@ -91,18 +87,16 @@ export function BusinessDetailScreen() {
   if (isNotFound) {
     return (
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.navBar}>
+        <View style={styles.floatingNavBar}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.floatingCircleBtn}
             onPress={handleBack}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Regresar"
           >
-            <Feather name="arrow-left" size={20} color={colors.text.primary} />
+            <Feather name="arrow-left" size={19} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.navTitle}>No encontrado</Text>
-          <View style={styles.navSpacer} />
         </View>
 
         <View style={styles.feedbackCenter}>
@@ -139,18 +133,16 @@ export function BusinessDetailScreen() {
   if (errorMessage || !business) {
     return (
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.navBar}>
+        <View style={styles.floatingNavBar}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.floatingCircleBtn}
             onPress={handleBack}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Regresar"
           >
-            <Feather name="arrow-left" size={20} color={colors.text.primary} />
+            <Feather name="arrow-left" size={19} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.navTitle}>Error de conexión</Text>
-          <View style={styles.navSpacer} />
         </View>
 
         <View style={styles.feedbackCenter}>
@@ -186,7 +178,7 @@ export function BusinessDetailScreen() {
     );
   }
 
-  // ── ESTADO 4: INFORMACIÓN CARGADA EXITOSAMENTE ──
+  // ── ESTADO 4: PRESENTACIÓN COMERCIAL PÚBLICA ──
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <View style={styles.screenContainer}>
@@ -194,37 +186,57 @@ export function BusinessDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          <BusinessDetailHeader
+          {/* 1. Portada con imagen, logotipo, nombre, categoría y ubicación */}
+          <BusinessCoverHero
             business={business}
+            sector={sector}
             accentColor={accentColor}
             onBack={handleBack}
           />
 
-          <BusinessInfoSection
+          {/* 2. Presentación y descripción del negocio */}
+          <BusinessAboutSection
             business={business}
+            sector={sector}
             accentColor={accentColor}
           />
 
+          {/* 3. Catálogo de servicios, productos o menú según el sector */}
           <BusinessServicesSection
             services={business.services}
+            sector={sector}
+            accentColor={accentColor}
+          />
+
+          {/* 4. Profesionales / Staff (cuando corresponda por sector) */}
+          <BusinessStaffSection
+            business={business}
+            sector={sector}
+            accentColor={accentColor}
+          />
+
+          {/* 5. Galería de fotografías (según el sector) */}
+          <BusinessGallerySection
+            business={business}
+            sector={sector}
+            accentColor={accentColor}
+          />
+
+          {/* 6. Ubicación, horarios y contacto */}
+          <BusinessLocationHoursSection
+            business={business}
+            sector={sector}
             accentColor={accentColor}
           />
         </ScrollView>
 
-        {/* Botón de acción principal fijo al pie */}
-        <View style={styles.bottomBarContainer}>
-          <TouchableOpacity
-            style={styles.bookCtaButton}
-            onPress={handleBook}
-            activeOpacity={0.85}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={`Reservar cita en ${business.name}`}
-          >
-            <Feather name="calendar" size={18} color="#FFFFFF" />
-            <Text style={styles.bookCtaText}>Reservar cita</Text>
-          </TouchableOpacity>
-        </View>
+        {/* 7. Botón de acción para iniciar una reserva */}
+        <BusinessBookingBottomBar
+          business={business}
+          sector={sector}
+          accentColor={accentColor}
+          onBook={handleBook}
+        />
       </View>
     </SafeAreaView>
   );

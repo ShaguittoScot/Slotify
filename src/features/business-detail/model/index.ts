@@ -3,13 +3,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { isValidHexColor } from '@/features/business-brand';
 import { businessDetailApi } from '../api';
 import type { BusinessDetailDto } from '../types';
 
-export const isValidHexColor = (color?: string | null): boolean => {
-  if (!color || typeof color !== 'string') return false;
-  return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(color.trim());
-};
+export * from './sector';
+export { isValidHexColor };
 
 export const formatPrice = (price: number): string => {
   if (typeof price !== 'number' || isNaN(price)) return '$0.00';

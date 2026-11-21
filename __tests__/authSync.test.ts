@@ -27,11 +27,11 @@ jest.mock('../src/features/auth/api', () => ({
   },
 }));
 
-import { useAuthStore } from '../src/features/auth/model';
 import { authApi } from '../src/features/auth/api';
-import { storage } from '../src/shared/lib/storage';
-import { STORAGE_KEYS } from '../src/shared/lib/constants';
+import { useAuthStore } from '../src/features/auth/model';
 import { apiClient } from '../src/shared/lib/api';
+import { STORAGE_KEYS } from '../src/shared/lib/constants';
+import { storage } from '../src/shared/lib/storage';
 
 describe('Sincronización de Autenticación y Onboarding — Slotify', () => {
   beforeEach(() => {

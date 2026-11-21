@@ -1,4 +1,4 @@
-import { isValidHexColor, formatPrice } from '../model';
+import { isValidHexColor, formatPrice, detectSector } from '../model';
 import { businessDetailApi } from '../api';
 import { apiClient } from '@/shared/lib/api';
 import type { BusinessDetailDto } from '../types';
@@ -98,6 +98,51 @@ describe('Business Detail Feature', () => {
 
       expect(activeServices).toHaveLength(2);
       expect(activeServices.map((s) => s.name)).toEqual(['Corte Activo', 'Servicio Sin Flag']);
+    });
+  });
+
+  describe('detectSector (Adaptación comercial por sector)', () => {
+    it('detecta sector Restaurantes y adapta catálogo a menú y platillos', () => {
+      const config1 = detectSector({ category: 'Restaurante Gourmet', categoryKey: 'restaurante' });
+      expect(config1.type).toBe('restaurant');
+      expect(config1.catalogTitle).toBe('Menú y Especialidades');
+      expect(config1.ctaText).toBe('Reservar mesa o turno');
+      expect(config1.showStaffByDefault).toBe(false);
+
+      const config2 = detectSector({ category: 'Café & Bistro', categoryKey: 'cafe' });
+      expect(config2.type).toBe('restaurant');
+    });
+
+    it('detecta sector Barbería / Estética y prioriza profesionales y galería de cortes', () => {
+      const config1 = detectSector({ sectorTemplateId: 5, category: 'Barbería Clásica' });
+      expect(config1.type).toBe('barbershop_beauty');
+      expect(config1.catalogTitle).toBe('Servicios y Tratamientos');
+      expect(config1.staffTitle).toBe('Profesionales y Estilistas');
+      expect(config1.galleryTitle).toBe('Galería de Trabajos');
+      expect(config1.showStaffByDefault).toBe(true);
+
+      const config2 = detectSector({ category: 'Salón de Belleza y Spa', categoryKey: 'belleza' });
+      expect(config2.type).toBe('barbershop_beauty');
+    });
+
+    it('detecta sector Salud / Clínica y adapta a especialidades, cuerpo médico e instalaciones', () => {
+      const config1 = detectSector({ sectorTemplateId: 1, category: 'Salud y Bienestar' });
+      expect(config1.type).toBe('health_clinic');
+      expect(config1.catalogTitle).toBe('Especialidades y Consultas');
+      expect(config1.staffTitle).toBe('Especialistas y Cuerpo Médico');
+      expect(config1.galleryTitle).toBe('Instalaciones y Consultorios');
+      expect(config1.ctaText).toBe('Agendar consulta');
+      expect(config1.showStaffByDefault).toBe(true);
+
+      const config2 = detectSector({ category: 'Clínica Dental Odontológica' });
+      expect(config2.type).toBe('health_clinic');
+    });
+
+    it('retorna configuración General cuando no pertenece a giros especializados', () => {
+      const config = detectSector({ category: 'Consultoría y Asesoría Legal', categoryKey: 'legal' });
+      expect(config.type).toBe('general');
+      expect(config.catalogTitle).toBe('Catálogo de Servicios');
+      expect(config.ctaText).toBe('Reservar cita');
     });
   });
 });

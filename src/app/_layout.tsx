@@ -27,7 +27,7 @@ import { useAppTheme } from '@/shared/theme';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { colors, isDark, hydrateTheme } = useAppTheme();
+  const { colors, isDark, hydrateTheme, isHydrated: isThemeHydrated } = useAppTheme();
   const segments = useSegments();
   const router = useRouter();
 
@@ -50,10 +50,10 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && isThemeHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, isThemeHydrated]);
 
   useEffect(() => {
     const loading = isLoading || isHydrating;

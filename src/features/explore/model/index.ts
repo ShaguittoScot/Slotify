@@ -2,16 +2,14 @@
  * Explore Feature — Model & State Management (Zustand)
  */
 
+import { isValidHexColor } from '@/features/business-brand';
 import { loadFormSchemaLocally } from '@/features/dashboard/model/formBranding';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { exploreApi } from '../api';
 import type { BusinessDto, Category } from '../types';
 
-export const isValidHexColor = (color?: string | null): boolean => {
-  if (!color || typeof color !== 'string') return false;
-  return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(color.trim());
-};
+export { isValidHexColor };
 
 type LocalBranding = Awaited<ReturnType<typeof loadFormSchemaLocally>>;
 

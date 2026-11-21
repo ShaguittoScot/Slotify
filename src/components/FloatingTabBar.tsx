@@ -23,7 +23,7 @@ type TabIcon = ComponentProps<typeof Feather>['name'];
 
 const TAB_GUTTER = 2;
 const BUSINESS_TABS = ['index', 'agenda', 'clients', 'settings'];
-const CONSUMER_TABS = ['explore', 'form-preview', 'index', 'settings'];
+const CONSUMER_TABS = ['explore', 'index', 'settings'];
 
 function getTabConfig(name: string, isBusiness: boolean): { label: string; icon: TabIcon } {
   switch (name) {
@@ -63,7 +63,7 @@ function TabContent({ label, icon, color, focused }: {
 
 export function FloatingTabBar(props: BottomTabBarProps) {
   const { state, descriptors, insets } = props;
-  const { isDark } = useAppTheme();
+  const { colors, isDark, visualTheme } = useAppTheme();
   const appMode = useAuthStore((session) => session.appMode);
   const options = descriptors[state.routes[state.index].key]?.options;
   if (StyleSheet.flatten(options?.tabBarStyle)?.display === 'none') return null;
@@ -71,20 +71,44 @@ export function FloatingTabBar(props: BottomTabBarProps) {
   return (
     <View pointerEvents="box-none" style={[styles.wrapper, { bottom: Math.max(insets.bottom + 10, 20) }]}>
       <View style={[styles.container, {
-        backgroundColor: isDark ? 'rgba(15, 15, 20, 0.96)' : 'rgba(255, 255, 255, 0.96)',
-        borderColor: isDark ? '#24242E' : 'rgba(0, 0, 0, 0.08)',
+        backgroundColor: colors.background.secondary,
+        borderColor: colors.border.main,
       }]}>
-        <TabTrack key={appMode} {...props} isBusiness={appMode === 'BUSINESS'} isDark={isDark} />
+        <TabTrack
+          key={`${appMode}-${visualTheme}-${isDark ? 'dark' : 'light'}`}
+          {...props}
+          isBusiness={appMode === 'BUSINESS'}
+          isDark={isDark}
+          indicatorColor={colors.tab.activeBg}
+          activeTextColor={colors.tab.activeText}
+          inactiveTextColor={colors.tab.inactiveText}
+        />
       </View>
     </View>
   );
 }
 
-function TabTrack({ state, descriptors, emitter, navigateToTab, isBusiness, isDark }: BottomTabBarProps & {
+function TabTrack({
+  state,
+  descriptors,
+  emitter,
+  navigateToTab,
+  isBusiness,
+  isDark,
+  indicatorColor,
+  activeTextColor,
+  inactiveTextColor,
+}: BottomTabBarProps & {
   isBusiness: boolean;
   isDark: boolean;
+  indicatorColor: string;
+  activeTextColor: string;
+  inactiveTextColor: string;
 }) {
-  const routes = state.routes.filter(({ name }) => (isBusiness ? BUSINESS_TABS : CONSUMER_TABS).includes(name));
+  const allowedTabs = isBusiness ? BUSINESS_TABS : CONSUMER_TABS;
+  const routes = allowedTabs
+    .map((tabName) => state.routes.find((r) => r.name === tabName))
+    .filter((r): r is NonNullable<typeof r> => Boolean(r));
   const activeKey = state.routes[state.index].key;
   const activeIndex = routes.findIndex(({ key }) => key === activeKey);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -92,7 +116,6 @@ function TabTrack({ state, descriptors, emitter, navigateToTab, isBusiness, isDa
   const indicatorWidth = tabWidth - TAB_GUTTER * 2;
   const indicatorIndex = useSharedValue(Math.max(0, activeIndex));
   const direction = I18nManager.isRTL ? -1 : 1;
-  const indicatorColor = isDark ? '#383838' : '#171717';
   const showIndicator = activeIndex >= 0 && indicatorWidth > 0;
 
   useEffect(() => {
@@ -135,7 +158,11 @@ function TabTrack({ state, descriptors, emitter, navigateToTab, isBusiness, isDa
             style={[styles.tabItem, fallbackHighlight && [styles.pillShadow, { backgroundColor: indicatorColor }]]}
             activeOpacity={0.7}
           >
-            <TabContent {...tab} focused={focused} color={fallbackHighlight ? '#FFFFFF' : isDark ? '#8E8E8E' : '#737373'} />
+            <TabContent
+              {...tab}
+              focused={focused}
+              color={fallbackHighlight ? activeTextColor : inactiveTextColor}
+            />
           </TouchableOpacity>
         );
       })}
@@ -148,7 +175,7 @@ function TabTrack({ state, descriptors, emitter, navigateToTab, isBusiness, isDa
             <Animated.View style={[styles.clippedLabels, { width: trackWidth }, clippedLabelsPosition]}>
               {routes.map((route) => (
                 <View key={route.key} style={styles.tabItem}>
-                  <TabContent {...getTabConfig(route.name, isBusiness)} focused={route.key === activeKey} color="#FFFFFF" />
+                  <TabContent {...getTabConfig(route.name, isBusiness)} focused={route.key === activeKey} color={activeTextColor} />
                 </View>
               ))}
             </Animated.View>

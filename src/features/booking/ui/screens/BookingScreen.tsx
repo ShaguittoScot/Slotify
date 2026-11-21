@@ -18,6 +18,7 @@ import Animated, { ZoomIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme } from '@/shared/theme';
+import { resolveBusinessBrand } from '@/features/business-brand';
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS } from '@/shared/lib/constants';
 import { supabase } from '@/shared/lib/supabase';
@@ -127,8 +128,15 @@ function buildClientFormSchema(
   savedCustomSchema: FormSchema | null,
   overrideStyle?: PresentationStyle
 ): FormSchema {
-  const accentColor = business.brandColor || savedCustomSchema?.accentColor || '#18181B';
-  const secondaryColor = savedCustomSchema?.secondaryColor || accentColor;
+  const resolvedBrand = resolveBusinessBrand({
+    ...business,
+    brandColor: business.brandColor || savedCustomSchema?.accentColor,
+    secondaryColor: savedCustomSchema?.secondaryColor,
+    logoUrl: business.logoUrl || savedCustomSchema?.logoUrl,
+    presentationStyle: overrideStyle || savedCustomSchema?.presentationStyle,
+  });
+  const accentColor = resolvedBrand.primaryColor;
+  const secondaryColor = resolvedBrand.secondaryColor;
 
   const services = (business.services || []).map((s) => ({
     id: s.id,
@@ -209,11 +217,10 @@ function buildClientFormSchema(
     description:
       savedCustomSchema?.description ||
       `Completa tus datos a continuación para confirmar tu espacio en ${business.name}.`,
-    presentationStyle:
-      overrideStyle || savedCustomSchema?.presentationStyle || 'classic_scroll',
+    presentationStyle: resolvedBrand.presentationStyle,
     accentColor,
     secondaryColor,
-    logoUrl: business.logoUrl || savedCustomSchema?.logoUrl || null,
+    logoUrl: resolvedBrand.logoUrl,
     businessName: business.name,
     services: services.length > 0 ? services : undefined,
     fields: baseFields,
@@ -389,19 +396,33 @@ export function BookingScreen() {
     if (!activeBusiness) return null;
 
     if (publicBusiness?.formConfig && Array.isArray(publicBusiness.formConfig.fields)) {
+      const resolved = resolveBusinessBrand(
+        {
+          id: activeBusiness.id,
+          name: activeBusiness.name,
+          slug: activeBusiness.slug,
+          category: activeBusiness.category,
+          categoryKey: activeBusiness.categoryKey,
+          sector: publicBusiness.sector,
+          sectorTemplateId: activeBusiness.sectorTemplateId,
+          brandColor:
+            publicBusiness.formConfig.accentColor || activeBusiness.brandColor,
+          secondaryColor: publicBusiness.formConfig.secondaryColor,
+          logoUrl: publicBusiness.formConfig.logoUrl ?? activeBusiness.logoUrl,
+          presentationStyle: publicBusiness.formConfig.presentationStyle,
+        },
+        colors
+      );
+
       return {
         title: publicBusiness.formConfig.title || 'Reserva tu Cita en Línea',
         description:
           publicBusiness.formConfig.description ||
           `Completa tus datos para confirmar tu espacio en ${activeBusiness.name}.`,
-        presentationStyle:
-          publicBusiness.formConfig.presentationStyle || 'classic_scroll',
-        accentColor:
-          publicBusiness.formConfig.accentColor ||
-          activeBusiness.brandColor ||
-          '#18181B',
-        secondaryColor: publicBusiness.formConfig.secondaryColor,
-        logoUrl: publicBusiness.formConfig.logoUrl ?? activeBusiness.logoUrl ?? null,
+        presentationStyle: resolved.presentationStyle,
+        accentColor: resolved.primaryColor,
+        secondaryColor: resolved.secondaryColor,
+        logoUrl: resolved.logoUrl,
         businessName: publicBusiness.formConfig.businessName || activeBusiness.name,
         fields: publicBusiness.formConfig.fields,
       };
@@ -676,7 +697,7 @@ export function BookingScreen() {
             style={[
               styles.backBtn,
               {
-                backgroundColor: isDark ? '#262628' : '#F3F4F6',
+                backgroundColor: colors.background.tertiary,
               },
             ]}
             onPress={() => {
@@ -768,14 +789,10 @@ export function BookingScreen() {
                   {
                     backgroundColor: isSelected
                       ? bizColor
-                      : isDark
-                      ? '#1F1F22'
-                      : '#F4F4F5',
+                      : colors.background.tertiary,
                     borderColor: isSelected
                       ? bizColor
-                      : isDark
-                      ? '#333'
-                      : '#E4E4E7',
+                      : colors.border.main,
                   },
                 ]}
               >
@@ -856,10 +873,8 @@ export function BookingScreen() {
                 style={[
                   styles.confirmationCard,
                   {
-                    backgroundColor: isDark ? '#1A1A1E' : '#FFFFFF',
-                    borderColor: isDark
-                      ? 'rgba(255,255,255,0.12)'
-                      : 'rgba(0,0,0,0.08)',
+                    backgroundColor: colors.background.secondary,
+                    borderColor: colors.border.main,
                   },
                 ]}
               >
@@ -938,7 +953,7 @@ export function BookingScreen() {
                     style={[
                       styles.totalHighlightBox,
                       {
-                        backgroundColor: isDark ? '#252529' : '#F8FAFC',
+                        backgroundColor: colors.background.tertiary,
                         borderColor: `${confirmedBooking.accentColor}40`,
                       },
                     ]}
@@ -977,7 +992,7 @@ export function BookingScreen() {
                   style={[
                     styles.secondaryActionBtn,
                     {
-                      backgroundColor: isDark ? '#27272A' : '#F4F4F5',
+                      backgroundColor: colors.background.tertiary,
                     },
                   ]}
                   onPress={() => setConfirmedBooking(null)}

@@ -369,8 +369,8 @@ export function FormViewer({
             style={[
               styles.optionCard,
               {
-                backgroundColor: isDark ? '#1E1E1E' : '#F9FAFB',
-                borderColor: isDark ? '#333' : '#E5E7EB',
+                backgroundColor: colors.background.secondary,
+                borderColor: colors.border.main,
               },
             ]}
           >
@@ -400,16 +400,12 @@ export function FormViewer({
                       ? isDark
                         ? `${primaryColor}30`
                         : `${primaryColor}14`
-                      : isDark
-                      ? '#1E1E1E'
-                      : '#FFFFFF',
+                      : colors.background.secondary,
                     borderColor: isSelected
                       ? primaryColor
                       : hasError
                       ? colors.status.error
-                      : isDark
-                      ? '#333'
-                      : '#E5E5E5',
+                      : colors.border.main,
                     justifyContent: 'space-between',
                   },
                   isSlideMode && styles.optionCardLarge,
@@ -462,9 +458,7 @@ export function FormViewer({
                     {
                       backgroundColor: isSelected
                         ? secondaryColor
-                        : isDark
-                        ? '#2A2A2A'
-                        : '#F4F4F5',
+                        : colors.background.tertiary,
                     },
                   ]}
                 >
@@ -525,14 +519,10 @@ export function FormViewer({
                       {
                         backgroundColor: isSelectedDay
                           ? primaryColor
-                          : isDark
-                          ? '#1E1E1E'
-                          : '#F8FAFC',
+                          : colors.background.tertiary,
                         borderColor: isSelectedDay
                           ? primaryColor
-                          : isDark
-                          ? '#333'
-                          : '#E2E8F0',
+                          : colors.border.main,
                       },
                     ]}
                   >
@@ -600,14 +590,10 @@ export function FormViewer({
                       {
                         backgroundColor: isSelectedTime
                           ? `${secondaryColor}22`
-                          : isDark
-                          ? '#1E1E1E'
-                          : '#F8FAFC',
+                          : colors.background.tertiary,
                         borderColor: isSelectedTime
                           ? secondaryColor
-                          : isDark
-                          ? '#333'
-                          : '#E2E8F0',
+                          : colors.border.main,
                       },
                     ]}
                   >
@@ -687,14 +673,12 @@ export function FormViewer({
                 styles.textInput,
                 field.type !== 'paragraph' && !isSlideMode && { paddingLeft: 42 },
                 {
-                  backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+                  backgroundColor: colors.background.secondary,
                   borderColor: hasError
                     ? colors.status.error
                     : value
                     ? primaryColor
-                    : isDark
-                    ? '#333'
-                    : '#E5E5E5',
+                    : colors.border.main,
                   color: colors.text.primary,
                   minHeight: field.type === 'paragraph' ? 96 : 52,
                 },
@@ -739,16 +723,12 @@ export function FormViewer({
                         ? isDark
                           ? `${primaryColor}30`
                           : `${primaryColor}15`
-                        : isDark
-                        ? '#1E1E1E'
-                        : '#FFFFFF',
+                        : colors.background.secondary,
                       borderColor: isSelected
                         ? primaryColor
                         : hasError
                         ? colors.status.error
-                        : isDark
-                        ? '#333'
-                        : '#E5E5E5',
+                        : colors.border.main,
                     },
                     isSlideMode && styles.optionCardLarge,
                   ]}
@@ -905,7 +885,7 @@ export function FormViewer({
         <View
           style={[
             styles.progressBarBg,
-            { backgroundColor: isDark ? '#333' : '#E5E5E5' },
+            { backgroundColor: colors.border.main },
           ]}
         >
           <Animated.View

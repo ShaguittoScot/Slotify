@@ -6,53 +6,74 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useAppTheme, ThemeMode } from './useTheme';
+import { useAppTheme, ThemeMode, VisualTheme } from './useTheme';
 
 interface ThemeSettingsModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-interface ThemeOption {
+interface VisualThemeOption {
+  id: VisualTheme;
+  title: string;
+  subtitle: string;
+  colors: string[];
+}
+
+interface AppearanceModeOption {
   id: ThemeMode;
   label: string;
-  description: string;
-  icon: (color: string) => React.ReactNode;
+  icon: 'sun' | 'moon' | 'smartphone';
 }
 
 export const ThemeSettingsModal: React.FC<ThemeSettingsModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { colors, palette, themeMode, setThemeMode, isDark } = useAppTheme();
+  const {
+    colors,
+    themeMode,
+    setThemeMode,
+    visualTheme,
+    setVisualTheme,
+    isDark,
+  } = useAppTheme();
 
-  const options: ThemeOption[] = [
+  const visualThemes: VisualThemeOption[] = [
     {
-      id: 'system',
-      label: 'Automático (Dispositivo)',
-      description: 'Sigue la configuración de tema de tu sistema operativo.',
-      icon: (color) => <Feather name="smartphone" size={20} color={color} />,
+      id: 'slotify',
+      title: 'Slotify',
+      subtitle: 'Identidad original',
+      colors: ['#121212', '#262626', '#E4E4E7', '#22C55E'],
     },
     {
-      id: 'light',
-      label: 'Modo Claro',
-      description: 'Fondo luminoso y limpio en grises neutros.',
-      icon: (color) => <Feather name="sun" size={20} color={color} />,
-    },
-    {
-      id: 'dark',
-      label: 'Modo Oscuro (Neutral Black)',
-      description: 'Fondo en negro mate y gris oscuro sin matices azules.',
-      icon: (color) => <Feather name="moon" size={20} color={color} />,
+      id: 'obsidian',
+      title: 'Obsidian',
+      subtitle: 'Identidad alternativa',
+      colors: ['#09090B', '#1C1C21', '#6366F1', '#10B981'],
     },
   ];
 
-  const handleSelect = async (mode: ThemeMode) => {
-    await setThemeMode(mode);
-    onClose();
-  };
+  const appearanceModes: AppearanceModeOption[] = [
+    {
+      id: 'light',
+      label: 'Claro',
+      icon: 'sun',
+    },
+    {
+      id: 'dark',
+      label: 'Oscuro',
+      icon: 'moon',
+    },
+    {
+      id: 'system',
+      label: 'Sistema',
+      icon: 'smartphone',
+    },
+  ];
 
   return (
     <Modal
@@ -76,10 +97,10 @@ export const ThemeSettingsModal: React.FC<ThemeSettingsModalProps> = ({
           <View style={styles.header}>
             <View>
               <Text style={[styles.title, { color: colors.text.primary }]}>
-                Ajustes de Tema
+                Apariencia
               </Text>
               <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-                Selecciona la apariencia visual de la app
+                Personaliza el tema y modo de visualización
               </Text>
             </View>
             <TouchableOpacity
@@ -88,92 +109,193 @@ export const ThemeSettingsModal: React.FC<ThemeSettingsModalProps> = ({
                 styles.closeButton,
                 { backgroundColor: colors.background.tertiary },
               ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Feather name="x" size={18} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Opciones */}
-          <View style={styles.optionsList}>
-            {options.map((item) => {
-              const isSelected = themeMode === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.optionCard,
-                    {
-                      backgroundColor: isSelected
-                        ? isDark
-                          ? colors.background.tertiary
-                          : palette.neutral[100]
-                        : colors.background.tertiary,
-                      borderColor: isSelected
-                        ? colors.border.focus
-                        : colors.border.light,
-                    },
-                    isSelected && styles.optionCardSelected,
-                  ]}
-                  onPress={() => handleSelect(item.id)}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    style={[
-                      styles.iconWrapper,
-                      {
-                        backgroundColor: isSelected
-                          ? colors.action.primary
-                          : isDark
-                          ? colors.background.secondary
-                          : palette.white,
-                      },
-                    ]}
-                  >
-                    {item.icon(
-                      isSelected
-                        ? colors.action.primaryText
-                        : colors.text.secondary
-                    )}
-                  </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* ─── 1. TEMA ─── */}
+            <Text style={[styles.sectionTitle, { color: colors.text.muted }]}>
+              TEMA
+            </Text>
 
-                  <View style={styles.optionContent}>
-                    <Text
-                      style={[
-                        styles.optionLabel,
-                        { color: colors.text.primary },
-                        isSelected && { fontWeight: '700' },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.optionDescription,
-                        { color: colors.text.secondary },
-                      ]}
-                    >
-                      {item.description}
-                    </Text>
-                  </View>
+              <View style={styles.themeList}>
+                {visualThemes.map((item) => {
+                  const isSelected = visualTheme === item.id;
 
-                  {isSelected && (
-                    <View
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => void setVisualTheme(item.id)}
                       style={[
-                        styles.checkBadge,
-                        { backgroundColor: colors.action.primary },
+                        styles.themeCard,
+                        {
+                          backgroundColor: isSelected
+                            ? isDark
+                              ? 'rgba(99, 102, 241, 0.12)'
+                              : '#F4F4F5'
+                            : colors.background.tertiary,
+                          borderColor: isSelected
+                            ? colors.border.focus
+                            : colors.border.light,
+                        },
                       ]}
+                      activeOpacity={0.7}
                     >
-                      <Feather
-                        name="check"
-                        size={14}
-                        color={colors.action.primaryText}
-                      />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                      {/* Radio Indicator */}
+                      <View
+                        style={[
+                          styles.radioOuter,
+                          {
+                            borderColor: isSelected
+                              ? colors.border.focus
+                              : colors.border.main,
+                          },
+                        ]}
+                      >
+                      { isSelected && (
+                            <View
+                              style={[
+                                styles.radioInner,
+                                { backgroundColor: colors.border.focus },
+                              ]}
+                            />
+                          )}
+                      </View>
+
+                        {/* Textos */}
+                        <View style={styles.themeInfo}>
+                          <Text
+                            style={[
+                              styles.themeTitle,
+                              {
+                                color: isSelected
+                                  ? colors.text.primary
+                                  : colors.text.secondary,
+                                fontWeight: isSelected ? '700' : '600',
+                              },
+                            ]}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.themeSubtitle,
+                              { color: colors.text.muted },
+                            ]}
+                          >
+                            {item.subtitle}
+                          </Text>
+                        </View>
+
+                            {/* Vista previa de colores */ }
+                            < View style={styles.previewColorsContainer}>
+                          {item.colors.map((c, idx) => (
+                            <View
+                              key={idx}
+                              style={[
+                                styles.colorDot,
+                                {
+                                  backgroundColor: c,
+                                  borderColor: isDark
+                                    ? 'rgba(255, 255, 255, 0.2)'
+                                    : 'rgba(0, 0, 0, 0.15)',
+                                },
+                              ]}
+                            />
+                      ))}
+                        </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* ─── 2. MODO DE APARIENCIA ─── */}
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.text.muted, marginTop: 20 },
+                ]}
+              >
+                MODO DE APARIENCIA
+              </Text>
+
+                  <View style={styles.modeGrid}>
+                    {appearanceModes.map((mode) => {
+                      const isSelected = themeMode === mode.id;
+
+                      return (
+                        <TouchableOpacity
+                          key={mode.id}
+                          onPress={() => void setThemeMode(mode.id)}
+                          style={[
+                            styles.modeCard,
+                            {
+                              backgroundColor: isSelected
+                                ? isDark
+                                    ? 'rgba(99, 102, 241, 0.14)'
+                                    : '#F4F4F5'
+                                  : colors.background.tertiary,
+                              borderColor: isSelected
+                                ? colors.border.focus
+                                : colors.border.light,
+                            },
+                          ]}
+                          activeOpacity={0.7}
+                        >
+                            <Feather
+                      name={mode.icon}
+                            size={20}
+                            color={
+                              isSelected
+                                ? visualTheme === 'obsidian'
+                                  ? '#818CF8'
+                                  : colors.text.primary
+                                : colors.text.muted
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.modeLabel,
+                              {
+                                color: isSelected
+                                  ? colors.text.primary
+                                  : colors.text.secondary,
+                                fontWeight: isSelected ? '700' : '500',
+                              },
+                            ]}
+                          >
+                          {mode.label}
+                        </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              </View>
+          </ScrollView>
+
+          {/* Botón Listo */}
+          <TouchableOpacity
+            style={[
+              styles.doneButton,
+              { backgroundColor: colors.action.primary },
+            ]}
+            onPress={onClose}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.doneButtonText,
+                { color: colors.action.primaryText },
+              ]}
+            >
+              Listo
+            </Text>
+          </TouchableOpacity>
         </Pressable>
       </Pressable>
     </Modal>
@@ -183,36 +305,32 @@ export const ThemeSettingsModal: React.FC<ThemeSettingsModalProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContainer: {
     width: '100%',
-    maxWidth: 420,
-    borderRadius: 24,
-    padding: 22,
+    maxWidth: 440,
+    maxHeight: '85%',
+    borderRadius: 22,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 8,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     marginTop: 2,
   },
   closeButton: {
@@ -222,45 +340,90 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionsList: {
-    gap: 12,
+  scrollContent: {
+    paddingBottom: 6,
   },
-  optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
-  optionCardSelected: {
-    borderWidth: 1.5,
-  },
-  iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  optionDescription: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  checkBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  },
-});
+    themeList: {
+      gap: 10,
+    },
+      themeCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        gap: 12,
+      },
+        radioOuter: {
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          borderWidth: 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+          radioInner: {
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+          },
+          themeInfo: {
+            flex: 1,
+            gap: 2,
+          },
+            themeTitle: {
+              fontSize: 14,
+            },
+              themeSubtitle: {
+                fontSize: 12,
+              },
+                previewColorsContainer: {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingLeft: 4,
+                },
+                colorDot: {
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  borderWidth: 1,
+                },
+                modeGrid: {
+                  flexDirection: 'row',
+                  gap: 8,
+                },
+                modeCard: {
+                  flex: 1,
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 4,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  gap: 6,
+                },
+                  modeLabel: {
+                    fontSize: 13,
+                    textAlign: 'center',
+                  },
+                  doneButton: {
+                    marginTop: 14,
+                    paddingVertical: 12,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  doneButtonText: {
+                    fontSize: 14,
+                    fontWeight: '700',
+                  },
+                });

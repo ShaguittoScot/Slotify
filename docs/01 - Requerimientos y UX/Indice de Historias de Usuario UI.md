@@ -17,6 +17,7 @@
 | **[[US-020 - Creador Dinamico de Formularios (Form Builder)]]** | Creador Dinámico de Formularios (Form Builder) | Dueño de Negocio | `FormBuilderScreen`, `FormViewer`, `form-preview` | ✅ Implementado |
 | **[[US-023 - Gestion de Bloqueos de Agenda y Citas]]** | Gestión de Bloqueos de Agenda y Citas | Administrador / Profesional | `BlockSlotModal`, `CalendarView` | ✅ Implementado |
 | **[[US-026 - Directorio y Modulo de Clientes B2B]]** | Directorio y Módulo de Clientes B2B | Dueño de Negocio | `ClientsScreen` | ✅ Implementado |
+| **[[Feature Business Detail & Adaptive Brand]]** | Experiencia Pública de Negocio e Identidad Visual Adaptativa (trazado a `US-023` Backend) | Cliente Consumidor (B2C) | `BusinessCard`, `BusinessDetailScreen`, `useBusinessBrand`, `BookingScreen` | ⚠️ Base e identidad completas; galería/portada/staff pendientes de DTO backend |
 
 ---
 

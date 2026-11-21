@@ -3,40 +3,52 @@ import { View, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
 import type { BusinessDetailServiceDto } from '../../types';
+import type { SectorConfig } from '../../model/sector';
 import { BusinessServiceCard } from './BusinessServiceCard';
 import { createBusinessServiceStyles } from '../styles/businessService.styles';
 
 interface BusinessServicesSectionProps {
   services: BusinessDetailServiceDto[];
+  sector: SectorConfig;
   accentColor: string;
 }
 
 export function BusinessServicesSection({
   services,
+  sector,
   accentColor,
 }: BusinessServicesSectionProps) {
   const { colors } = useAppTheme();
   const styles = createBusinessServiceStyles(colors, accentColor);
 
-  // Filtrar exclusivamente los servicios activos
+  // Filtrar exclusivamente servicios activos
   const activeServices = (services || []).filter((s) => s.isActive !== false);
+
+  const getUnitLabel = (count: number) => {
+    if (sector.type === 'restaurant') {
+      return count === 1 ? 'opción' : 'opciones';
+    }
+    if (sector.type === 'health_clinic') {
+      return count === 1 ? 'especialidad' : 'especialidades';
+    }
+    return count === 1 ? 'servicio' : 'servicios';
+  };
 
   return (
     <View style={styles.sectionContainer}>
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Servicios disponibles</Text>
+          <Text style={styles.sectionTitle}>{sector.catalogTitle}</Text>
           {activeServices.length > 0 && (
             <View style={styles.serviceCountBadge}>
               <Text style={styles.serviceCountText}>
-                {activeServices.length}{' '}
-                {activeServices.length === 1 ? 'servicio' : 'servicios'}
+                {activeServices.length} {getUnitLabel(activeServices.length)}
               </Text>
             </View>
           )}
         </View>
         <Text style={styles.sectionSubtitle}>
-          Consulta las opciones ofrecidas antes de iniciar tu reserva.
+          {sector.catalogSubtitle}
         </Text>
       </View>
 
@@ -45,9 +57,9 @@ export function BusinessServicesSection({
           <View style={styles.emptyIconCircle}>
             <Feather name="inbox" size={20} color={colors.text.muted} />
           </View>
-          <Text style={styles.emptyTitle}>Sin servicios activos</Text>
+          <Text style={styles.emptyTitle}>Sin opciones activas</Text>
           <Text style={styles.emptyDescription}>
-            Este establecimiento aún no tiene servicios disponibles para agendar.
+            Este establecimiento aún no tiene opciones disponibles para agendar.
           </Text>
         </View>
       ) : (
