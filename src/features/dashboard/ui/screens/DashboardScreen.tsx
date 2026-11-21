@@ -5,6 +5,8 @@ import {
   ScrollView,
   StyleSheet,
   Share,
+  Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -16,6 +18,11 @@ import Animated, {
   LinearTransition,
 } from 'react-native-reanimated';
 import { useAuthStore } from '@/features/auth/model';
+import {
+  bookingLink,
+  fetchOwnBusinessInfo,
+  fetchOwnBusinessLogoUrl,
+} from '@/features/settings/api';
 import {
   useCalendarStore,
   getCalendarAmount,
@@ -41,7 +48,7 @@ const EMPTY_SLOTS: CalendarSlot[] = [];
 export function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
-  const { user, toggleAppMode } = useAuthStore();
+  const { user } = useAuthStore();
   const { slots: storeSlots, loadSlots } = useCalendarStore();
   const {
     apiClients,
@@ -51,6 +58,9 @@ export function DashboardScreen() {
     currentScopeKey,
   } = useClientsStore();
   const [migrationModalVisible, setMigrationModalVisible] = useState(false);
+  const [businessSlug, setBusinessSlug] = useState<string | undefined>(undefined);
+  const [businessLogoUrl, setBusinessLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
   const [calendar, setCalendar] = useState<{
     scopeKey: string;
     data?: CalendarResponse;
@@ -62,6 +72,7 @@ export function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      const controller = new AbortController();
       const refresh = () => {
         const currentTime = Date.now();
         setNow(currentTime);
@@ -74,6 +85,25 @@ export function DashboardScreen() {
             if (active) setCalendar({ scopeKey, failed: true });
           }
         );
+        if (user?.businessId) {
+          fetchOwnBusinessInfo(controller.signal).then(
+            (info) => {
+              if (active && info.slug) setBusinessSlug(info.slug);
+            },
+            () => {
+              // Mantiene el slug previo si falla la consulta de perfil
+            }
+          );
+          fetchOwnBusinessLogoUrl(controller.signal).then(
+            (logo) => {
+              if (active) {
+                setBusinessLogoUrl(logo);
+                setLogoError(false);
+              }
+            },
+            () => {}
+          );
+        }
       };
       refresh();
       void loadClients(scopeKey);
@@ -81,9 +111,10 @@ export function DashboardScreen() {
       const timer = setInterval(() => setNow(Date.now()), 60_000);
       return () => {
         active = false;
+        controller.abort();
         clearInterval(timer);
       };
-    }, [loadClients, loadSlots, scopeKey])
+    }, [loadClients, loadSlots, scopeKey, user?.businessId])
   );
 
   const currentCalendar =
@@ -132,12 +163,20 @@ export function DashboardScreen() {
   };
 
   const handleShareLink = async () => {
+    const shareUrl = bookingLink(businessSlug);
+    if (!shareUrl) {
+      Alert.alert(
+        'Enlace de reservas no configurado',
+        businessSlug
+          ? 'Configura EXPO_PUBLIC_BOOKING_BASE_URL para compartir tu formulario público.'
+          : 'Aún estamos cargando el identificador de tu negocio. Intenta nuevamente en unos segundos.'
+      );
+      return;
+    }
+
     try {
-      const slug = user?.businessName
-        ? user.businessName.toLowerCase().replace(/\s+/g, '-')
-        : 'central-barber';
       await Share.share({
-        message: `Reserva tu cita en línea en Slotify: https://slotify.app/book/${slug}`,
+        message: `Reserva tu cita en línea en ${user?.businessName || 'Slotify'}: ${shareUrl}`,
       });
     } catch {
       // Ignored
@@ -178,7 +217,16 @@ export function DashboardScreen() {
                   },
                 ]}
               >
-                <Text style={s.avatarText}>{getInitials(businessTitle)}</Text>
+                {businessLogoUrl && !logoError ? (
+                  <Image
+                    source={{ uri: businessLogoUrl }}
+                    style={s.avatarImage}
+                    resizeMode="cover"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <Text style={s.avatarText}>{getInitials(businessTitle)}</Text>
+                )}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={s.roleRow}>
@@ -198,22 +246,6 @@ export function DashboardScreen() {
 
             <View style={s.headerActions}>
               <AnimatedPressable
-                onPress={toggleAppMode}
-                style={[
-                  s.modePill,
-                  {
-                    backgroundColor: isDark ? '#14141A' : '#F4F4F5',
-                    borderColor: isDark
-                      ? 'rgba(129, 140, 248, 0.25)'
-                      : 'rgba(99, 102, 241, 0.2)',
-                  },
-                ]}
-              >
-                <Feather name="repeat" size={13} color="#818CF8" />
-                <Text style={s.modePillText}>Modo Cliente</Text>
-              </AnimatedPressable>
-
-              <AnimatedPressable
                 accessibilityRole="button"
                 accessibilityLabel="Abrir Ajustes"
                 style={[
@@ -225,7 +257,7 @@ export function DashboardScreen() {
                 ]}
                 onPress={() => router.navigate('/(main)/settings')}
               >
-                <Feather name="sliders" size={17} color={colors.text.primary} />
+                <Feather name="settings" size={17} color={colors.text.primary} />
               </AnimatedPressable>
             </View>
           </Animated.View>
@@ -609,6 +641,11 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 14,
@@ -642,20 +679,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  modePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  modePillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#818CF8',
   },
   iconBtn: {
     width: 38,

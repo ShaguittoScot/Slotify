@@ -20,8 +20,9 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '@/shared/theme';
 import { FluidButton } from '@/components/ui/FluidButton';
 import { useSectorTemplateStore } from '../model';
 import { saveBusinessSectorSelection } from '../api';
@@ -39,6 +40,7 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
   const params = useLocalSearchParams();
   const isMigrationMode = params.isMigration === 'true';
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useAppTheme();
 
   const {
     categories,
@@ -102,29 +104,57 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
   } as any) : {};
 
   return (
-    <View style={styles.outerScreen}>
+    <View style={[styles.outerScreen, { backgroundColor: colors.background.primary }]}>
       {/* Contenedor centralizado responsivo */}
-      <View style={styles.responsiveShell}>
+      <View
+        style={[
+          styles.responsiveShell,
+          {
+            backgroundColor: colors.background.primary,
+            borderLeftColor: colors.border.main,
+            borderRightColor: colors.border.main,
+          },
+        ]}
+      >
         {/* Barra Superior con Progreso y Safe Area para evitar colisión con Notch */}
-        <View style={[styles.topBar, { paddingTop: insets.top, height: 56 + insets.top }]}>
+        <View
+          style={[
+            styles.topBar,
+            {
+              paddingTop: insets.top,
+              height: 56 + insets.top,
+              backgroundColor: colors.background.primary,
+              borderBottomColor: colors.border.main,
+            },
+          ]}
+        >
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Regresar"
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={styles.backButton}
+            style={[
+              styles.backButton,
+              {
+                backgroundColor: colors.background.secondary,
+                borderColor: colors.border.main,
+              },
+            ]}
             onPress={handleBack}
           >
-            <SymbolView
-              name={{ ios: 'chevron.backward', android: 'arrow_back', web: 'arrow_back' }}
-              size={18}
-              tintColor="#E2E8F0"
-            />
+            <Feather name="arrow-left" size={18} color={colors.text.primary} />
           </TouchableOpacity>
 
           <View style={styles.stepIndicator}>
-            <Text style={styles.stepText}>PASO 01 / 03</Text>
-            <View style={styles.stepTrack}>
-              <View style={styles.stepProgress} />
+            <Text style={[styles.stepText, { color: colors.text.secondary }]}>
+              PASO 01 / 03
+            </Text>
+            <View style={[styles.stepTrack, { backgroundColor: colors.border.main }]}>
+              <View
+                style={[
+                  styles.stepProgress,
+                  { backgroundColor: colors.action.primary },
+                ]}
+              />
             </View>
           </View>
 
@@ -137,10 +167,10 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
             entering={FadeInDown.delay(40).springify().damping(16)}
             style={styles.header}
           >
-            <Text style={styles.heading}>
+            <Text style={[styles.heading, { color: colors.text.primary }]}>
               ¿Cuál es tu giro comercial?
             </Text>
-            <Text style={styles.subheading}>
+            <Text style={[styles.subheading, { color: colors.text.muted }]}>
               Configuraremos tu entorno de trabajo en base a tu sector.
             </Text>
           </Animated.View>
@@ -148,8 +178,8 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
           {/* Lista de Giros Comerciales con render instantáneo */}
           {isLoading && categories.length === 0 ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6366F1" />
-              <Text style={styles.loadingText}>
+              <ActivityIndicator size="large" color={colors.action.primary} />
+              <Text style={[styles.loadingText, { color: colors.text.muted }]}>
                 Cargando sectores disponibles...
               </Text>
             </View>
@@ -164,12 +194,23 @@ export const SectorSelectionScreen: React.FC<SectorSelectionScreenProps> = ({
         </View>
 
         {/* Dock Flotante Inferior con FluidButton */}
-        <View style={[styles.bottomDock, webDockGlass]}>
+        <View
+          style={[
+            styles.bottomDock,
+            webDockGlass,
+            {
+              backgroundColor: isDark
+                ? 'rgba(18, 18, 18, 0.94)'
+                : 'rgba(255, 255, 255, 0.94)',
+              borderTopColor: colors.border.main,
+            },
+          ]}
+        >
           <FluidButton
             testID="continue-sector-button"
             label={
-              selectedCategory 
-                ? (isCustomCanvas ? 'Continuar con Lienzo Libre' : `Continuar con ${selectedCategory.name}`) 
+              selectedCategory
+                ? (isCustomCanvas ? 'Continuar con Lienzo Libre' : `Continuar con ${selectedCategory.name}`)
                 : 'Selecciona una opción'
             }
             disabled={!selectedCategory}

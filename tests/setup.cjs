@@ -21,3 +21,27 @@ jest.mock('expo-symbols', () => ({
   SymbolView: () => null,
 }));
 
+jest.mock('@expo/vector-icons', () => ({
+  Feather: () => null,
+  MaterialCommunityIcons: () => null,
+  FontAwesome5: () => null,
+  AntDesign: () => null,
+  Ionicons: () => null,
+}));
+
+jest.mock('expo-router', () => ({
+  router: {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+  },
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+  }),
+  useLocalSearchParams: () => ({}),
+  usePathname: () => '/',
+  useSegments: () => [],
+}));
+

@@ -1,35 +1,40 @@
-import React, { useState } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
+import { useAuthStore } from '@/features/auth/model';
+import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
+import { ThemeSettingsModal, useAppTheme } from '@/shared/theme';
+import { Feather } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
   Alert,
+  Image,
   Linking,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useAuthStore } from '@/features/auth/model';
-import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
-import { FluidToggleSwitch } from '@/components/ui/FluidToggleSwitch';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { TemplateMigrationModal } from '@/features/dashboard/ui/components/TemplateMigrationModal';
-import { EditProfileModal } from '../components/EditProfileModal';
-import { BusinessInfoModal } from '../components/BusinessInfoModal';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { fetchOwnBusinessLogoUrl } from '../../api';
 import { requestAppointmentNotificationPermission } from '../../model/appointmentNotifications';
-import { LocalNotificationsUnavailable } from '../../model/localNotifications';
+import {
+  LocalNotificationsUnavailable,
+  loadLocalNotificationDevice,
+} from '../../model/localNotifications';
 import {
   appointmentHaptic,
   settingsScope,
   useSettingsPreferences,
 } from '../../model/preferences';
+import { BusinessInfoModal } from '../components/BusinessInfoModal';
+import { EditProfileModal } from '../components/EditProfileModal';
 
 export function SettingsScreen() {
   const router = useRouter();
-  const { colors, isDark, themeMode } = useAppTheme();
+  const { colors, isDark, themeMode, visualTheme } = useAppTheme();
   const { user, logout, appMode, setAppMode, toggleAppMode } = useAuthStore();
 
   const isBusiness = appMode === 'BUSINESS';
@@ -39,13 +44,41 @@ export function SettingsScreen() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showBusinessInfoModal, setShowBusinessInfoModal] = useState(false);
   const [requestingNotifications, setRequestingNotifications] = useState(false);
+  const [businessLogoUrl, setBusinessLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isBusiness || !user?.businessId) {
+        setBusinessLogoUrl(null);
+        return;
+      }
+      let active = true;
+      const controller = new AbortController();
+      fetchOwnBusinessLogoUrl(controller.signal).then(
+        (logo) => {
+          if (active) {
+            setBusinessLogoUrl(logo);
+            setLogoError(false);
+          }
+        },
+        () => { }
+      );
+      return () => {
+        active = false;
+        controller.abort();
+      };
+    }, [isBusiness, user?.businessId])
+  );
 
   const preferences = useSettingsPreferences();
   const scope = settingsScope(user);
   const preferencesReady = preferences.ready && preferences.scope === scope;
+  const isBusinessUser = Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+  const isClientUser = Boolean(user?.id && (user?.role === 'CLIENTE' || !isBusiness));
   const canNotify =
     Platform.OS !== 'web' &&
-    Boolean(user?.businessId && !user.businessId.startsWith('demo'));
+    Boolean(user?.id && (isBusinessUser || isClientUser));
 
   const changeMode = () => {
     if (isBusiness) {
@@ -79,7 +112,7 @@ export function SettingsScreen() {
             {
               text: 'Abrir ajustes',
               onPress: () => {
-                void Linking.openSettings().catch(() => {});
+                void Linking.openSettings().catch(() => { });
               },
             },
           ]
@@ -99,6 +132,23 @@ export function SettingsScreen() {
       );
     } finally {
       setRequestingNotifications(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      const device = loadLocalNotificationDevice();
+      await device.scheduleNotificationAsync({
+        content: {
+          title: '🔔 Slotify: Prueba exitosa',
+          body: '¡El motor de notificaciones push está activo y funcionando en tu dispositivo!',
+          data: { test: true },
+        },
+        trigger: null,
+      });
+      appointmentHaptic(true);
+    } catch (err: any) {
+      Alert.alert('Aviso', 'Asegúrate de permitir las notificaciones en el sistema.');
     }
   };
 
@@ -126,9 +176,9 @@ export function SettingsScreen() {
   };
 
   const getThemeModeLabel = () => {
-    if (themeMode === 'light') return 'Modo Claro';
-    if (themeMode === 'system') return 'Automático';
-    return 'Obsidian Black';
+  };
+
+  const getVisualThemeLabel = () => {
   };
 
   const displayName = isBusiness
@@ -136,8 +186,8 @@ export function SettingsScreen() {
       ? user.fullName
       : user?.businessName || 'Administrador'
     : user?.fullName && user.fullName !== 'Pendiente'
-    ? user.fullName
-    : 'Cliente Slotify';
+      ? user.fullName
+      : 'Cliente Slotify';
 
   const getInitials = (name: string) => {
     const parts = name.trim().split(/\s+/);
@@ -160,8 +210,8 @@ export function SettingsScreen() {
       style={[
         styles.settingItem,
         {
-          backgroundColor: isDark ? '#121216' : '#FFFFFF',
-          borderColor: isDark ? '#22222A' : '#E4E4E7',
+          backgroundColor: colors.background.secondary,
+          borderColor: colors.border.main,
         },
       ]}
       onPress={onPress}
@@ -169,7 +219,11 @@ export function SettingsScreen() {
       <View
         style={[
           styles.settingIconWrapper,
-          { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+          {
+            backgroundColor: isDark
+              ? colors.background.tertiary
+              : colors.background.primary,
+          },
         ]}
       >
         <Feather name={icon} size={16} color={iconTint} />
@@ -258,8 +312,8 @@ export function SettingsScreen() {
               style={[
                 styles.profileCard,
                 {
-                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
-                  borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.main,
                 },
               ]}
             >
@@ -272,9 +326,18 @@ export function SettingsScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.avatarText, { color: accentColor }]}>
-                  {getInitials(displayName)}
-                </Text>
+                {isBusiness && businessLogoUrl && !logoError ? (
+                  <Image
+                    source={{ uri: businessLogoUrl }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <Text style={[styles.avatarText, { color: accentColor }]}>
+                    {getInitials(displayName)}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.profileInfo}>
@@ -288,8 +351,7 @@ export function SettingsScreen() {
                   style={[styles.profileEmail, { color: colors.text.muted }]}
                   numberOfLines={1}
                 >
-                  {user?.email ||
-                    (isBusiness ? 'admin@slotify.com' : 'cliente@slotify.com')}
+                  {user?.email || 'Sin correo registrado'}
                 </Text>
               </View>
 
@@ -381,6 +443,24 @@ export function SettingsScreen() {
             )}
           </Animated.View>
 
+          {/* ─── APARIENCIA ─── */}
+          <Animated.View
+            entering={FadeInDown.duration(480).delay(140).springify()}
+            style={styles.section}
+          >
+            <Text style={[styles.sectionHeader, { color: colors.text.muted }]}>
+              APARIENCIA
+            </Text>
+
+            {renderSettingRow(
+              'layers',
+              'Apariencia',
+              `${getVisualThemeLabel()} • ${getThemeModeLabel()}`,
+              () => setShowThemeModal(true),
+              visualTheme === 'obsidian' ? '#818CF8' : colors.text.primary
+            )}
+          </Animated.View>
+
           {/* ─── PREFERENCIAS Y SISTEMA ─── */}
           <Animated.View
             entering={FadeInDown.duration(500).delay(170).springify()}
@@ -390,27 +470,23 @@ export function SettingsScreen() {
               SISTEMA
             </Text>
 
-            {renderSettingRow(
-              isDark ? 'moon' : 'sun',
-              'Apariencia',
-              getThemeModeLabel(),
-              () => setShowThemeModal(true),
-              colors.text.primary
-            )}
-
             <View
               style={[
                 styles.settingItem,
                 {
-                  backgroundColor: isDark ? '#121216' : '#FFFFFF',
-                  borderColor: isDark ? '#22222A' : '#E4E4E7',
+                  backgroundColor: colors.background.secondary,
+                  borderColor: colors.border.main,
                 },
               ]}
             >
               <View
                 style={[
                   styles.settingIconWrapper,
-                  { backgroundColor: isDark ? '#1A1A22' : '#F4F4F5' },
+                  {
+                    backgroundColor: isDark
+                      ? colors.background.tertiary
+                      : colors.background.primary,
+                  },
                 ]}
               >
                 <Feather name="bell" size={16} color={colors.text.primary} />
@@ -425,8 +501,8 @@ export function SettingsScreen() {
                   style={[styles.settingValue, { color: colors.text.muted }]}
                 >
                   {canNotify
-                    ? 'Recordatorios de agenda, nuevas reservas y cancelaciones'
-                    : 'Disponible en la app móvil con una cuenta de negocio'}
+                    ? 'Recordatorios de citas, nuevas reservas y cancelaciones'
+                    : 'Disponible en la app móvil'}
                 </Text>
               </View>
               <FluidToggleSwitch
@@ -440,6 +516,44 @@ export function SettingsScreen() {
                 activeColor={accentColor}
               />
             </View>
+
+            {canNotify && preferencesReady && preferences.notifications && (
+              <AnimatedPressable
+                accessibilityRole="button"
+                accessibilityLabel="Probar notificación inmediata"
+                onPress={handleTestNotification}
+                style={[
+                  styles.settingItem,
+                  {
+                    backgroundColor: isDark ? '#14141C' : '#F0FDF4',
+                    borderColor: isDark ? '#1E293B' : '#BBF7D0',
+                    borderStyle: 'dashed',
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.settingIconWrapper,
+                    { backgroundColor: isDark ? '#1E293B' : '#DCFCE7' },
+                  ]}
+                >
+                  <Feather name="send" size={15} color="#10B981" />
+                </View>
+                <View style={styles.settingTextContent}>
+                  <Text
+                    style={[styles.settingLabel, { color: isDark ? '#34D399' : '#059669', fontSize: 13.5 }]}
+                  >
+                    Probar Notificación Inmediata
+                  </Text>
+                  <Text
+                    style={[styles.settingValue, { color: colors.text.muted, fontSize: 11.5 }]}
+                  >
+                    Toca para recibir una alerta push en este dispositivo
+                  </Text>
+                </View>
+                <Feather name="arrow-right" size={15} color="#10B981" />
+              </AnimatedPressable>
+            )}
 
             <View
               style={[
@@ -606,6 +720,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 15,

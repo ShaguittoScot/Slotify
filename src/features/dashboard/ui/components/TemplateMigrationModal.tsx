@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { AppModalSheet } from '@/components/ui/AppModalSheet';
 import { useAuthStore } from '@/features/auth/model';
 import { useRouter } from 'expo-router';
 import { fetchSectorTemplates } from '@/features/sector-templates/api';
@@ -64,14 +65,30 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <View style={[s.container, { backgroundColor: colors.background.primary }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-            <Feather name="x" size={24} color={colors.text.primary} />
-          </TouchableOpacity>
+    <AppModalSheet
+      visible={visible}
+      onClose={onClose}
+      dismissible={!migrating}
+      sheetStyle={{ paddingHorizontal: 0, height: '82%' }}
+    >
+      <View style={[s.container, { backgroundColor: colors.background.secondary }]}>
+        <View style={[s.header, { borderBottomColor: colors.border.main }]}>
           <Text style={[s.title, { color: colors.text.primary }]}>Cambiar Giro del Negocio</Text>
-          <View style={{ width: 44 }} />
+          <TouchableOpacity
+            onPress={onClose}
+            disabled={migrating}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar migración de plantilla"
+            style={[
+              s.closeBtn,
+              {
+                backgroundColor: colors.background.primary,
+                borderColor: colors.border.main,
+              },
+            ]}
+          >
+            <Feather name="x" size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={s.content}>
@@ -116,7 +133,7 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
             onPress={handleMigrate}
           >
             {migrating ? (
-              <ActivityIndicator color="#FFF" />
+              <ActivityIndicator color={colors.action.primaryText} />
             ) : (
               <Text style={[s.submitText, { color: selectedId ? colors.action.primaryText : colors.text.secondary }]}>
                 Migrar Plantilla
@@ -125,7 +142,7 @@ export function TemplateMigrationModal({ visible, onClose }: Props) {
           </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+    </AppModalSheet>
   );
 }
 
@@ -135,12 +152,18 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(150,150,150,0.1)'
   },
-  closeBtn: { width: 44, height: 44, justifyContent: 'center' },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: { fontSize: 18, fontWeight: '700' },
   content: { flex: 1, padding: 20 },
   description: { fontSize: 14, marginBottom: 20, lineHeight: 20 },

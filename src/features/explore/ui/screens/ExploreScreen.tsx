@@ -1,19 +1,19 @@
-import React, { useEffect, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/shared/theme';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo } from 'react';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  useExploreStore,
   selectExploreCategories,
   selectFilteredBusinesses,
+  useExploreStore,
 } from '../../model';
-import { ExploreHeader } from '../components/ExploreHeader';
 import { BusinessCard } from '../components/BusinessCard';
-import { SkeletonCard } from '../components/SkeletonCard';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorState } from '../components/ErrorState';
+import { ExploreHeader } from '../components/ExploreHeader';
+import { SkeletonCard } from '../components/SkeletonCard';
 import { createExploreScreenStyles } from '../styles/exploreScreen.styles';
 
 export function ExploreScreen() {
@@ -57,21 +57,28 @@ export function ExploreScreen() {
     [businesses]
   );
 
+  // Asegurar que siempre haya una categoría válida seleccionada (por defecto 'all' / "Todos")
+  const activeCategoryKey = useMemo(() => {
+    if (!selectedCategoryKey || selectedCategoryKey === 'all') return 'all';
+    const exists = categories.some((c) => c.key.toLowerCase() === selectedCategoryKey.toLowerCase());
+    return exists ? selectedCategoryKey : 'all';
+  }, [categories, selectedCategoryKey]);
+
   // Lista filtrada reactiva
   const filteredBusinesses = useMemo(
     () =>
       selectFilteredBusinesses(
         businesses,
         debouncedQuery,
-        selectedCategoryKey
+        activeCategoryKey
       ),
-    [businesses, debouncedQuery, selectedCategoryKey]
+    [businesses, debouncedQuery, activeCategoryKey]
   );
 
-  const handleNavigateToBook = useCallback(
+  const handleNavigateToDetail = useCallback(
     (slug: string) => {
       if (slug) {
-        router.push(`/book/${slug}` as any);
+        router.push(`/business/${slug}` as any);
       }
     },
     [router]
@@ -90,8 +97,8 @@ export function ExploreScreen() {
       (b) =>
         b.slug?.toLowerCase() === clean || b.name?.toLowerCase() === clean
     );
-    handleNavigateToBook(found ? found.slug : clean);
-  }, [searchInput, businesses, handleNavigateToBook]);
+    handleNavigateToDetail(found ? found.slug : clean);
+  }, [searchInput, businesses, handleNavigateToDetail]);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -101,7 +108,7 @@ export function ExploreScreen() {
         onSubmitSearch={handleDirectSearch}
         onClearSearch={() => setSearchInput('')}
         categories={categories}
-        selectedCategoryKey={selectedCategoryKey}
+        selectedCategoryKey={activeCategoryKey}
         onSelectCategory={setSelectedCategoryKey}
       />
 
@@ -126,7 +133,7 @@ export function ExploreScreen() {
             renderItem={({ item }) => (
               <BusinessCard
                 business={item}
-                onBook={handleNavigateToBook}
+                onSelect={handleNavigateToDetail}
               />
             )}
             ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
@@ -154,7 +161,7 @@ export function ExploreScreen() {
             ListEmptyComponent={
               <EmptyState
                 isSearching={
-                  debouncedQuery.length > 0 || selectedCategoryKey !== 'all'
+                  debouncedQuery.length > 0 || activeCategoryKey !== 'all'
                 }
                 onReset={resetFilters}
               />

@@ -22,14 +22,6 @@ import { useAppTheme } from '@/shared/theme';
 import { FormSchema, FormField, FormServiceItem } from '../screens/FormBuilderScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Catálogo base por defecto cuando el negocio no especifica servicios propios
-const MOCK_SERVICES: FormServiceItem[] = [
-  { id: 's1', name: 'Corte Clásico', price: 200, duration: 30 },
-  { id: 's2', name: 'Arreglo de Barba', price: 150, duration: 20 },
-  { id: 's3', name: 'Corte + Barba', price: 300, duration: 50 },
-  { id: 's4', name: 'Facial Exprés', price: 180, duration: 25 },
-];
-
 const AVAILABLE_TIME_SLOTS = [
   '09:00 AM',
   '10:00 AM',
@@ -138,7 +130,7 @@ export function FormViewer({
   const secondaryColor = schema.secondaryColor || primaryColor;
   const businessName = schema.businessName || 'Establecimiento Verificado';
   const serviceCatalog =
-    schema.services && schema.services.length > 0 ? schema.services : MOCK_SERVICES;
+    schema.services && schema.services.length > 0 ? schema.services : [];
 
   const getInitials = (name: string) => {
     const clean = (name || 'SN').trim();
@@ -150,8 +142,12 @@ export function FormViewer({
   };
 
   const isFieldAnswered = (field: FormField, val: any): boolean => {
+    if (field.type === 'service_catalog') {
+      if (serviceCatalog.length === 0) return true;
+      return Array.isArray(val) && val.length > 0;
+    }
     if (val === undefined || val === null) return false;
-    if (field.type === 'service_catalog' || field.type === 'multiple_choice') {
+    if (field.type === 'multiple_choice') {
       return Array.isArray(val) && val.length > 0;
     }
     if (field.type === 'date_time') {
@@ -367,6 +363,25 @@ export function FormViewer({
     const hasError = validationErrorFieldId === field.id;
 
     if (field.type === 'service_catalog') {
+      if (serviceCatalog.length === 0) {
+        return (
+          <View
+            style={[
+              styles.optionCard,
+              {
+                backgroundColor: colors.background.secondary,
+                borderColor: colors.border.main,
+              },
+            ]}
+          >
+            <Feather name="info" size={16} color={colors.text.muted} style={{ marginRight: 10 }} />
+            <Text style={{ color: colors.text.secondary, fontSize: 13.5, flex: 1 }}>
+              Este negocio aún no tiene servicios publicados; puedes continuar para solicitar una cita general.
+            </Text>
+          </View>
+        );
+      }
+
       const selectedServiceIds = (value as string[]) || [];
 
       return (
@@ -385,16 +400,12 @@ export function FormViewer({
                       ? isDark
                         ? `${primaryColor}30`
                         : `${primaryColor}14`
-                      : isDark
-                      ? '#1E1E1E'
-                      : '#FFFFFF',
+                      : colors.background.secondary,
                     borderColor: isSelected
                       ? primaryColor
                       : hasError
                       ? colors.status.error
-                      : isDark
-                      ? '#333'
-                      : '#E5E5E5',
+                      : colors.border.main,
                     justifyContent: 'space-between',
                   },
                   isSlideMode && styles.optionCardLarge,
@@ -447,9 +458,7 @@ export function FormViewer({
                     {
                       backgroundColor: isSelected
                         ? secondaryColor
-                        : isDark
-                        ? '#2A2A2A'
-                        : '#F4F4F5',
+                        : colors.background.tertiary,
                     },
                   ]}
                 >
@@ -510,14 +519,10 @@ export function FormViewer({
                       {
                         backgroundColor: isSelectedDay
                           ? primaryColor
-                          : isDark
-                          ? '#1E1E1E'
-                          : '#F8FAFC',
+                          : colors.background.tertiary,
                         borderColor: isSelectedDay
                           ? primaryColor
-                          : isDark
-                          ? '#333'
-                          : '#E2E8F0',
+                          : colors.border.main,
                       },
                     ]}
                   >
@@ -585,14 +590,10 @@ export function FormViewer({
                       {
                         backgroundColor: isSelectedTime
                           ? `${secondaryColor}22`
-                          : isDark
-                          ? '#1E1E1E'
-                          : '#F8FAFC',
+                          : colors.background.tertiary,
                         borderColor: isSelectedTime
                           ? secondaryColor
-                          : isDark
-                          ? '#333'
-                          : '#E2E8F0',
+                          : colors.border.main,
                       },
                     ]}
                   >
@@ -672,14 +673,12 @@ export function FormViewer({
                 styles.textInput,
                 field.type !== 'paragraph' && !isSlideMode && { paddingLeft: 42 },
                 {
-                  backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+                  backgroundColor: colors.background.secondary,
                   borderColor: hasError
                     ? colors.status.error
                     : value
                     ? primaryColor
-                    : isDark
-                    ? '#333'
-                    : '#E5E5E5',
+                    : colors.border.main,
                   color: colors.text.primary,
                   minHeight: field.type === 'paragraph' ? 96 : 52,
                 },
@@ -724,16 +723,12 @@ export function FormViewer({
                         ? isDark
                           ? `${primaryColor}30`
                           : `${primaryColor}15`
-                        : isDark
-                        ? '#1E1E1E'
-                        : '#FFFFFF',
+                        : colors.background.secondary,
                       borderColor: isSelected
                         ? primaryColor
                         : hasError
                         ? colors.status.error
-                        : isDark
-                        ? '#333'
-                        : '#E5E5E5',
+                        : colors.border.main,
                     },
                     isSlideMode && styles.optionCardLarge,
                   ]}
@@ -890,7 +885,7 @@ export function FormViewer({
         <View
           style={[
             styles.progressBarBg,
-            { backgroundColor: isDark ? '#333' : '#E5E5E5' },
+            { backgroundColor: colors.border.main },
           ]}
         >
           <Animated.View

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { AppModalSheet } from '@/components/ui/AppModalSheet';
 import { DEFAULT_BUSINESS_TIME_ZONE } from '@/features/calendar/model/businessTime';
 import type { BusinessClient, ClientAppointmentStatus, ClientManagementAction } from '../../types';
 import { formatShortDate, getClientInitials } from './ClientCard';
@@ -163,35 +163,13 @@ export function ClientDetailModal({
     }
   };
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={managing ? () => {} : onClose}
-    >
-      <View style={s.overlay}>
-        <View
-          style={[
-            s.sheet,
-            {
-              backgroundColor: colors.background.secondary,
-              borderColor: colors.border.main,
-            },
-          ]}
-        >
-          {/* Handle superior */}
-          <View style={s.handleWrap}>
-            <View
-              style={[
-                s.handleBar,
-                { backgroundColor: isDark ? '#3A3A3A' : '#D4D4D4' },
-              ]}
-            />
-          </View>
+  const primaryBg = colors.action?.primary ?? (isDark ? '#FAFAFA' : '#09090B');
+  const primaryText = colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF');
 
-          {/* Encabezado de perfil */}
-          <View style={s.headerRow}>
+  return (
+    <AppModalSheet visible={visible} onClose={onClose} dismissible={!managing}>
+      {/* Encabezado de perfil */}
+      <View style={s.headerRow}>
             <View
               style={[
                 s.avatarLarge,
@@ -537,13 +515,30 @@ export function ClientDetailModal({
                         testID={`confirm-client-${pendingAction}`}
                         style={[
                           s.managementButton,
-                          { backgroundColor: pendingAction === 'delete' ? '#B91C1C' : '#4F46E5', borderColor: 'transparent' },
+                          {
+                            backgroundColor:
+                              pendingAction === 'delete' ? '#B91C1C' : primaryBg,
+                            borderColor: 'transparent',
+                          },
                         ]}
                       >
                         {managing ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <ActivityIndicator
+                            size="small"
+                            color={pendingAction === 'delete' ? '#FFFFFF' : primaryText}
+                          />
                         ) : (
-                          <Text style={[s.managementButtonText, { color: '#FFFFFF' }]}>
+                          <Text
+                            style={[
+                              s.managementButtonText,
+                              {
+                                color:
+                                  pendingAction === 'delete'
+                                    ? '#FFFFFF'
+                                    : primaryText,
+                              },
+                            ]}
+                          >
                             {managementLabels[pendingAction]}
                           </Text>
                         )}
@@ -715,9 +710,7 @@ export function ClientDetailModal({
               )}
             </View>
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    </AppModalSheet>
   );
 }
 

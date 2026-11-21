@@ -11,9 +11,7 @@ export interface RegisterAdminRequest {
   fullName?: string;
   email: string;
   password: string;
-  businessName: string;
-  businessPhone?: string;
-  sectorTemplateId?: number;
+  phone?: string;
 }
 
 export interface RegisterClientRequest {
@@ -23,6 +21,11 @@ export interface RegisterClientRequest {
   email: string;
   password: string;
   phone?: string;
+}
+
+export interface ExchangeTokenRequest {
+  userId: string;
+  email: string;
 }
 
 export interface AuthResponse {

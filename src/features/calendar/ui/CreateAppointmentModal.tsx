@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView,
+  ActivityIndicator, Keyboard, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/shared/theme';
+import { AppModalSheet } from '@/components/ui/AppModalSheet';
 import { searchClientOptions, type ClientOption } from '@/features/clients/api';
 import { useSectorTemplateStore } from '@/features/sector-templates';
 import { CANONICAL_SECTOR_CATEGORIES } from '@/features/sector-templates/constants';
@@ -240,12 +241,17 @@ export function CreateAppointmentModal({
 
   const fieldStyle = [s.field, { backgroundColor: colors.background.primary, borderColor: colors.border.main, color: colors.text.primary }];
   const close = () => { if (!isSaving) onClose(); };
+  const primaryBg = colors.action?.primary ?? (isDark ? '#FAFAFA' : '#09090B');
+  const primaryText = colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF');
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView style={[s.overlay, { backgroundColor: colors.background.backdrop }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[s.sheet, { backgroundColor: colors.background.secondary, paddingBottom: Math.max(14, insets.bottom) }]}>
-          <View style={[s.handle, { backgroundColor: colors.border.strong }]} />
+    <AppModalSheet
+      visible={visible}
+      onClose={close}
+      dismissible={!isSaving}
+      keyboardAvoiding
+      sheetStyle={{ maxHeight: '94%', paddingHorizontal: 0, paddingBottom: Math.max(14, insets.bottom) }}
+    >
           <View style={s.header}>
             <View style={[s.headerIcon, { backgroundColor: isDark ? '#252347' : '#EEF2FF' }]}>
               <Feather name="calendar" size={20} color={accent} />
@@ -370,15 +376,13 @@ export function CreateAppointmentModal({
             {error ? <Text accessibilityRole="alert" style={[s.error, { color: colors.status.error, backgroundColor: colors.status.errorBg }]}>{error}</Text> : null}
             <TouchableOpacity
               accessibilityRole="button" testID="save-manual-appointment" onPress={handleSave} disabled={isSaving}
-              style={[s.save, { backgroundColor: ACCENT, opacity: isSaving ? 0.65 : 1 }]}
+              style={[s.save, { backgroundColor: primaryBg, opacity: isSaving ? 0.65 : 1 }]}
             >
-              {isSaving ? <ActivityIndicator color="#FFF" /> : <Feather name="calendar" color="#FFF" size={18} />}
-              <Text style={s.saveText}>Guardar cita</Text>
+              {isSaving ? <ActivityIndicator color={primaryText} /> : <Feather name="calendar" color={primaryText} size={18} />}
+              <Text style={[s.saveText, { color: primaryText }]}>Guardar cita</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </AppModalSheet>
   );
 }
 

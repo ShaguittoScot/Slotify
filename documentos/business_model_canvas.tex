@@ -1,0 +1,176 @@
+\documentclass[landscape,a4paper,10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[margin=0.8cm]{geometry}
+\usepackage{xcolor}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, positioning, calc}
+
+\pagestyle{empty}
+
+% Paleta de Colores Moderna (Slotify Brand)
+\definecolor{primaryDark}{HTML}{0F172A}    % Slate 900
+\definecolor{primaryBlue}{HTML}{2563EB}    % Blue 600
+\definecolor{accentTeal}{HTML}{0D9488}     % Teal 600
+\definecolor{bgLight}{HTML}{F8FAFC}        % Slate 50
+\definecolor{cardBorder}{HTML}{CBD5E1}     % Slate 300
+\definecolor{textMuted}{HTML}{64748B}      % Slate 500
+
+% Estilos de Cajas TikZ para el Canvas
+\tikzset{
+    canvasBox/.style={
+        rectangle,
+        draw=cardBorder,
+        fill=white,
+        line width=0.8pt,
+        rounded corners=4pt,
+        inner sep=7pt,
+        text width=#1,
+        minimum height=6.3cm,
+        align=left,
+        anchor=north west
+    },
+    bottomBox/.style={
+        rectangle,
+        draw=cardBorder,
+        fill=white,
+        line width=0.8pt,
+        rounded corners=4pt,
+        inner sep=7pt,
+        text width=#1,
+        minimum height=3.8cm,
+        align=left,
+        anchor=north west
+    }
+}
+
+\newcommand{\itemDesc}[2]{\noindent\textcolor{primaryBlue}{\footnotesize$\blacksquare$} \textbf{#1:} #2\par\vspace{3pt}}
+\newcommand{\itemDescTeal}[2]{\noindent\textcolor{accentTeal}{\footnotesize$\blacksquare$} \textbf{#1:} #2\par\vspace{3pt}}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{\color{primaryBlue} Slotify} \ \textbar\ \ \textbf{\color{primaryDark} Business Model Canvas}}\\[2pt]
+    {\footnotesize \textbf{Diseñado para:} Plataforma de Gestión de Reservas y Turnos \quad\textbar\quad \textbf{Versión:} 1.0 \quad\textbar\quad \textbf{Fecha:} \today \quad\textbar\quad \textbf{Autor:} Equipo Slotify}
+\end{center}
+
+\vspace{0.1cm}
+
+\noindent
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+    % ==========================================
+    % 1. SOCIOS CLAVE (Key Partners)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=11.6cm] (KP) at (0, 0) {
+        {\color{primaryBlue}\textbf{\small 1. SOCIOS CLAVE}}\\[3pt]
+        {\tiny\color{textMuted}¿Quiénes son nuestros socios estratégicos?}\\[6pt]
+        \itemDesc{Pasarelas de Pago}{Stripe, Mercado Pago y PayPal para cobros seguros.}
+        \itemDesc{Infraestructura Cloud}{Hosting API (.NET 8) y base de datos PostgreSQL.}
+        \itemDesc{Negocios Pioneros}{Barberías, estéticas, consultorios y centros deportivos aliados.}
+        \itemDesc{Servicios de Mensajería}{Firebase (Push), Twilio (SMS/WhatsApp) y SendGrid.}
+    };
+
+    % ==========================================
+    % 2. ACTIVIDADES CLAVE (Key Activities)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=5.65cm] (KA) at (5.55, 0) {
+        {\color{primaryBlue}\textbf{\small 2. ACTIVIDADES CLAVE}}\\[3pt]
+        {\tiny\color{textMuted}¿Qué acciones clave requiere el modelo?}\\[5pt]
+        \itemDesc{Desarrollo Continuo}{App móvil (React Native/Expo) y API robusta.}
+        \itemDesc{Gestión de Concurrencia}{Prevención de solapamiento de turnos en tiempo real.}
+        \itemDesc{Soporte \& Onboarding}{Capacitación y asistencia técnica B2B.}
+        \itemDesc{Marketing \& Crecimiento}{Atracción de comercios y usuarios finales.}
+    };
+
+    % ==========================================
+    % 3. RECURSOS CLAVE (Key Resources)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=5.65cm] (KR) at (5.55, -5.95) {
+        {\color{primaryBlue}\textbf{\small 6. RECURSOS CLAVE}}\\[3pt]
+        {\tiny\color{textMuted}¿Qué activos estratégicos requerimos?}\\[5pt]
+        \itemDesc{Tecnología \& Código}{Arquitectura Clean, repositorios y servidores.}
+        \itemDesc{Talento Humano}{Ingenieros de Software, diseñadores UI/UX y soporte.}
+        \itemDesc{Datos \& Analítica}{Registros de reservas, disponibilidad y métricas.}
+    };
+
+    % ==========================================
+    % 4. PROPUESTA DE VALOR (Value Proposition)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=11.6cm, fill=bgLight] (VP) at (11.1, 0) {
+        {\color{primaryBlue}\textbf{\small 3. PROPUESTAS DE VALOR}}\\[3pt]
+        {\tiny\color{textMuted}¿Qué valor entregamos al cliente?}\\[6pt]
+        \textbf{\footnotesize Para Negocios (B2B):}\par\vspace{3pt}
+        \itemDescTeal{Cero Ausentismo}{Recordatorios y confirmaciones automáticas.}
+        \itemDescTeal{Gestión 24/7}{Agenda digital organizada sin llamadas telefónicas.}
+        \itemDescTeal{Control Financiero}{Métricas claras de ingresos y ocupación.}\par\vspace{4pt}
+        \textbf{\footnotesize Para Clientes Finales (B2C):}\par\vspace{3pt}
+        \itemDesc{Reserva Instantánea}{Citas en segundos con confirmación inmediata.}
+        \itemDesc{Flexibilidad Total}{Reprogramación y cancelación sin fricción.}
+    };
+
+    % ==========================================
+    % 5. RELACIÓN CON CLIENTES (Customer Relationships)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=5.65cm] (CR) at (16.65, 0) {
+        {\color{primaryBlue}\textbf{\small 4. RELACIÓN CON CLIENTES}}\\[3pt]
+        {\tiny\color{textMuted}¿Cómo interactuamos con ellos?}\\[5pt]
+        \itemDesc{Autoservicio}{Plataforma intuitiva sin intermediarios.}
+        \itemDesc{Soporte Dedicado}{Asistencia técnica y chat B2B para negocios.}
+        \itemDesc{Confianza \& Transparencia}{Calificaciones, reseñas verificadas y seguridad.}
+    };
+
+    % ==========================================
+    % 6. CANALES (Channels)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=5.65cm] (CH) at (16.65, -5.95) {
+        {\color{primaryBlue}\textbf{\small 8. CANALES}}\\[3pt]
+        {\tiny\color{textMuted}¿Por dónde llegamos a los clientes?}\\[5pt]
+        \itemDesc{Tiendas de Apps}{Google Play Store y Apple App Store.}
+        \itemDesc{Web / Landing Page}{Portal de registro e información para comercios.}
+        \itemDesc{Canales Digitales}{Redes sociales, publicidad segmentada y referidos.}
+    };
+
+    % ==========================================
+    % 7. SEGMENTOS DE CLIENTES (Customer Segments)
+    % ==========================================
+    \node[canvasBox=5.3cm, minimum height=11.6cm] (CS) at (22.2, 0) {
+        {\color{primaryBlue}\textbf{\small 5. SEGMENTOS DE CLIENTES}}\\[3pt]
+        {\tiny\color{textMuted}¿Para quién creamos valor?}\\[6pt]
+        \textbf{\footnotesize Negocios de Servicios (B2B):}\par\vspace{3pt}
+        \itemDescTeal{Belleza \& Cuidado}{Peluquerías, barberías, spas y manicura.}
+        \itemDescTeal{Salud \& Bienestar}{Consultorios médicos, psicólogos, fisios.}
+        \itemDescTeal{Deportes \& Ocio}{Canchas sintéticas, pádel y gimnasios.}\par\vspace{5pt}
+        \textbf{\footnotesize Clientes Finales (B2C):}\par\vspace{3pt}
+        \itemDesc{Usuarios Móviles}{Personas que buscan agendar servicios rápido y sin esperas.}
+    };
+
+    % ==========================================
+    % 8. ESTRUCTURA DE COSTOS (Cost Structure)
+    % ==========================================
+    \node[bottomBox=13.62cm] (CST) at (0, -12.0) {
+        {\color{primaryBlue}\textbf{\small 7. ESTRUCTURA DE COSTOS}}\\[3pt]
+        {\tiny\color{textMuted}¿Cuáles son los principales costos operativos?}\\[5pt]
+        \itemDesc{Infraestructura Cloud}{Servidores API, base de datos PostgreSQL y dominios.}
+        \itemDesc{Servicios de Mensajería \& Pagos}{Comisiones por transacción y costo SMS/WhatsApp.}
+        \itemDesc{Desarrollo \& Soporte}{Mantenimiento continuo, seguridad y nuevas funcionalidades.}
+        \itemDesc{Marketing \& Ventas}{Publicidad digital y campañas de adquisición (CAC).}
+    };
+
+    % ==========================================
+    % 9. FUENTES DE INGRESOS (Revenue Streams)
+    % ==========================================
+    \node[bottomBox=13.62cm] (RS) at (13.88, -12.0) {
+        {\color{primaryBlue}\textbf{\small 9. FUENTES DE INGRESOS}}\\[3pt]
+        {\tiny\color{textMuted}¿Cómo genera ingresos la plataforma?}\\[5pt]
+        \itemDesc{Suscripción SaaS (B2B)}{Planes mensuales y anuales (Plan Free, Plan Pro y Business).}
+        \itemDesc{Comisión por Señas / Pagos}{Pequeña comisión en pagos online por adelantado.}
+        \itemDesc{Promoción \& Visibilidad}{Destacado de comercios en los primeros resultados de búsqueda.}
+        \itemDesc{Módulos Premium}{Herramientas avanzadas de fidelización y marketing para negocios.}
+    };
+
+\end{tikzpicture}
+
+\end{document}

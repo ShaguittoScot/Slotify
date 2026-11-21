@@ -16,6 +16,16 @@ interface MonthViewProps {
 
 const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
+function formatSelectedDayTitle(date: Date): string {
+  const formatted = date.toLocaleDateString('es-ES', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return formatted ? formatted.charAt(0).toUpperCase() + formatted.slice(1) : '';
+}
+
 export const MonthView: React.FC<MonthViewProps> = ({
   selectedDate,
   timeZone,
@@ -107,53 +117,54 @@ export const MonthView: React.FC<MonthViewProps> = ({
             const hasSlots = slots.some((s) => isSameDay(toBusinessClock(s.startTime, timeZone), item.date));
 
             return (
-              <TouchableOpacity
-                key={idx}
-                style={[
-                  styles.dayCell,
-                  isSelected && [
-                    styles.dayCellSelected,
-                    {
-                      backgroundColor: isDark ? '#383838' : '#171717',
-                    },
-                  ],
-                  isToday && !isSelected && [
-                    styles.dayCellToday,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(99, 102, 241, 0.14)'
-                        : 'rgba(99, 102, 241, 0.08)',
-                      borderColor: isDark
-                        ? 'rgba(99, 102, 241, 0.35)'
-                        : 'rgba(99, 102, 241, 0.25)',
-                    },
-                  ],
-                ]}
-                onPress={() => onSelectDate(item.date)}
-                activeOpacity={0.75}
-              >
-                <Text
+              <View key={idx} style={styles.dayCellWrapper}>
+                <TouchableOpacity
                   style={[
-                    styles.dayCellText,
-                    { color: colors.text.primary },
-                    !item.isCurrentMonth && { color: colors.border.strong, opacity: 0.5 },
-                    isSelected && { color: '#FFFFFF', fontWeight: '800' },
+                    styles.dayCell,
+                    isSelected && [
+                      styles.dayCellSelected,
+                      {
+                        backgroundColor: isDark ? '#383838' : '#171717',
+                      },
+                    ],
+                    isToday && !isSelected && [
+                      styles.dayCellToday,
+                      {
+                        backgroundColor: isDark
+                          ? 'rgba(99, 102, 241, 0.14)'
+                          : 'rgba(99, 102, 241, 0.08)',
+                        borderColor: isDark
+                          ? 'rgba(99, 102, 241, 0.35)'
+                          : 'rgba(99, 102, 241, 0.25)',
+                      },
+                    ],
                   ]}
+                  onPress={() => onSelectDate(item.date)}
+                  activeOpacity={0.75}
                 >
-                  {item.date.getUTCDate()}
-                </Text>
+                  <Text
+                    style={[
+                      styles.dayCellText,
+                      { color: colors.text.primary },
+                      !item.isCurrentMonth && { color: colors.border.strong, opacity: 0.5 },
+                      isSelected && { color: '#FFFFFF', fontWeight: '800' },
+                    ]}
+                  >
+                    {item.date.getUTCDate()}
+                  </Text>
 
-                {/* Micro indicador de citas */}
-                <View
-                  style={[
-                    styles.slotDot,
-                    hasSlots && {
-                      backgroundColor: isSelected ? '#818CF8' : colors.text.muted,
-                    },
-                    !hasSlots && { backgroundColor: 'transparent' },
-                  ]}
-                />
-              </TouchableOpacity>
+                  {/* Micro indicador de citas */}
+                  <View
+                    style={[
+                      styles.slotDot,
+                      hasSlots && {
+                        backgroundColor: isSelected ? '#818CF8' : colors.text.muted,
+                      },
+                      !hasSlots && { backgroundColor: 'transparent' },
+                    ]}
+                  />
+                </TouchableOpacity>
+              </View>
             );
           })}
         </View>
@@ -163,12 +174,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
       <View style={styles.dayDetailContainer}>
         <View style={styles.detailHeader}>
           <Text style={[styles.detailTitle, { color: colors.text.primary }]}>
-            {selectedDate.toLocaleDateString('es-ES', {
-              timeZone: 'UTC',
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
+            {formatSelectedDayTitle(selectedDate)}
           </Text>
           <View
             style={[
@@ -231,20 +237,24 @@ const styles = StyleSheet.create({
   },
   weekHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-start',
     marginBottom: 8,
   },
   weekHeaderText: {
     fontSize: 12,
     fontWeight: '700',
-    width: 38,
+    width: '14.2857%',
     textAlign: 'center',
     letterSpacing: -0.2,
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around',
+  },
+  dayCellWrapper: {
+    width: '14.2857%',
+    alignItems: 'center',
+    marginVertical: 2,
   },
   dayCell: {
     width: 38,
@@ -252,7 +262,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    marginVertical: 2,
   },
   dayCellSelected: {
     shadowColor: '#000',
@@ -289,7 +298,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.3,
-    textTransform: 'capitalize',
   },
   countPill: {
     paddingHorizontal: 10,

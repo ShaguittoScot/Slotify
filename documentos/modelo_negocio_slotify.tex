@@ -1,0 +1,366 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm, headheight=14.5pt]{geometry}
+\usepackage[table]{xcolor}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, positioning, calc}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+% ==============================================================================
+% CONFIGURACIÓN DE COLORES DE MARCA (SLOTIFY BRAND)
+% ==============================================================================
+\definecolor{primaryDark}{HTML}{0F172A}    % Slate 900
+\definecolor{primaryBlue}{HTML}{2563EB}    % Blue 600
+\definecolor{accentTeal}{HTML}{0D9488}     % Teal 600
+\definecolor{lightGray}{HTML}{F8FAFC}      % Slate 50
+\definecolor{borderGray}{HTML}{CBD5E1}     % Slate 300
+\definecolor{textDark}{HTML}{1E293B}       % Slate 800
+\definecolor{textMuted}{HTML}{64748B}      % Slate 500
+
+% ==============================================================================
+% CONFIGURACIÓN DE HIPERVÍNCULOS
+% ==============================================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryBlue,
+    filecolor=accentTeal,
+    urlcolor=primaryBlue,
+    pdftitle={Slotify - Modelo de Negocio y Business Model Canvas},
+    pdfauthor={Equipo de Desarrollo y Negocio Slotify}
+}
+
+% ==============================================================================
+% FORMATO DE ENCABEZADOS Y PIE DE PÁGINA
+% ==============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{textMuted}{\footnotesize\textbf{Slotify} \textbar\ Modelo de Negocio y Business Model Canvas}}
+\fancyhead[R]{\textcolor{textMuted}{\footnotesize Versión 1.0}}
+\fancyfoot[C]{\textcolor{textMuted}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ==============================================================================
+% FORMATO DE TÍTULOS DE SECCIONES
+% ==============================================================================
+\titleformat{\section}
+    {\color{primaryDark}\normalfont\Large\bfseries}
+    {\color{primaryBlue}\thesection.}{0.8em}{}[\titlerule]
+
+\titleformat{\subsection}
+    {\color{primaryDark}\normalfont\large\bfseries}
+    {\color{accentTeal}\thesubsection.}{0.6em}{}
+
+\titleformat{\subsubsection}
+    {\color{textDark}\normalfont\normalsize\bfseries}
+    {\color{primaryBlue}\thesubsubsection.}{0.5em}{}
+
+% Comandos auxiliares para items destacados
+\newcommand{\bulletBlue}{\textcolor{primaryBlue}{\footnotesize$\blacksquare$}\ }
+\newcommand{\bulletTeal}{\textcolor{accentTeal}{\footnotesize$\blacksquare$}\ }
+\newcommand{\destacado}[2]{\noindent\bulletBlue\textbf{#1:} #2\par\vspace{3pt}}
+\newcommand{\destacadoTeal}[2]{\noindent\bulletTeal\textbf{#1:} #2\par\vspace{3pt}}
+
+\begin{document}
+
+% ==============================================================================
+% PORTADA PROFESIONAL Y ELEGANTE
+% ==============================================================================
+\begin{titlepage}
+    \pagecolor{lightGray}
+    \begin{tikzpicture}[remember picture, overlay]
+        % Franja lateral decorativa
+        \fill[primaryBlue] (current page.north west) rectangle ([xshift=1.2cm]current page.south west);
+        \fill[accentTeal] ([xshift=1.2cm]current page.north west) rectangle ([xshift=1.5cm]current page.south west);
+    \end{tikzpicture}
+
+    \vspace*{2.0cm}
+    \begin{flushleft}
+        \hspace*{1.2cm}
+        \begin{minipage}{0.88\textwidth}
+            {\Huge\textbf{\color{primaryDark} SLOTIFY}}\\[0.4cm]
+            {\Large\textbf{\color{primaryBlue} Plataforma Integral de Gestión de Reservas y Citas}}\\[0.2cm]
+            {\color{textMuted}\rule{\linewidth}{1.5pt}}\\[0.6cm]
+            {\LARGE\textbf{\color{textDark} Documento Maestro de Negocio,}}\\[0.2cm]
+            {\LARGE\textbf{\color{textDark} Propuesta de Valor y Business Model Canvas}}\\[2.0cm]
+            
+            \begin{tabular}{ll}
+                \textbf{\color{primaryDark} Proyecto:} & Slotify Ecosystem (Mobile App \& Backend API) \\[4pt]
+                \textbf{\color{primaryDark} Estado:} & Fase de Desarrollo Activa (MVP \& Sprint 1) \\[4pt]
+                \textbf{\color{primaryDark} Versión:} & 1.0 \\[4pt]
+                \textbf{\color{primaryDark} Fecha:} & \today \\[4pt]
+                \textbf{\color{primaryDark} Repositorio Móvil:} & \url{https://github.com/ShaguittoScot/Slotify} \\[4pt]
+                \textbf{\color{primaryDark} Repositorio Backend:} & \url{https://github.com/ShaguittoScot/Slotify_back} \\
+            \end{tabular}
+            
+            \vfill
+            \vspace{2.5cm}
+            {\footnotesize\color{textMuted} \copyright\ 2026 Slotify Team. Todos los derechos reservados.}
+        \end{minipage}
+    \end{flushleft}
+\end{titlepage}
+
+\nopagecolor
+\pagenumbering{roman}
+\newpage
+
+% ==============================================================================
+% ÍNDICE GENERAL
+% ==============================================================================
+\tableofcontents
+\newpage
+\pagenumbering{arabic}
+
+% ==============================================================================
+% SECCIÓN 1: INTRODUCCIÓN Y RESUMEN EJECUTIVO
+% ==============================================================================
+\section{Introducción y Resumen Ejecutivo}
+
+En la era digital contemporánea, los hábitos de consumo exigen inmediatez, transparencia y autonomía. A pesar de esto, una parte sustancial del sector de servicios de proximidad (estética, salud, deportes y servicios profesionales independientes) continúa operando con mecanismos arcaicos de reserva: llamadas telefónicas, agendas en papel o conversaciones informales en aplicaciones de mensajería como WhatsApp.
+
+Esta falta de modernización provoca ineficiencias severas: solapamiento de horarios, cancelaciones no notificadas a tiempo, pérdida de reservas fuera del horario laboral y una notable sobrecarga mental y administrativa para el prestador del servicio.
+
+\textbf{Slotify} surge como un ecosistema tecnológico integral de intermediación y gestión de citas que conecta fluidamente a dos actores clave:
+\begin{enumerate}
+    \item \textbf{Prestadores de Servicios (Comercios y Profesionales - B2B):} Dotándolos de una plataforma inteligente de automatización de agendas, control de personal, recordatorios multicanal y analíticas de negocio.
+    \item \textbf{Clientes Finales (Consumidores - B2C):} Ofreciéndoles una aplicación móvil moderna, rápida y atractiva donde descubrir comercios, consultar disponibilidad en tiempo real y asegurar su turno en menos de un minuto.
+\end{enumerate}
+
+\begin{center}
+    \fcolorbox{borderGray}{lightGray}{
+        \begin{minipage}{0.92\textwidth}
+            \vspace{5pt}
+            \textbf{\color{primaryBlue} Declaración de Impacto:}
+            \textit{Slotify transforma el agendamiento de servicios en un proceso 100\% automatizado, predecible y sin fricción, incrementando los ingresos de los negocios aliados y devolviendo tiempo de valor a ambas partes.}
+            \vspace{5pt}
+        \end{minipage}
+    }
+\end{center}
+
+---
+
+% ==============================================================================
+% SECCIÓN 2: IDENTIDAD CORPORATIVA
+% ==============================================================================
+\section{Identidad Corporativa y Quiénes Somos}
+
+\subsection{¿Quiénes Somos?}
+Slotify es una iniciativa de desarrollo de software enfocada en la creación de productos digitales de alto rendimiento. Nuestro equipo combina experiencia en ingeniería de software móvil con \textbf{React Native / Expo SDK 52} y arquitectura backend de grado empresarial con \textbf{.NET 8 Clean Architecture y PostgreSQL}.
+
+\subsection{Misión}
+Empoderar a profesionales independientes y empresas de servicios mediante herramientas digitales accesibles que automaticen su logística de turnos, reduzcan el ausentismo y maximicen su rentabilidad diaria.
+
+\subsection{Visión}
+Ser la plataforma líder de referencia en gestión y reserva de citas de servicios personales y profesionales en América Latina, caracterizada por su facilidad de uso, confiabilidad absoluta y calidad estética.
+
+\subsection{Valores Fundamentales}
+\begin{itemize}
+    \item \textbf{Excelencia en Experiencia de Usuario (UX/UI):} Creemos en interfaces elegantes, intuitivas y ágiles que enamoren al usuario desde el primer uso.
+    \item \textbf{Confiabilidad e Integridad de Datos:} Garantía de cero solapamientos de turnos y sincronización reactiva en tiempo real.
+    \item \textbf{Seguridad y Confidencialidad (*Zero Trust*):} Tratamiento estricto y cifrado de los datos personales y de transacciones financieras.
+    \item \textbf{Sostenibilidad y Escalabilidad:} Código limpio, arquitectura modular y modelos de negocio justos y transparentes.
+\end{itemize}
+
+---
+
+% ==============================================================================
+% SECCIÓN 3: EL PROBLEMA QUE ESTAMOS ATACANDO
+% ==============================================================================
+\section{Definición del Problema: Dolores del Mercado}
+
+\subsection{Dolores del Prestador de Servicios (Negocios / B2B)}
+\begin{enumerate}
+    \item \textbf{Impacto Económico del Ausentismo (*No-Show*):} Las inasistencias sin previo aviso representan pérdidas de hasta un 25\% de los ingresos brutos en sectores como barberías, spas y consultorios.
+    \item \textbf{Interrupción Continua del Flujo de Trabajo:} Contestar llamadas o responder mensajes de chat mientras se atiende a un cliente degrada la calidad del servicio presencial y satura al profesional.
+    \item \textbf{Invisibilidad Fuera de Horario Comercial:} Más del 40\% de las personas intentan reservar servicios por la noche o durante fines de semana, momentos en los cuales los comercios no atienden el teléfono.
+    \item \textbf{Falta de Información Estratégica:} Ausencia de reportes sobre horas de mayor demanda, índice de fidelización o servicios con mayor margen.
+\end{enumerate}
+
+\subsection{Dolores del Usuario Final (Clientes / B2C)}
+\begin{enumerate}
+    \item \textbf{Fricción en la Comunicación:} Esperas prolongadas para obtener una respuesta sobre horarios disponibles.
+    \item \textbf{Falta de Transparencia:} Incertidumbre respecto a precios actualizados, duración del servicio o reputación del profesional.
+    \item \textbf{Dificultad para Cancelar o Reprogramar:} Procesos incómodos que desincentivan la reprogramación ordenada.
+\end{enumerate}
+
+---
+
+% ==============================================================================
+% SECCIÓN 4: NUESTRA PROPUESTA DE SOLUCIÓN
+% ==============================================================================
+\section{Nuestra Solución: La Experiencia Slotify}
+
+Slotify integra una solución bidireccional y armónica:
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|X|X|}
+\hline
+\rowcolor{lightGray}
+\textbf{\color{primaryDark}Para Negocios (SaaS B2B)} & \textbf{\color{primaryDark}Para Usuarios Finales (App B2C)} \\
+\hline
+\destacadoTeal{Agenda Inteligente 24/7}{Citas agendadas automáticamente sin necesidad de contestar mensajes.} & 
+\destacado{Reserva en 3 Clics}{Exploración por categorías, selección de profesional y horario instantáneo.} \\
+\hline
+\destacadoTeal{Recordatorios Automatizados}{Notificaciones Push, WhatsApp y SMS para erradicar el olvido de citas.} & 
+\destacado{Sincronización Personal}{Integración directa con Google Calendar y Apple Calendar.} \\
+\hline
+\destacadoTeal{Gestión de Personal}{Organización de turnos, descansos y comisiones por cada empleado.} & 
+\destacado{Transparencia y Valoraciones}{Precios claros y sistema de calificaciones comunitarias verificadas.} \\
+\hline
+\destacadoTeal{Panel de Métricas}{Reportes financieros, tasa de ocupación y clientes más frecuentes.} & 
+\destacado{Historial y Favoritos}{Acceso inmediato a los comercios de confianza con un solo toque.} \\
+\hline
+\end{tabularx}
+\end{center}
+
+---
+
+% ==============================================================================
+% SECCIÓN 5: SEGMENTACIÓN DE CLIENTES Y MERCADO OBJETIVO
+% ==============================================================================
+\section{Segmentación de Clientes y Mercado Objetivo}
+
+\subsection{Segmento B2B (Oferta de Servicios)}
+\begin{itemize}
+    \item \textbf{Estética y Bienestar:} Barberías, peluquerías, salones de manicura, centros de depilación y spas.
+    \item \textbf{Salud Integral:} Consultorios de nutrición, psicología, fisioterapia y medicina alternativa.
+    \item \textbf{Deportes y Entretenimiento:} Canchas de fútbol 5, pádel, tenis y entrenadores personales.
+    \item \textbf{Servicios Especializados:} Estudios de tatuaje, estética vehicular (*detailing*), veterinarias y clases particulares.
+\end{itemize}
+
+\subsection{Segmento B2C (Demanda de Servicios)}
+\begin{itemize}
+    \item Consumidores de 18 a 55 años, usuarios habituales de smartphones, que valoran la puntualidad, la conveniencia y la eliminación de intermediarios telefónicos.
+\end{itemize}
+
+---
+
+% ==============================================================================
+% SECCIÓN 6: BUSINESS MODEL CANVAS DETALLADO
+% ==============================================================================
+\section{Business Model Canvas (Desglose Exhaustivo)}
+
+\subsection{1. Socios Clave (*Key Partners*)}
+\destacado{Pasarelas de Cobro Digital}{Stripe, Mercado Pago y PayPal para procesar señas y pagos en línea.}
+\destacado{Proveedores de Nube y Base de Datos}{Infraestructura cloud para alojar la API .NET 8 y bases de datos PostgreSQL con alta disponibilidad.}
+\destacado{APIs de Mensajería y Notificaciones}{Twilio (WhatsApp y SMS) y Firebase Cloud Messaging (Push Notifications).}
+\destacado{Comercios Pioneros (*Early Adopters*)}{Negocios de prueba para retroalimentación activa del producto.}
+
+\subsection{2. Actividades Clave (*Key Activities*)}
+\destacado{Ingeniería de Software}{Desarrollo iterativo de la app móvil y backend con arquitectura limpia.}
+\destacado{Control de Concurrencia}{Algoritmos atómicos que impiden el solapamiento de reservas simultáneas.}
+\destacado{Atención y Soporte B2B}{Acompañamiento en la carga inicial de catálogos y horarios.}
+\destacado{Marketing y Adquisición}{Campañas digitales segmentadas para sumar nuevos comercios y usuarios.}
+
+\subsection{3. Recursos Clave (*Key Resources*)}
+\destacado{Infraestructura y Código}{Repositorios de código fuente bajo estándares SOLID, servidores y bases de datos ACID.}
+\destacado{Equipo Multidisciplinario}{Desarrolladores de software, diseñadores de producto y especialistas en soporte.}
+\destacado{Activos de Información}{Datos agregados de oferta, demanda y tendencias de consumo.}
+
+\subsection{4. Propuesta de Valor (*Value Proposition*)}
+\destacado{Para Negocios (B2B)}{Reducción drástica del ausentismo, captación de citas fuera de horario laboral y profesionalización digital de la marca.}
+\destacado{Para Clientes (B2C)}{Comodidad extrema para agendar turnos al instante, transparencia en precios y recordatorios oportunos.}
+
+\subsection{5. Relaciones con Clientes (*Customer Relationships*)}
+\destacado{Autoservicio Automatizado}{Experiencia 100\% guiada para el usuario final y panel intuitivo para el comercio.}
+\destacado{Soporte Técnico Especializado}{Canal directo para comercios y resolución ágil de dudas.}
+\destacado{Confianza y Reputación}{Reseñas reales tras la culminación exitosa de cada servicio.}
+
+\subsection{6. Canales (*Channels*)}
+\destacado{Tiendas de Aplicaciones}{Google Play Store y Apple App Store para la app móvil.}
+\destacado{Sitio Web y Landing Page}{Página oficial con información del producto y registro de negocios.}
+\destacado{Redes Sociales y Pauta}{Estrategia de contenidos en Instagram, TikTok y LinkedIn.}
+
+\subsection{7. Segmentos de Clientes (*Customer Segments*)}
+\destacado{Prestadores B2B}{Comercios y profesionales de servicios que manejan agenda de turnos.}
+\destacado{Usuarios B2C}{Público general que consume servicios de salud, belleza, bienestar o deporte.}
+
+\subsection{8. Estructura de Costos (*Cost Structure*)}
+\destacado{Costos de Infraestructura Cloud}{Servidores de API, base de datos gestionada y certificados de seguridad.}
+\destacado{Costos Variables de APIs}{Tarifas por envío de mensajes SMS/WhatsApp y comisiones de pasarela.}
+\destacado{Adquisición de Clientes (CAC)}{Presupuesto de publicidad y marketing digital.}
+\destacado{Desarrollo y Mantenimiento}{Horas de ingeniería, licencias y herramientas de desarrollo.}
+
+\subsection{9. Fuentes de Ingresos (*Revenue Streams*)}
+\destacado{Suscripción SaaS B2B}{Cobro recurrente mensual o anual por uso de la plataforma según el tamaño del negocio.}
+\destacado{Comisiones por Seña o Pago Online}{Porcentaje mínimo en reservas pagadas por adelantado a través de la app.}
+\destacado{Posicionamiento Destacado}{Publicidad interna para visibilizar comercios en los primeros lugares de búsqueda.}
+
+---
+
+% ==============================================================================
+% SECCIÓN 7: ESTRUCTURA DE PLANES Y MONETIZACIÓN
+% ==============================================================================
+\section{Estrategia de Monetización y Planes SaaS}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|c|X|}
+\hline
+\rowcolor{primaryDark}
+\textbf{\color{white}Nivel de Plan} & \textbf{\color{white}Precio Estimado} & \textbf{\color{white}Beneficios y Funcionalidades} \\
+\hline
+\textbf{Plan Free (Starter)} & \$0 / mes & 
+Hasta 50 reservas/mes, 1 único profesional, catálogo básico de servicios, notificaciones push. \\
+\hline
+\textbf{Plan Pro (Negocios)} & \$19.99 / mes & 
+Reservas ilimitadas, hasta 5 profesionales, recordatorios automáticos WhatsApp/SMS, métricas de ventas y ocupación. \\
+\hline
+\textbf{Plan Enterprise} & \$49.99 / mes & 
+Múltiples sucursales, profesionales ilimitados, reportería financiera avanzada y soporte prioritario 24/7. \\
+\hline
+\end{tabularx}
+\end{center}
+
+---
+
+% ==============================================================================
+% SECCIÓN 8: ARQUITECTURA TECNOLÓGICA Y SEGURIDAD
+% ==============================================================================
+\section{Arquitectura Tecnológica y Estándares de Seguridad}
+
+\subsection{Frontend Móvil (React Native + Expo SDK 52)}
+\begin{itemize}
+    \item \textbf{Navegación Basada en Archivos:} Expo Router con tipado estricto en TypeScript.
+    \item \textbf{Patrón MVVM Reactivo:} Desacoplamiento total entre vista y lógica de datos, garantizando estabilidad ante rotaciones y cambios de ciclo de vida.
+    \item \textbf{Persistencia Segura:} Manejo de tokens y estados mediante almacenamiento protegido.
+\end{itemize}
+
+\subsection{Backend Empresarial (.NET 8 + PostgreSQL)}
+\begin{itemize}
+    \item \textbf{Clean Architecture \& Principios SOLID:} Separación nítida de responsabilidades en capas (Dominio, Aplicación, Infraestructura y API).
+    \item \textbf{Integridad Transaccional (ACID):} Control estricto de concurrencia para evitar la duplicidad de turnos.
+    \item \textbf{Seguridad Zero Trust:} Autenticación sin estado (*stateless*) mediante tokens JWT y validación exhaustiva de todas las peticiones en el servidor.
+\end{itemize}
+
+---
+
+% ==============================================================================
+% SECCIÓN 9: CONCLUSIONES Y PRÓXIMOS PASOS
+% ==============================================================================
+\section{Conclusiones y Próximos Pasos}
+
+Slotify se consolida como una propuesta de alto valor técnico y comercial. Al atacar directamente las ineficiencias del modelo tradicional de reservas y ofrecer una experiencia moderna tanto para negocios como para usuarios finales, la plataforma cuenta con un alto potencial de escalabilidad y adopción en el mercado.
+
+\subsection{Próximos Hitos del Roadmap:}
+\begin{enumerate}
+    \item Culminación del MVP funcional móvil y enlace completo con la API Backend.
+    \item Despliegue de fase piloto controlada con 15 comercios estratégicos.
+    \item Incorporación del módulo de cobro de señas y recordatorios automáticos por WhatsApp.
+    \item Apertura pública en tiendas Google Play Store y Apple App Store.
+\end{enumerate}
+
+\vspace{1.5cm}
+\begin{center}
+    {\color{textMuted}\rule{0.6\linewidth}{0.8pt}}\\[0.3cm]
+    \textbf{\color{primaryDark}Slotify: Tu tiempo, tus servicios, en un solo lugar.}
+\end{center}
+
+\end{document}

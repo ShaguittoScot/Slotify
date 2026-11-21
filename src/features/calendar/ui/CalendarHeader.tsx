@@ -284,12 +284,27 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           {/* Botón "+ Agendar" */}
           {onAddPress && (
             <TouchableOpacity
-              style={styles.addPillBtn}
+              style={[
+                styles.addPillBtn,
+                { backgroundColor: colors.action?.primary ?? (isDark ? '#FAFAFA' : '#09090B') },
+              ]}
               onPress={onAddPress}
               activeOpacity={0.8}
             >
-              <Feather name="plus" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.addPillText}>Agendar</Text>
+              <Feather
+                name="plus"
+                size={13}
+                color={colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF')}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.addPillText,
+                  { color: colors.action?.primaryText ?? (isDark ? '#09090B' : '#FFFFFF') },
+                ]}
+              >
+                Agendar
+              </Text>
             </TouchableOpacity>
           )}
         </View>

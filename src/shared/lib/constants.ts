@@ -24,6 +24,10 @@ export const API_ENDPOINTS = {
     LOGOUT: '/auth/logout',
     ME: '/auth/me',
   },
+  /** Onboarding de negocio */
+  ONBOARDING: {
+    COMPLETE_BUSINESS: '/onboarding/complete-business-onboarding',
+  },
   /** US-006: Selector de Giro Comercial / US-002: Plantillas por Sector */
   SECTOR_TEMPLATES: {
     GET_ALL: '/sector-templates',
@@ -49,6 +53,18 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/clients/${id}`,
     ARCHIVE: '/clients/archive',
     RESTORE: (id: string) => `/clients/${id}/restore`,
+  },
+  PUBLIC_BOOKING: {
+    GET_BUSINESS: (slug: string) => `/public/businesses/${encodeURIComponent(slug)}`,
+    AVAILABILITY: (slug: string) => `/public/businesses/${encodeURIComponent(slug)}/availability`,
+    CREATE_APPOINTMENT: (slug: string) => `/public/businesses/${encodeURIComponent(slug)}/appointments`,
+  },
+  CONSUMER: {
+    APPOINTMENTS: '/consumer/appointments',
+  },
+  /** Motor de notificaciones push */
+  NOTIFICATIONS: {
+    UPCOMING: '/notifications/upcoming',
   },
 } as const;
 

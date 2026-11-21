@@ -42,6 +42,7 @@ export interface AuthUser {
   role: 'DUENO' | 'EMPLEADO' | 'CLIENTE';
   businessId?: string;
   businessName?: string;
+  isOnboardingCompleted?: boolean;
 }
 
 /** Respuesta de login/register del backend */

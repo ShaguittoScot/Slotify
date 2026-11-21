@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Platform,
   Alert,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/shared/theme';
+import { AppModalSheet } from '@/components/ui/AppModalSheet';
 import { formatBusinessHour, scheduleInstant } from '@/features/calendar/model/businessTime';
 
 interface BlockSlotModalProps {
@@ -105,24 +104,14 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
   };
 
   return (
-    <Modal
+    <AppModalSheet
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      onClose={onClose}
+      dismissible={!isSaving}
+      keyboardAvoiding
     >
-      <View style={styles.overlay}>
-        <View
-          style={[
-            styles.modalContainer,
-            {
-              backgroundColor: isDark ? '#11131E' : '#FFFFFF',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-            },
-          ]}
-        >
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.border.main }]}>
             <View style={styles.headerTitleRow}>
               <View style={[styles.iconBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
                 <Feather name="slash" size={18} color="#EF4444" />
@@ -138,7 +127,7 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar bloqueo" disabled={isSaving}
               onPress={onClose} style={[styles.close, { backgroundColor: colors.background.primary, borderColor: colors.border.main }]}>
-              <Feather name="x" size={20} color={colors.text.muted} />
+              <Feather name="x" size={18} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -341,9 +330,7 @@ export const BlockSlotModal: React.FC<BlockSlotModalProps> = ({
               <Text style={styles.saveBtnText}>Confirmar Bloqueo</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
-    </Modal>
+    </AppModalSheet>
   );
 };
 

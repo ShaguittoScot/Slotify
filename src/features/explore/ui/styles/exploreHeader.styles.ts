@@ -8,7 +8,7 @@ export function createExploreHeaderStyles(colors: ThemeColors) {
       paddingTop: 10,
       paddingBottom: 12,
       borderBottomWidth: 1,
-      borderBottomColor: colors.isDark ? '#1E1E24' : colors.border.main,
+      borderBottomColor: colors.border.main,
       backgroundColor: colors.background.primary,
       gap: 12,
     },
@@ -27,7 +27,7 @@ export function createExploreHeaderStyles(colors: ThemeColors) {
       width: 6,
       height: 6,
       borderRadius: 3,
-      backgroundColor: '#6366F1',
+      backgroundColor: colors.text.accent,
     },
     tagLabel: {
       fontSize: 10,
@@ -52,8 +52,8 @@ export function createExploreHeaderStyles(colors: ThemeColors) {
       height: 44,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: colors.isDark ? '#24242C' : colors.border.main,
-      backgroundColor: colors.isDark ? '#121216' : colors.background.secondary,
+      borderColor: colors.border.main,
+      backgroundColor: colors.background.secondary,
       paddingHorizontal: 14,
       gap: 10,
     },
@@ -74,18 +74,18 @@ export function createExploreHeaderStyles(colors: ThemeColors) {
       borderWidth: 1,
     },
     categoryChipActive: {
-      backgroundColor: colors.isDark ? '#FAFAFA' : '#18181B',
-      borderColor: colors.isDark ? '#FAFAFA' : '#18181B',
+      backgroundColor: colors.action.primary,
+      borderColor: colors.action.primary,
     },
     categoryChipInactive: {
-      backgroundColor: colors.isDark ? '#121216' : colors.background.secondary,
-      borderColor: colors.isDark ? '#24242C' : colors.border.main,
+      backgroundColor: colors.background.secondary,
+      borderColor: colors.border.main,
     },
     categoryChipText: {
       fontSize: 12.5,
     },
     categoryChipTextActive: {
-      color: colors.isDark ? '#09090B' : '#FFFFFF',
+      color: colors.action.primaryText,
       fontWeight: '700',
     },
     categoryChipTextInactive: {

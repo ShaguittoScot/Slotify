@@ -20,19 +20,19 @@ import { ActivityIndicator, Pressable, StatusBar, StyleSheet, Text, View } from 
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/features/auth/model';
-import { useAppointmentNotifications } from '@/features/settings/model/appointmentNotifications';
+import { useNotificationEngine } from '@/features/notifications/model/engine';
 import { STORAGE_KEYS } from '@/shared/lib/constants';
 import { useAppTheme } from '@/shared/theme';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { colors, isDark, hydrateTheme } = useAppTheme();
+  const { colors, isDark, hydrateTheme, isHydrated: isThemeHydrated } = useAppTheme();
   const segments = useSegments();
   const router = useRouter();
 
-  const { isAuthenticated, isLoading, user, businessProfileStatus, error, appMode, hydrate, logout } = useAuthStore();
-  useAppointmentNotifications(isAuthenticated ? user : null);
+  const { isAuthenticated, isLoading, isHydrating, user, businessProfileStatus, error, syncError, appMode, hydrate, logout } = useAuthStore();
+  useNotificationEngine(isAuthenticated ? user : null);
 
   const [fontsLoaded] = useFonts({
     Poppins_500Medium,
@@ -50,17 +50,19 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && isThemeHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, isThemeHydrated]);
 
   useEffect(() => {
-    if (isLoading || !fontsLoaded) return;
+    const loading = isLoading || isHydrating;
+    if (loading || !fontsLoaded) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inMainGroup = segments[0] === '(main)';
-    const inBusinessSetup = segments[0] === '(onboarding)' && segments[1] === 'wizard';
+    const segList = segments as unknown as string[];
+    const inAuthGroup = segList[0] === '(auth)';
+    const inMainGroup = segList[0] === '(main)';
+    const inBusinessSetup = segList[0] === '(onboarding)' && segList[1] === 'wizard';
 
     if (!isAuthenticated && (inMainGroup || inBusinessSetup)) {
       router.replace('/(auth)');
@@ -68,7 +70,8 @@ export default function RootLayout() {
     }
 
     if (!isAuthenticated) return;
-    if (appMode === 'CONSUMER') {
+
+    if (segList[1] === 'register-client' || appMode === 'CONSUMER') {
       if (!inAuthGroup && !inBusinessSetup) return;
       let active = true;
       const routeToConsumer = (completed: string | null) => {
@@ -78,14 +81,39 @@ export default function RootLayout() {
         .then(routeToConsumer, () => routeToConsumer(null));
       return () => { active = false; };
     }
-    if (businessProfileStatus === 'needs-setup' && (inAuthGroup || inMainGroup)) {
-      router.replace('/(onboarding)/wizard');
-    } else if (businessProfileStatus === 'ready' && inAuthGroup) {
-      router.replace('/(main)');
-    }
-  }, [isAuthenticated, isLoading, businessProfileStatus, appMode, segments, fontsLoaded, router]);
 
-  if (isLoading || !fontsLoaded) {
+    // Modo Business (DUENO / EMPLEADO)
+    const isCompleted = businessProfileStatus === 'ready' || Boolean(user?.isOnboardingCompleted);
+    const needsSetup = businessProfileStatus === 'needs-setup' || (!isCompleted && !user?.businessId);
+
+    if (isCompleted) {
+      if (inAuthGroup || inBusinessSetup) {
+        router.replace('/(main)');
+      }
+    } else if (needsSetup) {
+      if (syncError) {
+        return;
+      }
+      if (inMainGroup || inAuthGroup) {
+        router.replace('/(onboarding)/wizard');
+      }
+    }
+  }, [
+    isAuthenticated,
+    isLoading,
+    isHydrating,
+    businessProfileStatus,
+    user?.isOnboardingCompleted,
+    user?.businessId,
+    appMode,
+    syncError,
+    segments,
+    fontsLoaded,
+    router,
+  ]);
+
+  const loading = isLoading || isHydrating;
+  if (loading || !fontsLoaded) {
     return (
       <View
         style={{
@@ -107,7 +135,7 @@ export default function RootLayout() {
           No pudimos verificar tu negocio
         </Text>
         <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.text.secondary }]}>
-          {error || 'Intenta consultar tu cuenta de nuevo.'}
+          {error || syncError || 'Intenta consultar tu cuenta de nuevo.'}
         </Text>
         <Pressable accessibilityRole="button" onPress={hydrate}
           style={[styles.retry, { backgroundColor: colors.action.primary }]}>

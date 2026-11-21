@@ -1,14 +1,25 @@
 import { StyleSheet } from 'react-native';
 import type { ThemeColors } from '@/shared/theme';
 
+interface BusinessCardBrandTokens {
+  onPrimaryText?: string;
+  primarySoftBg?: string;
+  primaryBorder?: string;
+}
+
 export function createBusinessCardStyles(
   colors: ThemeColors,
-  accentColor: string
+  accentColor: string,
+  brandTokens?: BusinessCardBrandTokens
 ) {
+  const onPrimaryText = brandTokens?.onPrimaryText ?? '#FFFFFF';
+  const primarySoftBg = brandTokens?.primarySoftBg ?? `${accentColor}16`;
+  const primaryBorder = brandTokens?.primaryBorder ?? `${accentColor}50`;
+
   return StyleSheet.create({
     card: {
-      backgroundColor: colors.isDark ? '#121216' : colors.background.secondary,
-      borderColor: colors.isDark ? '#22222A' : colors.border.main,
+      backgroundColor: colors.background.secondary,
+      borderColor: colors.border.main,
       borderRadius: 18,
       borderWidth: 1,
       padding: 16,
@@ -24,8 +35,8 @@ export function createBusinessCardStyles(
       height: 46,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: `${accentColor}50`,
-      backgroundColor: `${accentColor}16`,
+      borderColor: primaryBorder,
+      backgroundColor: primarySoftBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -34,7 +45,7 @@ export function createBusinessCardStyles(
       height: 46,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: `${accentColor}40`,
+      borderColor: primaryBorder,
       backgroundColor: colors.background.tertiary,
     },
     avatarText: {
@@ -80,7 +91,7 @@ export function createBusinessCardStyles(
     bookBtnText: {
       fontSize: 12,
       fontWeight: '700',
-      color: '#FFFFFF',
+      color: onPrimaryText,
     },
     servicesList: {
       flexDirection: 'row',
@@ -88,7 +99,7 @@ export function createBusinessCardStyles(
       gap: 8,
       paddingTop: 10,
       borderTopWidth: 1,
-      borderTopColor: colors.isDark ? '#1D1D24' : colors.border.light,
+      borderTopColor: colors.border.light,
     },
     serviceBadge: {
       flexDirection: 'row',
@@ -97,7 +108,7 @@ export function createBusinessCardStyles(
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 8,
-      backgroundColor: colors.isDark ? '#191920' : colors.background.tertiary,
+      backgroundColor: colors.background.tertiary,
     },
     serviceBadgeName: {
       fontSize: 12,
@@ -113,7 +124,7 @@ export function createBusinessCardStyles(
       paddingHorizontal: 8,
       paddingVertical: 5,
       borderRadius: 8,
-      backgroundColor: colors.isDark ? '#191920' : colors.background.tertiary,
+      backgroundColor: colors.background.tertiary,
       alignItems: 'center',
       justifyContent: 'center',
     },

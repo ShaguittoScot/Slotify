@@ -853,18 +853,19 @@ export default function SectorTemplatesScreen() {
             disabled={migrating}
             style={[
               styles.primaryActionButton,
+              { backgroundColor: colors.action.primary },
               migrating && { opacity: 0.7 }
             ]}
             activeOpacity={0.85}
           >
             {migrating ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.action.primaryText} />
             ) : (
               <>
-                <Text style={styles.primaryActionText}>
+                <Text style={[styles.primaryActionText, { color: colors.action.primaryText }]}>
                   {isMigrationMode ? 'Migrar Plantilla' : 'Aplicar Plantilla'} ({selectedServices.length} serv • {selectedAddonIds.length} extras • {activeModules.length} mod)
                 </Text>
-                <Feather name="arrow-right" size={18} color="#FFFFFF" />
+                <Feather name="arrow-right" size={18} color={colors.action.primaryText} />
               </>
             )}
           </TouchableOpacity>
@@ -877,8 +878,12 @@ export default function SectorTemplatesScreen() {
           animationType="fade"
           onRequestClose={() => setEditingServiceIndex(null)}
         >
-          <View style={styles.editModalOverlay}>
-            <View
+          <Pressable
+            style={styles.editModalOverlay}
+            onPress={() => setEditingServiceIndex(null)}
+          >
+            <Pressable
+              onPress={(e) => e.stopPropagation()}
               style={[
                 styles.modalCard,
                 {
@@ -891,8 +896,19 @@ export default function SectorTemplatesScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                   Personalizar Servicio
                 </Text>
-                <TouchableOpacity onPress={() => setEditingServiceIndex(null)}>
-                  <Feather name="x" size={20} color={colors.text.muted} />
+                <TouchableOpacity
+                  onPress={() => setEditingServiceIndex(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar modal de edición"
+                  style={[
+                    styles.modalCloseCircle,
+                    {
+                      backgroundColor: colors.background.primary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <Feather name="x" size={18} color={colors.text.secondary} />
                 </TouchableOpacity>
               </View>
 
@@ -928,13 +944,13 @@ export default function SectorTemplatesScreen() {
                       {
                         backgroundColor:
                           editServiceDuration === String(dur)
-                            ? 'rgba(224, 122, 95, 0.15)'
+                            ? colors.action.primary
                             : isDark
                               ? 'rgba(255,255,255,0.06)'
                               : '#F3F4F6',
                         borderColor:
                           editServiceDuration === String(dur)
-                            ? '#E07A5F'
+                            ? colors.action.primary
                             : isDark
                               ? 'rgba(255,255,255,0.1)'
                               : '#E5E7EB',
@@ -947,7 +963,7 @@ export default function SectorTemplatesScreen() {
                         {
                           color:
                             editServiceDuration === String(dur)
-                              ? '#E07A5F'
+                              ? colors.action.primaryText
                               : colors.text.primary,
                           fontWeight: editServiceDuration === String(dur) ? '700' : '500',
                         },
@@ -1022,13 +1038,15 @@ export default function SectorTemplatesScreen() {
 
                 <TouchableOpacity
                   onPress={handleSaveEditedService}
-                  style={styles.saveBtn}
+                  style={[styles.saveBtn, { backgroundColor: colors.action.primary }]}
                 >
-                  <Text style={styles.saveBtnText}>Guardar</Text>
+                  <Text style={[styles.saveBtnText, { color: colors.action.primaryText }]}>
+                    Guardar
+                  </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Pressable>
+          </Pressable>
         </Modal>
 
         {/* Modal para Agregar Nuevo Servicio */}
@@ -1038,8 +1056,12 @@ export default function SectorTemplatesScreen() {
           animationType="fade"
           onRequestClose={() => setShowAddModal(false)}
         >
-          <View style={styles.editModalOverlay}>
-            <View
+          <Pressable
+            style={styles.editModalOverlay}
+            onPress={() => setShowAddModal(false)}
+          >
+            <Pressable
+              onPress={(e) => e.stopPropagation()}
               style={[
                 styles.modalCard,
                 {
@@ -1052,8 +1074,19 @@ export default function SectorTemplatesScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
                   Nuevo Servicio
                 </Text>
-                <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                  <Feather name="x" size={20} color={colors.text.muted} />
+                <TouchableOpacity
+                  onPress={() => setShowAddModal(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar modal de nuevo servicio"
+                  style={[
+                    styles.modalCloseCircle,
+                    {
+                      backgroundColor: colors.background.primary,
+                      borderColor: colors.border.main,
+                    },
+                  ]}
+                >
+                  <Feather name="x" size={18} color={colors.text.secondary} />
                 </TouchableOpacity>
               </View>
 
@@ -1088,13 +1121,13 @@ export default function SectorTemplatesScreen() {
                       {
                         backgroundColor:
                           newServiceDuration === String(dur)
-                            ? 'rgba(224, 122, 95, 0.15)'
+                            ? colors.action.primary
                             : isDark
                               ? 'rgba(255,255,255,0.06)'
                               : '#F3F4F6',
                         borderColor:
                           newServiceDuration === String(dur)
-                            ? '#E07A5F'
+                            ? colors.action.primary
                             : isDark
                               ? 'rgba(255,255,255,0.1)'
                               : '#E5E7EB',
@@ -1107,7 +1140,7 @@ export default function SectorTemplatesScreen() {
                         {
                           color:
                             newServiceDuration === String(dur)
-                              ? '#E07A5F'
+                              ? colors.action.primaryText
                               : colors.text.primary,
                           fontWeight: newServiceDuration === String(dur) ? '700' : '500',
                         },
@@ -1171,13 +1204,15 @@ export default function SectorTemplatesScreen() {
 
                 <TouchableOpacity
                   onPress={handleAddNewService}
-                  style={styles.saveBtn}
+                  style={[styles.saveBtn, { backgroundColor: colors.action.primary }]}
                 >
-                  <Text style={styles.saveBtnText}>Agregar a Plantilla</Text>
+                  <Text style={[styles.saveBtnText, { color: colors.action.primaryText }]}>
+                    Agregar a Plantilla
+                  </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Pressable>
+          </Pressable>
         </Modal>
       </View>
     </SafeAreaView>
@@ -1458,6 +1493,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.3,
+  },
+  modalCloseCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fieldLabel: {
     fontSize: 11,

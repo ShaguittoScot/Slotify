@@ -4,42 +4,47 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAppTheme } from '@/shared/theme';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { useBusinessBrand } from '@/features/business-brand';
 import type { BusinessDto } from '../../types';
-import { isValidHexColor } from '../../model';
 import { createBusinessCardStyles } from '../styles/businessCard.styles';
 
 interface BusinessCardProps {
   business: BusinessDto;
-  onBook: (slug: string) => void;
+  onSelect?: (slug: string) => void;
+  onBook?: (slug: string) => void;
 }
 
-export function BusinessCard({ business, onBook }: BusinessCardProps) {
+export function BusinessCard({ business, onSelect, onBook }: BusinessCardProps) {
   const { colors } = useAppTheme();
   const [imageError, setImageError] = useState(false);
+
+  const handleAction = onSelect || onBook || (() => {});
+  const isDetailMode = Boolean(onSelect);
 
   const initial = business.name ? business.name.charAt(0).toUpperCase() : 'S';
   const category = business.category || 'Servicios';
   const services = business.services || [];
-  const accentColor = isValidHexColor(business.brandColor)
-    ? business.brandColor!
-    : '#6366F1';
-  const hasValidLogo = Boolean(
-    business.logoUrl && business.logoUrl.trim().length > 0 && !imageError
-  );
+  const brand = useBusinessBrand(business);
+  const hasValidLogo = Boolean(brand.logoUrl && !imageError);
 
   const styles = useMemo(
-    () => createBusinessCardStyles(colors, accentColor),
-    [colors, accentColor]
+    () =>
+      createBusinessCardStyles(colors, brand.primaryColor, {
+        onPrimaryText: brand.onPrimaryText,
+        primarySoftBg: brand.primarySoftBg,
+        primaryBorder: brand.primaryBorder,
+      }),
+    [colors, brand.primaryColor, brand.onPrimaryText, brand.primarySoftBg, brand.primaryBorder]
   );
 
   return (
     <Animated.View entering={FadeInDown.duration(380).springify()}>
       <AnimatedPressable
         style={styles.card}
-        onPress={() => onBook(business.slug)}
+        onPress={() => handleAction(business.slug)}
         accessible={true}
         accessibilityRole="button"
-        accessibilityLabel={`Negocio ${business.name}, categoría ${category}. Toca para reservar`}
+        accessibilityLabel={`Negocio ${business.name}, categoría ${category}. Toca para ${isDetailMode ? 'ver detalles' : 'reservar'}`}
       >
         {/* Cabecera limpia: Avatar + Nombre/Categoría + Acción */}
         <View style={styles.cardHeader}>
@@ -68,8 +73,14 @@ export function BusinessCard({ business, onBook }: BusinessCardProps) {
           </View>
 
           <View style={styles.bookBtn}>
-            <Text style={styles.bookBtnText}>Reservar</Text>
-            <Feather name="arrow-up-right" size={13} color="#FFFFFF" />
+            <Text style={styles.bookBtnText}>
+              {isDetailMode ? 'Ver detalles' : 'Reservar'}
+            </Text>
+            <Feather
+              name={isDetailMode ? 'arrow-right' : 'arrow-up-right'}
+              size={13}
+              color={brand.onPrimaryText}
+            />
           </View>
         </View>
 

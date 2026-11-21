@@ -13,24 +13,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useAuthStore } from '../model';
 import { useAppTheme, ThemeSettingsModal } from '@/shared/theme';
-import { useSectorTemplateStore } from '@/features/sector-templates';
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner';
+import { FormFieldError } from '@/components/ui/FormFieldError';
+import type { NormalizedError } from '@/shared/lib/errorUtils';
 
 type SelectedRole = 'CLIENTE' | 'NEGOCIO';
+type FormStatus = 'idle' | 'submitting' | 'error' | 'success';
 
 export const RegisterScreen = () => {
   const router = useRouter();
   const { colors, isDark, themeMode } = useAppTheme();
-  const { selectedCategory, onboardingResult } = useSectorTemplateStore();
 
   const register = useAuthStore((state) => state.register);
   const registerClient = useAuthStore((state) => state.registerClient);
   const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
   const setAppMode = useAuthStore((state) => state.setAppMode);
   const isLoading = useAuthStore((state) => state.isLoading);
-  const error = useAuthStore((state) => state.error);
+  const storeError = useAuthStore((state) => state.error);
+  const storeFormError = useAuthStore((state) => state.formError);
   const clearError = useAuthStore((state) => state.clearError);
 
   // Form State
@@ -41,62 +43,132 @@ export const RegisterScreen = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [businessName, setBusinessName] = useState(onboardingResult?.businessName || '');
   const [showThemeModal, setShowThemeModal] = useState(false);
+
+  // Estados de control y validación de formulario
+  const [formStatus, setFormStatus] = useState<FormStatus>('idle');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [localError, setLocalError] = useState<NormalizedError | string | null>(null);
 
   const isBusiness = role === 'NEGOCIO';
 
-  const isClientValid =
-    firstName.trim().length > 0 &&
-    email.trim().length > 0 &&
-    password.length >= 6;
-
-  const isBusinessValid =
-    firstName.trim().length > 0 &&
-    email.trim().length > 0 &&
-    password.length >= 6 &&
-    businessName.trim().length > 0 &&
-    phone.trim().length > 0;
-
-  const isFormValid = isBusiness ? isBusinessValid : isClientValid;
+  const clearFieldError = (fieldName: string) => {
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    }
+    if (localError || storeError) {
+      setLocalError(null);
+      clearError();
+      setFormStatus('idle');
+    }
+  };
 
   const handleRoleChange = (newRole: SelectedRole) => {
     clearError();
+    setLocalError(null);
+    setFieldErrors({});
+    setFormStatus('idle');
     setRole(newRole);
     setAppMode(newRole === 'NEGOCIO' ? 'BUSINESS' : 'CONSUMER');
   };
 
+  const validateFields = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const cleanFirstName = firstName.trim();
+    if (!cleanFirstName) {
+      errors.firstName = 'El nombre es obligatorio.';
+    }
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      errors.email = 'El correo electrónico es obligatorio.';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        errors.email = 'Ingresa un correo electrónico con formato válido.';
+      }
+    }
+
+    if (!password) {
+      errors.password = 'La contraseña es obligatoria.';
+    } else if (password.length < 6) {
+      errors.password = 'La contraseña debe tener al menos 6 caracteres.';
+    }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setLocalError({
+        title: 'Verifica los datos requeridos',
+        message: 'Por favor completa o corrige los campos señalados antes de continuar.',
+        category: 'VALIDATION',
+        fieldErrors: errors,
+      });
+      setFormStatus('error');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleRegister = async () => {
-    if (!isFormValid) return;
+    if (formStatus === 'submitting' || isLoading) return;
+
+    if (!validateFields()) {
+      return;
+    }
+
     try {
+      setFormStatus('submitting');
       clearError();
+      setLocalError(null);
+
       const sanitizedPhone = phone.trim() || undefined;
       const cleanFirstName = firstName.trim();
       const cleanLastName = lastName.trim();
+      const cleanEmail = email.trim().toLowerCase();
 
       if (isBusiness) {
         await register({
           firstName: cleanFirstName,
           lastName: cleanLastName,
           fullName: `${cleanFirstName} ${cleanLastName}`.trim(),
-          email: email.trim().toLowerCase(),
+          email: cleanEmail,
           password,
-          businessName: businessName.trim(),
-          businessPhone: sanitizedPhone,
-          sectorTemplateId: selectedCategory?.id ?? 1,
+          phone: sanitizedPhone,
         });
       } else {
         await registerClient({
           firstName: cleanFirstName,
           lastName: cleanLastName,
           fullName: `${cleanFirstName} ${cleanLastName}`.trim(),
-          email: email.trim().toLowerCase(),
+          email: cleanEmail,
           password,
           phone: sanitizedPhone,
         });
       }
-    } catch {
-      // Handled in store
+
+      setFormStatus('success');
+    } catch (err: any) {
+      setFormStatus('error');
+      const errObj: NormalizedError =
+        err && typeof err === 'object' && 'message' in err
+          ? err
+          : {
+              title: 'No se pudo guardar la información',
+              message: err?.message || 'Ocurrió un error al procesar el registro.',
+              category: 'UNKNOWN',
+            };
+
+      setLocalError(errObj);
+      if (errObj.fieldErrors) {
+        setFieldErrors((prev) => ({ ...prev, ...errObj.fieldErrors }));
+      }
     }
   };
 
@@ -104,15 +176,6 @@ export const RegisterScreen = () => {
     if (themeMode === 'system') return 'smartphone';
     return isDark ? 'moon' : 'sun';
   };
-
-  const generatedSlug =
-    businessName
-      .toLowerCase()
-      .trim()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'tu-negocio';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background.primary }]}>
@@ -161,7 +224,7 @@ export const RegisterScreen = () => {
             <Text style={[styles.title, { color: colors.text.primary }]}>Crea tu cuenta</Text>
             <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
               {isBusiness
-                ? 'Gestiona tu negocio y recibe citas sin fricción.'
+                ? 'Regístrate para comenzar a configurar tu negocio en Slotify.'
                 : 'Encuentra y agenda tus servicios favoritos en segundos.'}
             </Text>
           </View>
@@ -241,7 +304,7 @@ export const RegisterScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* FORMULARIO DINÁMICO */}
+          {/* Formulario */}
           <View
             style={[
               styles.formContainer,
@@ -251,21 +314,17 @@ export const RegisterScreen = () => {
               },
             ]}
           >
-            {error ? (
-              <View
-                style={[
-                  styles.errorBox,
-                  {
-                    backgroundColor: colors.status.errorBg,
-                    borderColor: colors.status.error,
-                  },
-                ]}
-              >
-                <Text style={[styles.errorText, { color: colors.status.error }]}>{error}</Text>
-              </View>
-            ) : null}
+            <FormErrorBanner
+              error={localError || storeFormError || storeError}
+              onDismiss={() => {
+                setLocalError(null);
+                clearError();
+                setFormStatus('idle');
+              }}
+              onRetry={handleRegister}
+            />
 
-            {/* Nombre y Apellido (Campos Separados) */}
+            {/* Nombre y Apellido */}
             <View style={styles.nameRow}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: 6 }]}>
                 <Text style={[styles.label, { color: colors.text.primary }]}>Nombre</Text>
@@ -275,15 +334,19 @@ export const RegisterScreen = () => {
                     {
                       backgroundColor: colors.background.tertiary,
                       color: colors.text.primary,
-                      borderColor: colors.border.main,
+                      borderColor: fieldErrors.firstName ? colors.status.error : colors.border.main,
                     },
                   ]}
                   placeholder="Ej. Juan"
                   placeholderTextColor={colors.text.muted}
                   value={firstName}
-                  onChangeText={setFirstName}
-                  editable={!isLoading}
+                  onChangeText={(val) => {
+                    setFirstName(val);
+                    clearFieldError('firstName');
+                  }}
+                  editable={formStatus !== 'submitting' && !isLoading}
                 />
+                <FormFieldError error={fieldErrors.firstName} />
               </View>
 
               <View style={[styles.inputGroup, { flex: 1, marginLeft: 6 }]}>
@@ -301,7 +364,7 @@ export const RegisterScreen = () => {
                   placeholderTextColor={colors.text.muted}
                   value={lastName}
                   onChangeText={setLastName}
-                  editable={!isLoading}
+                  editable={formStatus !== 'submitting' && !isLoading}
                 />
               </View>
             </View>
@@ -315,7 +378,7 @@ export const RegisterScreen = () => {
                   {
                     backgroundColor: colors.background.tertiary,
                     color: colors.text.primary,
-                    borderColor: colors.border.main,
+                    borderColor: fieldErrors.email ? colors.status.error : colors.border.main,
                   },
                 ]}
                 placeholder="tu@correo.com"
@@ -324,16 +387,20 @@ export const RegisterScreen = () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={email}
-                onChangeText={setEmail}
-                editable={!isLoading}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  clearFieldError('email');
+                }}
+                editable={formStatus !== 'submitting' && !isLoading}
               />
+              <FormFieldError error={fieldErrors.email} />
             </View>
 
-            {/* Teléfono */}
+            {/* Teléfono Personal */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text.primary }]}>
-                {isBusiness ? 'Teléfono del negocio' : 'Teléfono / WhatsApp'}
-                {!isBusiness && <Text style={{ color: colors.text.muted, fontWeight: '400' }}> (opcional)</Text>}
+                Teléfono
+                <Text style={{ color: colors.text.muted, fontWeight: '400' }}> (opcional)</Text>
               </Text>
               <TextInput
                 style={[
@@ -349,7 +416,7 @@ export const RegisterScreen = () => {
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
-                editable={!isLoading}
+                editable={formStatus !== 'submitting' && !isLoading}
               />
             </View>
 
@@ -361,7 +428,7 @@ export const RegisterScreen = () => {
                   styles.passwordContainer,
                   {
                     backgroundColor: colors.background.tertiary,
-                    borderColor: colors.border.main,
+                    borderColor: fieldErrors.password ? colors.status.error : colors.border.main,
                   },
                 ]}
               >
@@ -371,8 +438,11 @@ export const RegisterScreen = () => {
                   placeholderTextColor={colors.text.muted}
                   secureTextEntry={!showPassword}
                   value={password}
-                  onChangeText={setPassword}
-                  editable={!isLoading}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    clearFieldError('password');
+                  }}
+                  editable={formStatus !== 'submitting' && !isLoading}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -386,109 +456,25 @@ export const RegisterScreen = () => {
                   />
                 </TouchableOpacity>
               </View>
+              <FormFieldError error={fieldErrors.password} />
             </View>
-
-            {/* Campos de Negocio */}
-            {isBusiness && (
-              <Animated.View entering={FadeInDown.duration(200)} exiting={FadeOut.duration(150)}>
-                <View style={[styles.sectionDivider, { borderColor: colors.border.light }]}>
-                  <Text style={[styles.sectionDividerText, { color: colors.text.muted }]}>
-                    DATOS DEL ESTABLECIMIENTO
-                  </Text>
-                </View>
-
-                {/* Categoría Seleccionada */}
-                {selectedCategory && (
-                  <View
-                    style={[
-                      styles.sectorBadge,
-                      {
-                        backgroundColor: colors.background.tertiary,
-                        borderColor: colors.border.main,
-                      },
-                    ]}
-                  >
-                    <View style={styles.sectorBadgeLeft}>
-                      <MaterialCommunityIcons name={(selectedCategory.iconName as any) || 'storefront'} size={18} color={colors.action.primary} />
-                      <Text
-                        style={[
-                          styles.sectorBadgeText,
-                          { color: colors.text.primary, fontWeight: '600' },
-                        ]}
-                      >
-                        {selectedCategory.name}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => router.push('/(onboarding)/templates')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.sectorBadgeChange, { color: colors.action.primary }]}>
-                        Cambiar
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Nombre del Negocio */}
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: colors.text.primary }]}>Nombre del negocio</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.background.tertiary,
-                        color: colors.text.primary,
-                        borderColor: colors.border.main,
-                      },
-                    ]}
-                    placeholder="Ej. Barbería Elite"
-                    placeholderTextColor={colors.text.muted}
-                    value={businessName}
-                    onChangeText={setBusinessName}
-                    editable={!isLoading}
-                  />
-                  <View
-                    style={[
-                      styles.slugPreviewBox,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(99, 102, 241, 0.08)'
-                          : 'rgba(99, 102, 241, 0.05)',
-                        borderColor: isDark
-                          ? 'rgba(99, 102, 241, 0.20)'
-                          : 'rgba(99, 102, 241, 0.15)',
-                      },
-                    ]}
-                  >
-                    <Feather name="globe" size={13} color={colors.action.primary} />
-                    <Text style={[styles.slugPreviewText, { color: colors.text.secondary }]}>
-                      Enlace público:{' '}
-                      <Text style={{ fontWeight: '700', color: colors.action.primary }}>
-                        slotly.app/{generatedSlug}
-                      </Text>
-                    </Text>
-                  </View>
-                </View>
-              </Animated.View>
-            )}
 
             {/* Botón Principal de Envío */}
             <TouchableOpacity
               style={[
                 styles.button,
                 { backgroundColor: colors.action.primary },
-                (!isFormValid || isLoading) && { backgroundColor: colors.action.disabled },
+                (formStatus === 'submitting' || isLoading) && { backgroundColor: colors.action.disabled },
               ]}
               onPress={handleRegister}
-              disabled={!isFormValid || isLoading}
+              disabled={formStatus === 'submitting' || isLoading}
               activeOpacity={0.8}
             >
-              {isLoading ? (
+              {formStatus === 'submitting' || isLoading ? (
                 <ActivityIndicator color={colors.action.primaryText} />
               ) : (
                 <Text style={[styles.buttonText, { color: colors.action.primaryText }]}>
-                  {isBusiness ? 'Continuar a Configuración' : 'Crear Cuenta de Cliente'}
+                  {isBusiness ? 'Continuar a Configurar Negocio' : 'Crear Cuenta de Cliente'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -584,8 +570,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
   },
-
-  // Segmented Control
   segmentedContainer: {
     flexDirection: 'row',
     borderRadius: 100,
@@ -614,7 +598,6 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 13,
   },
-
   formContainer: {
     borderRadius: 22,
     padding: 20,
@@ -640,17 +623,6 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  sectionDivider: {
-    borderTopWidth: 1,
-    paddingTop: 16,
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  sectionDividerText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   inputGroup: {
     marginBottom: 14,
@@ -682,41 +654,6 @@ const styles = StyleSheet.create({
   eyeBtn: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  slugPreviewBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 6,
-  },
-  slugPreviewText: {
-    fontSize: 12,
-  },
-  sectorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  sectorBadgeLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectorBadgeText: {
-    fontSize: 13,
-  },
-  sectorBadgeChange: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   button: {
     borderRadius: 100,

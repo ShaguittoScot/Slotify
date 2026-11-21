@@ -1,10 +1,12 @@
-import { supabase } from '@/shared/lib/supabase';
-import { isAxiosError } from 'axios';
-import type { Session } from '@supabase/supabase-js';
 import { apiClient } from '@/shared/lib/api';
 import { API_ENDPOINTS, STORAGE_KEYS } from '@/shared/lib/constants';
 import { storage } from '@/shared/lib/storage';
+import { supabase } from '@/shared/lib/supabase';
+import type { ApiResponse, AuthResponse } from '@/shared/types';
+import type { Session } from '@supabase/supabase-js';
+import { isAxiosError } from 'axios';
 import type {
+  ExchangeTokenRequest,
   ExchangeTokenResponse,
   LoginCredentials,
   RegisterAdminRequest,
@@ -20,12 +22,64 @@ export function authRequestMessage(error: unknown, fallback: string): string {
   if (!error.response) {
     return 'No se pudo conectar con Slotify. Revisa tu conexión e inténtalo de nuevo.';
   }
-  return error.response.data?.error || fallback;
+  const backendError = typeof error.response.data === 'object' ? error.response.data?.error : undefined;
+  if (backendError) {
+    return backendError;
+  }
+  if (error.response.status >= 502 && error.response.status <= 504) {
+    return 'No se pudo conectar con el servidor de Slotify (502/503/504). Inténtalo de nuevo.';
+  }
+  return fallback;
 }
 
 export const authApi = {
   /**
-   * Sign in with Supabase Auth using email/password.
+   * Intercambiar identidad autenticada de Supabase (userId + email) por JWT propio de Slotify
+   * con claim businessId e información actualizada del negocio (OnboardingCompletedAt).
+   */
+  exchangeToken: async (request: ExchangeTokenRequest): Promise<ApiResponse<AuthResponse>> => {
+    const response = await apiClient.post<ApiResponse<AuthResponse>>(
+      API_ENDPOINTS.AUTH.LOGIN,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Intercambia la identidad autenticada de Supabase por el JWT propio de Slotify (.NET JwtService)
+   * que contiene el claim `businessId` requerido por los endpoints protegidos (US-022).
+   */
+  exchangeBackendToken: async (supabaseToken: string, userId: string) => {
+    let tokenData: ExchangeTokenResponse['data'];
+    try {
+      const response = await apiClient.post<ExchangeTokenResponse>(
+        API_ENDPOINTS.AUTH.LOGIN,
+        { userId, email: (await authApi.getSession())?.user.email || '' },
+        { headers: { Authorization: `Bearer ${supabaseToken}` } },
+      );
+      tokenData = response.data?.data;
+    } catch (error) {
+      if (isAxiosError<{ code?: string }>(error) && error.response?.status === 404 &&
+        error.response.data?.code === 'business_profile_missing') {
+        return null;
+      }
+      throw error;
+    }
+
+    if (tokenData?.accessToken && tokenData.user?.id === userId &&
+      (await authApi.getSession())?.user.id === userId) {
+      await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, tokenData.accessToken);
+      if (tokenData.refreshToken) {
+        await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, tokenData.refreshToken);
+      }
+      return tokenData;
+    }
+
+    throw new Error('Slotify no pudo confirmar el perfil de esta sesión.');
+  },
+
+  /**
+   * Iniciar sesión con Supabase Auth usando email/password.
    */
   login: async (credentials: LoginCredentials) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -38,40 +92,7 @@ export const authApi = {
   },
 
   /**
-   * Intercambia la identidad autenticada de Supabase por el JWT propio de Slotify (.NET JwtService)
-   * que contiene el claim `businessId` requerido por los endpoints protegidos (US-022).
-   */
-  exchangeBackendToken: async (supabaseToken: string, userId: string) => {
-    let tokenData: ExchangeTokenResponse['data'];
-    try {
-      const response = await apiClient.post<ExchangeTokenResponse>(
-        API_ENDPOINTS.AUTH.LOGIN,
-        undefined,
-        { headers: { Authorization: `Bearer ${supabaseToken}` } },
-      );
-      tokenData = response.data?.data;
-    } catch (error) {
-      if (isAxiosError<{ code?: string }>(error) && error.response?.status === 404 &&
-          error.response.data?.code === 'business_profile_missing') {
-        return null;
-      }
-      throw error;
-    }
-
-    if (tokenData?.accessToken && tokenData.user?.id === userId &&
-        (await authApi.getSession())?.user.id === userId) {
-      await storage.secureSet(STORAGE_KEYS.ACCESS_TOKEN, tokenData.accessToken);
-      if (tokenData.refreshToken) {
-        await storage.secureSet(STORAGE_KEYS.REFRESH_TOKEN, tokenData.refreshToken);
-      }
-      return tokenData;
-    }
-
-    throw new Error('Slotify no pudo confirmar el perfil de esta sesión.');
-  },
-
-  /**
-   * Sign in with Google using Supabase OAuth.
+   * Iniciar sesión con Google usando Supabase OAuth.
    */
   loginWithGoogle: async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -82,11 +103,12 @@ export const authApi = {
   },
 
   /**
-   * Register with Supabase Auth.
-   * Syncing with .NET backend is done separately in onboarding.
+   * Registrar identidad en Supabase Auth.
+   * La creación y configuración del negocio se realiza exclusivamente en business-onboarding.
    */
   register: async (request: RegisterAdminRequest) => {
-    const calculatedFullName = request.fullName || `${request.firstName} ${request.lastName}`.trim();
+    const calculatedFullName =
+      request.fullName || `${request.firstName} ${request.lastName}`.trim();
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
       password: request.password || '',
@@ -95,6 +117,7 @@ export const authApi = {
           first_name: request.firstName,
           last_name: request.lastName,
           full_name: calculatedFullName,
+          role: 'DUENO',
         },
       },
     });
@@ -105,10 +128,11 @@ export const authApi = {
   },
 
   /**
-   * Register a consumer client with Supabase Auth and synchronize with PostgreSQL clientes table.
+   * Registrar un cliente consumidor con Supabase Auth y sincronizar con la tabla clientes.
    */
   registerClient: async (request: RegisterClientRequest) => {
-    const calculatedFullName = request.fullName || `${request.firstName} ${request.lastName}`.trim();
+    const calculatedFullName =
+      request.fullName || `${request.firstName} ${request.lastName}`.trim();
     const { data, error } = await supabase.auth.signUp({
       email: request.email,
       password: request.password,
@@ -171,7 +195,7 @@ export const authApi = {
 
     const syncedData = response.data?.data;
     if (response.data?.success !== true || !syncedData?.accessToken || !syncedData.businessId ||
-        syncedData.id !== syncPayload.id || (await authApi.getSession())?.user.id !== syncPayload.id) {
+      syncedData.id !== syncPayload.id || (await authApi.getSession())?.user.id !== syncPayload.id) {
       throw new Error('Slotify no pudo confirmar el registro del negocio para esta sesión.');
     }
 
@@ -184,7 +208,7 @@ export const authApi = {
   },
 
   /**
-   * Sign out from Supabase Auth and clear Slotify JWT tokens.
+   * Cerrar sesión en Supabase Auth y limpiar tokens JWT.
    */
   logout: async () => {
     await storage.secureRemove(STORAGE_KEYS.ACCESS_TOKEN);
@@ -194,7 +218,7 @@ export const authApi = {
   },
 
   /**
-   * Get the current session from Supabase.
+   * Obtener la sesión activa actual de Supabase.
    */
   getSession: async () => {
     const { data, error } = await supabase.auth.getSession();

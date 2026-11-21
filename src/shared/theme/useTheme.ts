@@ -1,27 +1,47 @@
 import { create } from 'zustand';
 import { useColorScheme as useRNColorScheme } from 'react-native';
-import { lightColors, darkColors, ThemeColors, palette } from './colors';
-import { storage } from '@/shared/lib/storage';
+import {
+  ThemeColors,
+  VisualTheme,
+  palette,
+  getThemeColors,
+  slotifyLightColors,
+  slotifyDarkColors,
+} from './colors';
+
+function getStorage() {
+  return (require('@/shared/lib/storage') as typeof import('@/shared/lib/storage')).storage;
+}
 
 export type ThemeMode = 'system' | 'light' | 'dark';
+export type { VisualTheme };
 
-const THEME_STORAGE_KEY = 'slotify_theme_preference';
+const THEME_MODE_STORAGE_KEY = 'slotify_theme_preference';
+const VISUAL_THEME_STORAGE_KEY = 'slotify_visual_theme_preference';
 
 interface ThemeState {
   mode: ThemeMode;
+  visualTheme: VisualTheme;
   isHydrated: boolean;
   setMode: (mode: ThemeMode) => Promise<void>;
+  setVisualTheme: (theme: VisualTheme) => Promise<void>;
   toggleTheme: () => Promise<void>;
   hydrateTheme: () => Promise<void>;
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  mode: 'dark', // Estilo oscuro elegante (Obsidian Black) por defecto
+  mode: 'dark', // Estilo oscuro elegante por defecto
+  visualTheme: 'slotify', // Tema actual por defecto
   isHydrated: false,
 
   setMode: async (mode: ThemeMode) => {
     set({ mode });
-    await storage.set(THEME_STORAGE_KEY, mode);
+    await getStorage().set(THEME_MODE_STORAGE_KEY, mode);
+  },
+
+  setVisualTheme: async (visualTheme: VisualTheme) => {
+    set({ visualTheme });
+    await getStorage().set(VISUAL_THEME_STORAGE_KEY, visualTheme);
   },
 
   toggleTheme: async () => {
@@ -37,42 +57,65 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     }
 
     set({ mode: nextMode });
-    await storage.set(THEME_STORAGE_KEY, nextMode);
+    await getStorage().set(THEME_MODE_STORAGE_KEY, nextMode);
   },
 
   hydrateTheme: async () => {
     try {
-      const savedMode = await storage.get<ThemeMode>(THEME_STORAGE_KEY);
-      if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
-        set({ mode: savedMode, isHydrated: true });
-      } else {
-        set({ mode: 'dark', isHydrated: true });
-      }
+      const storage = getStorage();
+      const [savedMode, savedVisualTheme] = await Promise.all([
+        storage.get<ThemeMode>(THEME_MODE_STORAGE_KEY),
+        storage.get<VisualTheme>(VISUAL_THEME_STORAGE_KEY),
+      ]);
+
+      const validMode: ThemeMode =
+        savedMode === 'light' || savedMode === 'dark' || savedMode === 'system'
+          ? savedMode
+          : 'dark';
+
+      const validVisualTheme: VisualTheme =
+        savedVisualTheme === 'obsidian' ? 'obsidian' : 'slotify';
+
+      set({
+        mode: validMode,
+        visualTheme: validVisualTheme,
+        isHydrated: true,
+      });
     } catch {
-      set({ mode: 'dark', isHydrated: true });
+      set({ mode: 'dark', visualTheme: 'slotify', isHydrated: true });
     }
   },
 }));
 
 /**
- * Hook to consume current theme colors, dark/light state, and settings in any component
+ * Hook to consume current theme colors, dark/light state, visual identity, and settings in any component
  */
 export const useAppTheme = () => {
   const systemColorScheme = useRNColorScheme();
-  const { mode, setMode, toggleTheme, hydrateTheme, isHydrated } = useThemeStore();
+  const {
+    mode,
+    visualTheme,
+    setMode,
+    setVisualTheme,
+    toggleTheme,
+    hydrateTheme,
+    isHydrated,
+  } = useThemeStore();
 
   const isDark =
     mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
 
-  const colors: ThemeColors = isDark ? darkColors : lightColors;
+  const colors: ThemeColors = getThemeColors(visualTheme, isDark);
 
   return {
     colors,
     palette,
     isDark,
     themeMode: mode,
+    visualTheme,
     isHydrated,
     setThemeMode: setMode,
+    setVisualTheme,
     toggleTheme,
     hydrateTheme,
   };

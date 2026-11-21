@@ -23,7 +23,8 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { SymbolView } from 'expo-symbols';
+import { Feather } from '@expo/vector-icons';
+import { useAppTheme } from '@/shared/theme';
 import type { SectorCategory } from '../types';
 
 interface SectorTemplateCardProps {
@@ -34,22 +35,22 @@ interface SectorTemplateCardProps {
   index?: number;
 }
 
-type SymbolName = ComponentProps<typeof SymbolView>['name'];
+type FeatherIconName = ComponentProps<typeof Feather>['name'];
 
-function getSymbolConfig(iconName: string): SymbolName {
+function getFeatherIcon(iconName: string): FeatherIconName {
   switch (iconName) {
     case 'heart.fill':
-      return { ios: 'heart.fill', android: 'favorite', web: 'favorite' };
+      return 'heart';
     case 'sparkles':
-      return { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' };
+      return 'star';
     case 'figure.run':
-      return { ios: 'figure.run', android: 'directions_run', web: 'directions_run' };
+      return 'activity';
     case 'briefcase.fill':
-      return { ios: 'briefcase.fill', android: 'work', web: 'work' };
+      return 'briefcase';
     case 'square.grid.2x2':
-      return { ios: 'square.grid.2x2.fill', android: 'dashboard_customize', web: 'dashboard_customize' };
+      return 'layers';
     default:
-      return { ios: 'circle.grid.2x2.fill', android: 'category', web: 'category' };
+      return 'grid';
   }
 }
 
@@ -60,7 +61,9 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
   disabled = false,
   index = 0,
 }) => {
-  const symbolConfig = getSymbolConfig(category.iconName);
+  const { colors, isDark } = useAppTheme();
+  const iconName = getFeatherIcon(category.iconName);
+  const accentColor = category.isCustomCanvas ? '#10B981' : colors.action.primary;
 
   // Micro-interacción: escala de resorte al tocar
   const pressScale = useSharedValue(1);
@@ -136,9 +139,16 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
         onPress={() => onSelect(category)}
         style={[
           styles.cardContainer,
+          {
+            backgroundColor: isSelected
+              ? colors.background.secondary
+              : isDark
+                ? 'rgba(20, 20, 20, 0.88)'
+                : 'rgba(255, 255, 255, 0.85)',
+            borderColor: isSelected ? accentColor : colors.border.main,
+          },
           webGlassStyle,
-          isSelected && styles.cardSelected,
-          category.isCustomCanvas && isSelected && styles.cardCustomSelected,
+          isSelected && { shadowOpacity: 0.08, elevation: 3 },
           disabled && styles.cardDisabled,
         ]}
       >
@@ -146,7 +156,7 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
         <Animated.View
           style={[
             styles.glowBar,
-            category.isCustomCanvas && styles.glowBarCustom,
+            { backgroundColor: accentColor },
             animatedGlowBarStyle,
           ]}
         />
@@ -155,18 +165,20 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
         <View
           style={[
             styles.iconBadge,
-            isSelected ? styles.iconBadgeSelected : styles.iconBadgeDefault,
-            category.isCustomCanvas && isSelected && styles.iconBadgeCustomSelected,
+            {
+              backgroundColor: isSelected
+                ? category.isCustomCanvas
+                  ? 'rgba(16, 185, 129, 0.14)'
+                  : colors.background.tertiary
+                : colors.background.primary,
+              borderColor: isSelected ? accentColor : colors.border.main,
+            },
           ]}
         >
-          <SymbolView
-            name={symbolConfig}
-            size={22}
-            tintColor={
-              isSelected
-                ? (category.isCustomCanvas ? '#3F5B58' : '#C57747')
-                : '#AAACAD'
-            }
+          <Feather
+            name={iconName}
+            size={20}
+            color={isSelected ? accentColor : colors.text.muted}
           />
         </View>
 
@@ -174,7 +186,7 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
         <View style={styles.textContainer}>
           <View style={styles.headerRow}>
             <Text
-              style={[styles.title, isSelected && styles.titleSelected]}
+              style={[styles.title, { color: colors.text.primary }]}
               numberOfLines={1}
             >
               {category.name}
@@ -182,7 +194,7 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
 
           </View>
 
-          <Text style={styles.tagline} numberOfLines={1}>
+          <Text style={[styles.tagline, { color: colors.text.muted }]} numberOfLines={1}>
             {category.tagline}
           </Text>
         </View>
@@ -191,14 +203,20 @@ export const SectorTemplateCard: React.FC<SectorTemplateCardProps> = ({
         <View
           style={[
             styles.radioRing,
-            isSelected && styles.radioRingSelected,
-            category.isCustomCanvas && isSelected && styles.radioRingCustom,
+            {
+              borderColor: isSelected ? accentColor : colors.border.strong,
+              backgroundColor: isSelected
+                ? category.isCustomCanvas
+                  ? 'rgba(16, 185, 129, 0.12)'
+                  : colors.background.tertiary
+                : 'transparent',
+            },
           ]}
         >
           <Animated.View
             style={[
               styles.radioDot,
-              category.isCustomCanvas && styles.radioDotCustom,
+              { backgroundColor: accentColor },
               animatedRadioStyle,
             ]}
           />
